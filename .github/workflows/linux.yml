@@ -44,7 +44,7 @@ jobs:
           tool-cache: true
 
       - name: Clone.
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           submodules: recursive
           ref: ${{ env.TAGNAME }}
@@ -63,8 +63,8 @@ jobs:
           /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
           -D CMAKE_CONFIGURATION_TYPES=Release \
           -D CMAKE_INSTALL_PREFIX="/usr" \
-          -D TDESKTOP_API_ID=${{ secrets.API_ID }} \
-          -D TDESKTOP_API_HASH=${{ secrets.API_HASH }} \
+          -D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} \
+          -D TDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }} \
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON
 
       - name: Create Tar
@@ -79,7 +79,7 @@ jobs:
           path: out/install/KomaruGram-${{ env.TAGNAME }}.tar.zst
 
       - name: Upload artifact to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ env.TAGNAME }}
           tag_name: ${{ env.TAGNAME }}
