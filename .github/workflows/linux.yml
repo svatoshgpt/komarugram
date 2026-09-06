@@ -75,7 +75,7 @@ jobs:
           path: out/install/materialgram-${{ env.TAGNAME }}.tar.zst
 
       - name: Upload artifact to Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: ${{ env.TAGNAME }}
           tag_name: ${{ env.TAGNAME }}
