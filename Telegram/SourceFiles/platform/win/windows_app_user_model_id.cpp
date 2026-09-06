@@ -358,7 +358,7 @@ bool ValidateShortcut() {
 	}
 
 	if (cAlphaVersion()) {
-		path += u"AyuGramAlpha.lnk"_q;
+		path += u"KomaruGramAlpha.lnk"_q;
 		if (validateShortcutAt(path)) {
 			return true;
 		}
