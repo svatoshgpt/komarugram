@@ -1,3 +1,11 @@
+7.0.9 (KomaruGram)
+
+- KomaruGram: merge of materialgram (design) and AyuGram (features).
+- Material design, icons and palette from materialgram.
+- Ghost mode, message history, streamer mode, translator and more from AyuGram.
+- New Komaru cat app icon, KomaruGram branding throughout.
+- Auto-update disabled; releases are published on GitHub only.
+
 7.0.9 (05.08.26)
 
 - Add saving rich messages to HTML and importing them back.
