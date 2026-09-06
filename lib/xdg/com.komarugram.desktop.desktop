@@ -1,0 +1,22 @@
+[Desktop Entry]
+Name=KomaruGram
+Comment=Telegram Desktop fork with Material design and Ghost mode
+TryExec=KomaruGram
+Exec=KomaruGram -- %U
+Icon=com.komarugram.desktop
+Terminal=false
+StartupWMClass=KomaruGram
+Type=Application
+Categories=Chat;Network;InstantMessaging;Qt;
+MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;
+Keywords=tg;chat;im;messaging;messenger;sms;tdesktop;telegram;komarugram;ayugram;materialgram
+Actions=quit;
+DBusActivatable=true
+SingleMainWindow=true
+X-GNOME-UsesNotifications=true
+X-GNOME-SingleWindow=true
+
+[Desktop Action quit]
+Exec=KomaruGram -quit
+Name=Quit KomaruGram
+Icon=application-exit
