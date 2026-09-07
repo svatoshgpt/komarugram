@@ -43,11 +43,16 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include "base/random.h"
 
+// AyuGram includes
+#include "ayu/ayu_settings.h"
+#include "ayu/utils/telegram_helpers.h"
+
+
 namespace Data {
 namespace {
 
 constexpr auto kRefreshFullListEach = 60 * 60 * crl::time(1000);
-constexpr auto kPollEach = 7.5 * crl::time(1000);
+constexpr auto kPollEach = 15 * crl::time(1000);
 constexpr auto kSizeForDownscale = 64;
 constexpr auto kRecentRequestTimeout = 10 * crl::time(1000);
 constexpr auto kRecentReactionsLimit = 40;
@@ -1529,6 +1534,11 @@ void Reactions::send(not_null<HistoryItem*> item, bool addToRecent) {
 	)).done([=](const MTPUpdates &result) {
 		_sentRequests.remove(id);
 		_owner->session().api().applyUpdates(result);
+
+		const auto &ghost = AyuSettings::ghost(&_owner->session());
+		if (!ghost.sendReadMessages() && ghost.markReadAfterAction() && item) {
+			readHistory(item);
+		}
 	}).fail([=](const MTP::Error &error) {
 		_sentRequests.remove(id);
 	}).send();
@@ -1877,6 +1887,7 @@ void Reactions::sendPaidRequest(
 		return;
 	}
 
+	markReadAfterAction(item->history());
 	const auto id = item->fullId();
 	const auto randomId = base::unixtime::mtproto_msg_id();
 	auto &api = _owner->session().api();

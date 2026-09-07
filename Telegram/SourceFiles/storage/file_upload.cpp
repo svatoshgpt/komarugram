@@ -48,6 +48,9 @@ constexpr auto kDocumentUploadPartSize3 = 256 * 1024;
 // 512kb for large document ( <= 1500mb )
 constexpr auto kDocumentUploadPartSize4 = 512 * 1024;
 
+// One part each 200ms, if not uploaded faster.
+constexpr auto kUploadRequestInterval = crl::time(200);
+
 // How much time without upload causes additional session kill.
 constexpr auto kKillSessionTimeout = 15 * crl::time(1000);
 
@@ -152,6 +155,7 @@ bool Uploader::Entry::setPartSize(int partSize) {
 
 Uploader::Uploader(not_null<ApiWrap*> api)
 : _api(api)
+, _nextTimer([=] { maybeSend(); })
 , _stopSessionsTimer([=] { stopSessions(); }) {
 	const auto session = &_api->session();
 	photoReady(
@@ -358,7 +362,9 @@ void Uploader::upload(
 		}
 	}
 	_queue.push_back({ itemId, file });
-	maybeSend();
+	if (!_nextTimer.isActive()) {
+		maybeSend();
+	}
 }
 
 void Uploader::failed(FullMsgId itemId) {
@@ -669,6 +675,11 @@ void Uploader::maybeSend() {
 		if (_sentPerDcIndex[dcIndex] >= kAcceptAsFastIfTotalAtLeast) {
 			usedDcIndices.emplace(dcIndex);
 		}
+	}
+	if (usedDcIndices.empty()) {
+		_nextTimer.cancel();
+	} else {
+		_nextTimer.callOnce(kUploadRequestInterval);
 	}
 }
 
