@@ -80,25 +80,6 @@ void Tray::rebuildMenu() {
 	_tray.destroyMenu();
 	_tray.createMenu();
 
-	{
-		auto minimizeText = _textUpdates.events(
-		) | rpl::map([=] {
-			_activeForTrayIconAction = Core::App().isActiveForTrayMenu();
-			return _activeForTrayIconAction
-				? tr::lng_minimize_to_tray(tr::now)
-				: tr::lng_open_from_tray(tr::now).replace("Telegram", "KomaruGram");
-		});
-
-		_tray.addAction(
-			std::move(minimizeText),
-			[=] { 
-				_minimizeMenuItemClicks.fire({});
-				if (QApplication::keyboardModifiers() == (Qt::ShiftModifier | Qt::AltModifier)) {
-					Main::Session::debugFocus = true;
-				}
-			});
-	}
-
 	if (!Core::App().passcodeLocked()) {
 		auto notificationsText = _textUpdates.events(
 		) | rpl::map([=] {
