@@ -140,6 +140,30 @@ void BuildLinks(SectionBuilder &builder) {
 
 	builder.addSubsectionTitle(tr::ayu_LinksHeader());
 
+	const auto controller = builder.controller();
+
+	builder.addButton({
+		.id = u"ayu/channel"_q,
+		.title = tr::ayu_LinksChannel(),
+		.icon = { &st::menuIconChannel },
+		.label = rpl::single(QString("@komarugraminfo")),
+		.onClick = [=] {
+			controller->showPeerByLink(Window::PeerByLinkInfo{
+				.usernameOrId = QString("komarugraminfo"),
+			});
+		},
+	});
+	builder.addButton({
+		.id = u"ayu/chat"_q,
+		.title = tr::ayu_LinksChats(),
+		.icon = { &st::menuIconChats },
+		.label = rpl::single(QString("@komarugram")),
+		.onClick = [=] {
+			controller->showPeerByLink(Window::PeerByLinkInfo{
+				.usernameOrId = QString("komarugram"),
+			});
+		},
+	});
 	builder.addButton({
 		.id = u"ayu/github"_q,
 		.title = rpl::single(QString("GitHub")),
