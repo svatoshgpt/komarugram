@@ -1302,7 +1302,7 @@ void BuildMaterialgramSection(SectionBuilder &builder) {
 	builder.addSkip();
 	builder.addSubsectionTitle({
 		.id = u"advanced/materialgram"_q,
-		.title = rpl::single(u"materialgram"_q),
+		.title = rpl::single(u"KomaruGram"_q),
 		.keywords = { u"materialgram"_q },
 	});
 

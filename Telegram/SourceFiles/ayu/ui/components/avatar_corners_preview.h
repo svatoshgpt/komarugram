@@ -32,12 +32,7 @@ protected:
 	void mouseReleaseEvent(QMouseEvent *e) override;
 
 private:
-	void resolveChannel();
-	void subscribeToUpdates();
-
 	const not_null<Window::SessionController*> _controller;
 	Ui::EmptyUserpic _emptyUserpic;
-	PeerData *_peer = nullptr;
-	Ui::PeerUserpicView _userpicView;
 	std::unique_ptr<Ui::RippleAnimation> _ripple;
 };

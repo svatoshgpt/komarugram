@@ -383,7 +383,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_edit_caption_voice" = "Sorry, you can't edit messages when you have an unsent voice message.";
 
 "lng_intro_about" = "Welcome to the official Telegram Desktop app.\nIt's fast and secure.";
-"lng_materialgram_intro_about" = "Thanks for installing!\nNew releases are available in @materialgram channel or on GitHub";
+"lng_materialgram_intro_about" = "Thanks for installing!\nNew releases are available on GitHub";
 "lng_start_msgs" = "Start Messaging";
 
 "lng_intro_next" = "Next";
@@ -1326,7 +1326,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "lng_settings_faq" = "Telegram FAQ";
 "lng_settings_faq_subtitle" = "FAQ";
 "lng_settings_faq_link" = "https://telegram.org/faq#general-questions";
-"lng_materialgram_settings_channel" = "@materialgram";
+"lng_materialgram_settings_channel" = "KomaruGram";
 "lng_materialgram_settings_github" = "GitHub Releases";
 "lng_settings_features" = "Telegram Features";
 "lng_settings_credits" = "My Stars";
@@ -8951,7 +8951,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SuggestGhostModeStoryActionTextNo" = "No";
 "ayu_FirstLaunchAlert" = "KomaruGram is **free** software. You assume **full responsibility** for using this application with your account.";
 "ayu_LocalPremiumAlert" = "With local Telegram Premium, you won't get increased limits or be able to send animated emojis. Other users won't see your premium emoji and quote color.";
-"ayu_ExteraChatsAlert" = "Don't ask questions related to **AyuGram** in **exteraGram** chats. If you need help, ask in the official **AyuGram** chat.";
+"ayu_ExteraChatsAlert" = "Don't ask questions related to **KomaruGram** in **exteraGram** chats. If you need help, ask in the official **KomaruGram** chat.";
 "ayu_HideNextViewsDescriptionAyu" = "Hide my views forever, until Ghost Mode is disabled.";
 "ayu_EnableGhostModeStories" = "Enable Ghost Mode";
 "ayu_GhostModeIsActive" = "Ghost Mode is Active";
@@ -9028,11 +9028,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_InvalidConnectionLayerNote" = "You should re-login due to an error during the update.";
 "ayu_LocalPremiumNotice" = "You're using **local** Telegram Premium.\nIt **won't** give you any benefits.\n**Enjoy the star near your nickname!**";
 "ayu_DeveloperPopup" = "**{item}** is a member of the **exteraGram** development team.";
-"ayu_SupporterPopup" = "**{item}** supported the development of **exteraGram** or **AyuGram** and received an unique badge.";
-"ayu_OfficialResourcePopup" = "**{item}** is the official resource of **exteraGram** or **AyuGram**.";
+"ayu_SupporterPopup" = "**{item}** supported the development of **exteraGram** or **KomaruGram** and received an unique badge.";
+"ayu_OfficialResourcePopup" = "**{item}** is the official resource of **exteraGram** or **KomaruGram**.";
 "ayu_MutualContactInfo" = "This contact is mutual.";
 "ayu_SessionInfoOfficialApp" = "Official app";
-"ayu_SettingsWatermark" = "KomaruGram is a fork of AyuGram + materialgram.";
+"ayu_SettingsWatermark" = "KomaruGram";
 "ayu_SettingsDescription" = "Telegram Desktop fork focused on customization and ToS-breaking features.";
 "ayu_ConfirmationSticker" = "Do you want to send this sticker?";
 "ayu_ConfirmationGIF" = "Do you want to send this GIF?";

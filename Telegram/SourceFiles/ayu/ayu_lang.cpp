@@ -33,6 +33,16 @@ constexpr auto postfixes = {
 	"other"
 };
 
+// KomaruGram: the upstream language pack is AyuGram-branded and overrides the
+// locally compiled strings, so rebrand every fetched value before applying it.
+QString RebrandValue(QString value) {
+	value.replace(qsl("AyuGram Releases"), qsl("KomaruGram"));
+	value.replace(qsl("AyuGram"), qsl("KomaruGram"));
+	value.replace(qsl("ayugram"), qsl("komarugram"));
+	value.replace(qsl("materialgram"), qsl("KomaruGram"));
+	return value;
+}
+
 AyuLanguage *AyuLanguage::instance = nullptr;
 
 AyuLanguage::AyuLanguage() = default;
@@ -180,6 +190,7 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 	for (const QString &brokenKey : json.keys()) {
 		auto key = qsl("ayu_") + brokenKey;
 		auto val = json.value(brokenKey).toString().replace(qsl("&amp;"), qsl("&"));
+		val = RebrandValue(val);
 
 		if (key.endsWith("_Android")) {
 			continue;
