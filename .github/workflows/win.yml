@@ -174,6 +174,17 @@ jobs:
           path: ${{ env.TBUILD }}\Libraries
           key: ${{ runner.OS }}-${{ matrix.arch }}-libs-${{ env.CACHE_KEY }}
 
+      - name: Build cache.
+        id: cache-build
+        if: env.ONLY_CACHE == 'false'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
+          key: ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-
+            ${{ runner.OS }}-${{ matrix.arch }}-build-
+
       - name: KomaruGram build.
         if: env.ONLY_CACHE == 'false'
         run: |
@@ -189,6 +200,18 @@ jobs:
           %TDESKTOP_BUILD_DEFINE%
 
           cmake --build ..\out --config MinSizeRel --parallel 1 -- /p:CL_MPCount=3 /p:UseMultiToolTask=true /p:EnforceProcessCountAcrossBuilds=true
+
+      - name: Build cache size.
+        if: env.ONLY_CACHE == 'false'
+        shell: bash
+        run: du -sm TBuild/$REPO_NAME/out || true
+
+      - name: Save build cache.
+        if: env.ONLY_CACHE == 'false'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
+          key: ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-${{ github.sha }}
 
       - name: Move artifact.
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
