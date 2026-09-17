@@ -14,6 +14,7 @@
 #include "ayu/ui/settings/settings_main.h"
 #include "boxes/peer_list_box.h"
 #include "core/application.h"
+#include "core/version.h"
 #include "data/data_user.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
@@ -700,7 +701,7 @@ const auto kMeta = BuildHelper({
 } // namespace
 
 rpl::producer<QString> AyuGhost::title() {
-	return rpl::single(QString("AyuGram"));
+	return rpl::single(AppName.utf16());
 }
 
 AyuGhost::AyuGhost(
