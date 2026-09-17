@@ -18,6 +18,9 @@
 #include "ui/effects/ripple_animation.h"
 #include "window/window_session_controller.h"
 
+#include <QSvgRenderer>
+#include <QPainterPath>
+
 namespace {
 
 constexpr auto kPreviewName = "KomaruGram";
@@ -34,11 +37,14 @@ AvatarCornersPreview::AvatarCornersPreview(
 	Ui::EmptyUserpic::UserpicColor(
 		Data::DecideColorIndex(
 			peerFromChannel(ChannelId(2331068091)))),
-	QString::fromUtf8(kPreviewName)) {
+	QString::fromUtf8(kPreviewName))
+, _logo(std::make_unique<QSvgRenderer>(u":/gui/icons/komarugram.svg"_q)) {
 	const auto &row = st::defaultDialogRow;
 	setFixedHeight(row.height);
 	setCursor(Qt::PointingHandCursor);
 }
+
+AvatarCornersPreview::~AvatarCornersPreview() = default;
 
 void AvatarCornersPreview::paintEvent(QPaintEvent *e) {
 	auto p = Painter(this);
@@ -60,7 +66,23 @@ void AvatarCornersPreview::paintEvent(QPaintEvent *e) {
 	}
 
 	// Mirror the avatar corners setting this preview exists to demonstrate.
-	if (AyuUserpic::IsCircle()) {
+	if (_logo && _logo->isValid()) {
+		const auto target = QRectF(userpicX, userpicY, photoSize, photoSize);
+		auto shape = QPainterPath();
+		if (AyuUserpic::IsCircle()) {
+			shape.addEllipse(target);
+		} else if (const auto r = AyuUserpic::ComputeRadiusF(photoSize)
+			; r > 0.) {
+			shape.addRoundedRect(target, r, r);
+		} else {
+			shape.addRect(target);
+		}
+		auto hq = PainterHighQualityEnabler(p);
+		p.save();
+		p.setClipPath(shape);
+		_logo->render(&p, target);
+		p.restore();
+	} else if (AyuUserpic::IsCircle()) {
 		_emptyUserpic.paintCircle(p, userpicX, userpicY, width(), photoSize);
 	} else if (const auto radius = AyuUserpic::ComputeRadius(photoSize)) {
 		_emptyUserpic.paintRounded(
