@@ -153,6 +153,7 @@ TopBarWidget::TopBarWidget(
 	_forward->setFullRadius(true);
 	_sendNow->setFullRadius(true);
 	_delete->setFullRadius(true);
+	_messageShot->setFullRadius(true);
 
 	Lang::Updated(
 	) | rpl::on_next([=] {
