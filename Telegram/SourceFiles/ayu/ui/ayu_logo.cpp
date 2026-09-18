@@ -52,6 +52,19 @@ QImage CreateImage(const QString &name, const QSize resultImageSize, const int p
 		res.fill(Qt::transparent);
 		{
 			auto p = QPainter(&res);
+
+			// Clip to the same circle the SVG branch uses, otherwise PNG-based
+			// icons render as squares next to the round ones.
+			QPainterPath path;
+			path.addRoundedRect(
+				QRect(padding, padding, iconSize.width(), iconSize.height()),
+				iconSize.width() / 2.0f,
+				iconSize.height() / 2.0f
+			);
+			p.setRenderHint(QPainter::Antialiasing, true);
+			p.setRenderHint(QPainter::SmoothPixmapTransform, true);
+			p.setClipPath(path);
+
 			p.drawImage(QRect(padding, padding, iconSize.width(), iconSize.height()), loaded);
 		}
 		return res;
@@ -59,7 +72,10 @@ QImage CreateImage(const QString &name, const QSize resultImageSize, const int p
 
 	const auto svgPath = qsl(":/gui/art/ayu/%1/app.svg").arg(name);
 	if (!QFile::exists(svgPath)) {
-		return {};
+		// A settings file may still name an icon that no longer ships.
+		return (name == DEFAULT_ICON)
+			? QImage()
+			: CreateImage(DEFAULT_ICON, resultImageSize, padding);
 	}
 
 	auto svg = QSvgRenderer(svgPath);
