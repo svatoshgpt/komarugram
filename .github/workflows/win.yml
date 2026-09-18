@@ -109,8 +109,8 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ env.TBUILD }}\Libraries
-          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-
+          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
+          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-
 
       - name: Libraries.
         run: |
@@ -158,7 +158,7 @@ jobs:
 
       - name: Free up some disk space.
         shell: bash
-        run: find TBuild/Libraries '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -path '*/include/*'  -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete
+        run: find TBuild/Libraries '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name 'Makefile' -o -name '*.pc' -o -path '*/include/*'  -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete
 
       - name: Save ThirdParty cache.
         if: steps.cache-third-party.outputs.cache-hit != 'true'
@@ -172,7 +172,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: ${{ env.TBUILD }}\Libraries
-          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-${{ env.CACHE_KEY }}
+          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
 
       - name: Build cache.
         id: cache-build
