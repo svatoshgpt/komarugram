@@ -135,7 +135,10 @@ void AddCryptoDonate(
 	});
 }
 
-void BuildDonations(SectionBuilder &builder) {
+// Not wired into the section tree: the badge these details buy is handed
+// out by the upstream project, not by us. Kept for whenever there is
+// something of our own to put behind it.
+[[maybe_unused]] void BuildDonations(SectionBuilder &builder) {
 	builder.add([](const BuildContext &ctx) {
 		v::match(ctx, [&](const WidgetContext &wctx) {
 			const auto container = wctx.container;
@@ -220,7 +223,7 @@ const auto kMeta = BuildHelper({
 	auto ayu = AyuSectionBuilder(builder);
 
 	builder.addSkip();
-	BuildDonations(builder);
+	// BuildDonations() is deliberately not called -- see its definition.
 	BuildCrashReporting(builder, ayu);
 	BuildOtherThings(builder);
 });

@@ -15,7 +15,6 @@
 #include "ayu/data/entities.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
-#include "ayu/ui/boxes/donate_info_box.h"
 #include "ayu/ui/toasts.h"
 #include "ayu/utils/rc_manager.h"
 #include "core/core_settings.h"
@@ -272,24 +271,7 @@ Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
 			.adaptive = true,
 			.duration = 3 * crl::time(1000),
 		};
-		if (badge.badge == Info::Profile::BadgeType::ExteraSupporter) {
-			Ayu::Ui::ShowToastWithAction(
-				std::move(config),
-				tr::lng_collectible_learn_more(tr::now),
-				[=] {
-					const auto window = Core::App().activeWindow();
-					const auto controller = window
-						? window->sessionController()
-						: nullptr;
-					if (!controller) {
-						return;
-					}
-					controller->show(Box(Ui::FillDonateInfoBox, controller));
-					window->activate();
-				});
-		} else {
-			Ui::Toast::Show(std::move(config));
-		}
+		Ui::Toast::Show(std::move(config));
 	};
 }
 
