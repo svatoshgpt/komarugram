@@ -35,6 +35,12 @@ constexpr auto postfixes = {
 
 // KomaruGram: the upstream language pack is AyuGram-branded and overrides the
 // locally compiled strings, so rebrand every fetched value before applying it.
+// KomaruGram: strings we write ourselves. The remote pack still ships the
+// AyuGram wording for these keys, so its values are dropped on the floor.
+bool IsLocallyOwned(const QString &key) {
+	return (key == qsl("ayu_SettingsDescription"));
+}
+
 QString RebrandValue(QString value) {
 	value.replace(qsl("AyuGram Releases"), qsl("KomaruGram"));
 	value.replace(qsl("AyuGram"), qsl("KomaruGram"));
@@ -215,6 +221,10 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 			val = val.replace(qsl("%1$s"), qsl("{item}"));
 		} else if (val.contains(qsl("%1$s")) && val.contains(qsl("%2$s"))) {
 			val = val.replace(qsl("%1$s"), qsl("{item1}")).replace(qsl("%2$s"), qsl("{item2}"));
+		}
+
+		if (IsLocallyOwned(key)) {
+			continue;
 		}
 
 		Lang::GetInstance().resetValue(key.toUtf8());

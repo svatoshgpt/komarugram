@@ -30,7 +30,6 @@
 #include "window/window_session_controller.h"
 #include "window/themes/window_theme.h"
 
-#include <QDesktopServices>
 #include <QGuiApplication>
 #include <QSvgRenderer>
 
@@ -142,20 +141,7 @@ void BuildDonations(SectionBuilder &builder) {
 			const auto container = wctx.container;
 
 			AddSubsectionTitle(container, tr::ayu_SupportHeader());
-			AddDonate(
-				AddButtonWithIcon(
-					container,
-					rpl::single(QString("Boosty")),
-					st::settingsButton),
-				"boosty"
-			)->setClickedCallback([=] {
-				QDesktopServices::openUrl(QString("https://boosty.to/alexeyzavar"));
-			});
-			AddCryptoDonate("TON", QString("UQA4i8U8vP3mYUZSV3KqDQEHPwmhninEqCkkKc7BITQ652de"), container);
-			AddCryptoDonate("Bitcoin", QString("bc1qdk6qq4mzq5yap3fpy0qau3246w3m3uwac9f0xd"), container);
-			AddCryptoDonate("Ethereum", QString("0x405589857C8DFAb45B2027c68ad1e58877FDa347"), container);
-			AddCryptoDonate("Solana", QString("8ZHQpPxpsdRjsWoBcF1dmvRM5dB6zEhJ3jMBFZjYfyHs"), container);
-			AddCryptoDonate("Tron", QString("TRpbajq38qU8joThgAfKJLyEPbNjzsdPJ1"), container);
+			AddCryptoDonate("Gram", QString("UQAirl_g-9BqSSTGqcX0LHGEyhN_ewZ0ucNakXGrw-h9tMY4"), container);
 			AddSkip(container);
 
 			AddDividerText(container,
