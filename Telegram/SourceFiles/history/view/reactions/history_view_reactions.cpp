@@ -639,7 +639,7 @@ void InlineList::paint(
 	}
 	if (!animations.empty()
 		&& context.reactionInfo
-		&& !AyuFeatures::MessageShot::isTakingShot()) // fix crash when taking shot
+		&& !AyuFeatures::MessageShot::isTakingShot()) { // fix crash when taking shot
 		const auto now = context.now;
 		context.reactionInfo->effectPaint = [
 			now,
