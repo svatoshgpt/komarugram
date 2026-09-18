@@ -4,9 +4,6 @@
 [submodule "Telegram/ThirdParty/xxHash"]
 	path = Telegram/ThirdParty/xxHash
 	url = https://github.com/Cyan4973/xxHash.git
-[submodule "Telegram/ThirdParty/rlottie"]
-	path = Telegram/ThirdParty/rlottie
-	url = https://github.com/desktop-app/rlottie.git
 [submodule "Telegram/ThirdParty/lz4"]
 	path = Telegram/ThirdParty/lz4
 	url = https://github.com/lz4/lz4.git
@@ -21,16 +18,16 @@
 	url = https://github.com/desktop-app/lib_base.git
 [submodule "Telegram/codegen"]
 	path = Telegram/codegen
-	url = https://github.com/AyuGram/codegen.git
+	url = https://github.com/svatoshgpt/codegen.git
 [submodule "Telegram/lib_ui"]
 	path = Telegram/lib_ui
-	url = https://github.com/AyuGram/lib_ui.git
+	url = https://github.com/svatoshgpt/lib_ui.git
 [submodule "Telegram/lib_lottie"]
 	path = Telegram/lib_lottie
 	url = https://github.com/desktop-app/lib_lottie.git
 [submodule "Telegram/lib_tl"]
 	path = Telegram/lib_tl
-	url = https://github.com/AyuGram/lib_tl.git
+	url = https://github.com/svatoshgpt/lib_tl.git
 [submodule "Telegram/lib_spellcheck"]
 	path = Telegram/lib_spellcheck
 	url = https://github.com/desktop-app/lib_spellcheck
@@ -96,7 +93,7 @@
 	url = https://github.com/AyuGram/lib_icu.git
 [submodule "Telegram/ThirdParty/cmark-gfm"]
 	path = Telegram/ThirdParty/cmark-gfm
-	url = https://github.com/github/cmark-gfm.git
+	url = https://github.com/desktop-app/cmark-gfm.git
 [submodule "Telegram/ThirdParty/MicroTeX"]
 	path = Telegram/ThirdParty/MicroTeX
 	url = https://github.com/desktop-app/MicroTeX.git
