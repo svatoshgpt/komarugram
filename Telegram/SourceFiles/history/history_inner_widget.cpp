@@ -1197,11 +1197,6 @@ void HistoryInner::enumerateDates(Method method) {
 				itemtop);
 
 			// Attach date to the top of the visible area with the same margin as it has in service message.
-			const auto collapsed = Ui::CollapseDateShift(
-				collapseGaps(),
-				itemtop);
-
-			// Attach date to the top of the visible area with the same margin as it has in service message.
 			int dateTop = std::max(itemtop - collapsed, _visibleAreaTop)
 				+ st::msgServiceMargin.top();
 
