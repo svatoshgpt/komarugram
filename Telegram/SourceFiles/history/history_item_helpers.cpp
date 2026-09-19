@@ -1092,31 +1092,31 @@ MediaCheckResult CheckMessageMedia(const MTPMessageMedia &media) {
 		});
 	}, [](const MTPDmessageMediaPhoto &data) {
 		const auto photo = data.vphoto();
-		if (!photo) {
-			return data.vttl_seconds()
-				? Result::HasExpiredMediaTimeToLive
-				: Result::Empty;
+		if (data.vttl_seconds()) {
+			return Result::HasUnsupportedTimeToLive;
+		} else if (!photo) {
+			return Result::Empty;
 		}
 		return photo->match([](const MTPDphoto &) {
 			return Result::Good;
-		}, [&](const MTPDphotoEmpty &) {
-			return data.vttl_seconds()
-				? Result::HasExpiredMediaTimeToLive
-				: Result::Empty;
+		}, [](const MTPDphotoEmpty &) {
+			return Result::Empty;
 		});
 	}, [](const MTPDmessageMediaDocument &data) {
 		const auto document = data.vdocument();
-		if (!document) {
-			return data.vttl_seconds()
-				? Result::HasExpiredMediaTimeToLive
-				: Result::Empty;
+		if (data.vttl_seconds()) {
+			if (data.is_video()) {
+				return Result::HasUnsupportedTimeToLive;
+			} else if (!document) {
+				return Result::HasExpiredMediaTimeToLive;
+			}
+		} else if (!document) {
+			return Result::Empty;
 		}
 		return document->match([](const MTPDdocument &) {
 			return Result::Good;
-		}, [&](const MTPDdocumentEmpty &) {
-			return data.vttl_seconds()
-				? Result::HasExpiredMediaTimeToLive
-				: Result::Empty;
+		}, [](const MTPDdocumentEmpty &) {
+			return Result::Empty;
 		});
 	}, [](const MTPDmessageMediaWebPage &data) {
 		return data.vwebpage().match([](const MTPDwebPage &) {
