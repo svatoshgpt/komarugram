@@ -792,7 +792,7 @@ int main(int argc, char *argv[])
 
 	QByteArray compressed, resultCheck;
 #if defined Q_OS_WIN && !defined PACKER_USE_PACKAGED // use Lzma SDK for win
-	const int32 hSigLen = 128, hShaLen = 20, hPropsLen = LZMA_PROPS_SIZE, hOriginalSizeLen = sizeof(int32), hSize = hSigLen + hShaLen + hPropsLen + hOriginalSizeLen; // header
+	const int32 hSigLen = 256, hShaLen = 20, hPropsLen = LZMA_PROPS_SIZE, hOriginalSizeLen = sizeof(int32), hSize = hSigLen + hShaLen + hPropsLen + hOriginalSizeLen; // header
 
 	compressed.resize(hSize + resultSize + 1024 * 1024); // rsa signature + sha1 + lzma props + max compressed size
 
@@ -835,7 +835,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 #else // use liblzma for others
-	const int32 hSigLen = 128, hShaLen = 20, hPropsLen = 0, hOriginalSizeLen = sizeof(int32), hSize = hSigLen + hShaLen + hOriginalSizeLen; // header
+	const int32 hSigLen = 256, hShaLen = 20, hPropsLen = 0, hOriginalSizeLen = sizeof(int32), hSize = hSigLen + hShaLen + hOriginalSizeLen; // header
 
 	compressed.resize(hSize + resultSize + 1024 * 1024); // rsa signature + sha1 + lzma props + max compressed size
 
@@ -1045,7 +1045,7 @@ QString countAlphaVersionSignature(quint64 version) { // duplicated in autoupdat
 
 	QByteArray signedData = (QLatin1String("TelegramBeta_") + QString::number(version, 16).toLower()).toUtf8();
 
-	static const int32 shaSize = 20, keySize = 128;
+	static const int32 shaSize = 20, keySize = 256;
 
 	uchar sha1Buffer[shaSize];
 	hashSha1(signedData.constData(), signedData.size(), sha1Buffer); // count sha1
