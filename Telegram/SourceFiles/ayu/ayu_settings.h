@@ -168,7 +168,7 @@ private:
 	rpl::variable<bool> _markReadAfterAction = true;
 	rpl::variable<bool> _useScheduledMessages = false;
 	rpl::variable<SendWithoutSoundOption> _sendWithoutSound = SendWithoutSoundOption::Never;
-	rpl::variable<bool> _suggestGhostModeBeforeViewingStory = true;
+	rpl::variable<bool> _suggestGhostModeBeforeViewingStory = false;
 	rpl::variable<bool> _ghostModeActive = false;
 
 	rpl::variable<bool> _sendReadMessagesLocked = false;
@@ -646,7 +646,7 @@ private:
 	rpl::variable<bool> _increaseWebviewWidth = false;
 	rpl::variable<bool> _materialSwitches = true;
 	rpl::variable<bool> _removeMessageTail = false;
-	rpl::variable<bool> _disableNotificationsDelay = false;
+	rpl::variable<bool> _disableNotificationsDelay = true;
 	rpl::variable<bool> _localPremium = false;
 	rpl::variable<bool> _showChannelReactions = true;
 	rpl::variable<bool> _showGroupReactions = true;
@@ -685,7 +685,7 @@ private:
 	rpl::variable<bool> _showSReadToggleInDrawer = true;
 	rpl::variable<bool> _showNightModeToggleInDrawer = true;
 	rpl::variable<bool> _showGhostToggleInDrawer = true;
-	rpl::variable<bool> _showStreamerToggleInDrawer = false;
+	rpl::variable<bool> _showStreamerToggleInDrawer = true;
 	rpl::variable<bool> _showGhostToggleInTray = true;
 	rpl::variable<bool> _showStreamerToggleInTray = false;
 	rpl::variable<bool> _hidePremiumStatuses = false;
