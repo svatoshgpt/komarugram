@@ -10,5 +10,37 @@
         <file alias="icons/ayu/nocover.svg">../../icons/ayu/nocover.svg</file>
         <file alias="icons/ayu/donates/gram.svg">../../icons/ayu/donates/gram.svg</file>
         <file alias="icons/ayu/donates/support_logo.svg">../../icons/ayu/donates/support_logo.svg</file>
+        <file alias="fonts/FiraCode-Bold.ttf">../../fonts/FiraCode-Bold.ttf</file>
+        <file alias="fonts/FiraCode-Regular.ttf">../../fonts/FiraCode-Regular.ttf</file>
+        <file alias="fonts/Inter-Bold.ttf">../../fonts/Inter-Bold.ttf</file>
+        <file alias="fonts/Inter-BoldItalic.ttf">../../fonts/Inter-BoldItalic.ttf</file>
+        <file alias="fonts/Inter-Italic.ttf">../../fonts/Inter-Italic.ttf</file>
+        <file alias="fonts/Inter-Regular.ttf">../../fonts/Inter-Regular.ttf</file>
+        <file alias="fonts/JetBrainsMono-Bold.ttf">../../fonts/JetBrainsMono-Bold.ttf</file>
+        <file alias="fonts/JetBrainsMono-BoldItalic.ttf">../../fonts/JetBrainsMono-BoldItalic.ttf</file>
+        <file alias="fonts/JetBrainsMono-Italic.ttf">../../fonts/JetBrainsMono-Italic.ttf</file>
+        <file alias="fonts/JetBrainsMono-Regular.ttf">../../fonts/JetBrainsMono-Regular.ttf</file>
+        <file alias="fonts/Lato-Bold.ttf">../../fonts/Lato-Bold.ttf</file>
+        <file alias="fonts/Lato-BoldItalic.ttf">../../fonts/Lato-BoldItalic.ttf</file>
+        <file alias="fonts/Lato-Italic.ttf">../../fonts/Lato-Italic.ttf</file>
+        <file alias="fonts/Lato-Regular.ttf">../../fonts/Lato-Regular.ttf</file>
+        <file alias="fonts/Montserrat-Bold.ttf">../../fonts/Montserrat-Bold.ttf</file>
+        <file alias="fonts/Montserrat-BoldItalic.ttf">../../fonts/Montserrat-BoldItalic.ttf</file>
+        <file alias="fonts/Montserrat-Italic.ttf">../../fonts/Montserrat-Italic.ttf</file>
+        <file alias="fonts/Montserrat-Regular.ttf">../../fonts/Montserrat-Regular.ttf</file>
+        <file alias="fonts/NotoSans-Bold.ttf">../../fonts/NotoSans-Bold.ttf</file>
+        <file alias="fonts/NotoSans-BoldItalic.ttf">../../fonts/NotoSans-BoldItalic.ttf</file>
+        <file alias="fonts/NotoSans-Italic.ttf">../../fonts/NotoSans-Italic.ttf</file>
+        <file alias="fonts/NotoSans-Regular.ttf">../../fonts/NotoSans-Regular.ttf</file>
+        <file alias="fonts/Nunito-Italic-Variable.ttf">../../fonts/Nunito-Italic-Variable.ttf</file>
+        <file alias="fonts/Nunito-Variable.ttf">../../fonts/Nunito-Variable.ttf</file>
+        <file alias="fonts/OpenSans-Bold.ttf">../../fonts/OpenSans-Bold.ttf</file>
+        <file alias="fonts/OpenSans-BoldItalic.ttf">../../fonts/OpenSans-BoldItalic.ttf</file>
+        <file alias="fonts/OpenSans-Italic.ttf">../../fonts/OpenSans-Italic.ttf</file>
+        <file alias="fonts/OpenSans-Regular.ttf">../../fonts/OpenSans-Regular.ttf</file>
+        <file alias="fonts/Roboto-Bold.ttf">../../fonts/Roboto-Bold.ttf</file>
+        <file alias="fonts/Roboto-BoldItalic.ttf">../../fonts/Roboto-BoldItalic.ttf</file>
+        <file alias="fonts/Roboto-Italic.ttf">../../fonts/Roboto-Italic.ttf</file>
+        <file alias="fonts/Roboto-Regular.ttf">../../fonts/Roboto-Regular.ttf</file>
     </qresource>
 </RCC>

@@ -7,3 +7,7 @@
 
 # Ensure lottie animations are treated as binary files
 *.lottie binary
+
+# Ensure bundled fonts are treated as binary files
+*.ttf binary
+*.otf binary

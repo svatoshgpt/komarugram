@@ -17,6 +17,9 @@
 #include "ui/chat/chat_style_radius.h"
 #include "utils/rc_manager.h"
 
+#include <QDir>
+#include <QFontDatabase>
+
 #ifdef Q_OS_WIN
 #include "ayu/utils/windows_utils.h"
 #endif
@@ -60,6 +63,18 @@ void initTranslator() {
 	Ayu::Translator::TranslateManager::init();
 }
 
+void initFonts() {
+	// The picker lists whatever QFontDatabase knows about, which on a clean
+	// Windows install is a short and dated set. Register the bundled families
+	// before style::StartManager() resolves any font.
+	auto dir = QDir(u":/gui/fonts"_q);
+	for (const auto &entry : dir.entryList({ u"*.ttf"_q }, QDir::Files)) {
+		if (QFontDatabase::addApplicationFont(dir.filePath(entry)) < 0) {
+			LOG(("Font Error: failed to register %1").arg(entry));
+		}
+	}
+}
+
 void initIcon() {
 #ifdef Q_OS_WIN
 	AyuAssets::loadAppIco();
@@ -68,6 +83,7 @@ void initIcon() {
 }
 
 void init() {
+	initFonts();
 	initLang();
 	initDatabase();
 	initUiSettings();
