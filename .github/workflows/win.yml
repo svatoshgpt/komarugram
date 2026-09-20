@@ -14,7 +14,7 @@ jobs:
 
     strategy:
       matrix:
-        arch: [x64]
+        arch: [x64, x64_x86]
 
     env:
       UPLOAD_ARTIFACT: "true"
@@ -125,7 +125,7 @@ jobs:
           ARCH=""
           if [ -n "${{ matrix.arch }}" ]; then
             case "${{ matrix.arch }}" in
-              Win32) ARCH="x86";;
+              x64_x86) ARCH="x86";;
               *) ARCH="${{ matrix.arch }}";;
             esac
             echo "Architecture from matrix: $ARCH"
