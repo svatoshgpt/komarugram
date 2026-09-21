@@ -24,8 +24,11 @@ enum {
 
 	WebPageUserId = 701000,
 
-	UpdateDelayConstPart = 8 * 3600, // 8 hour min time between update check requests
-	UpdateDelayRandPart = 8 * 3600, // 8 hour max - min time between update check requests
+	// KomaruGram: releases should reach clients the same half hour, not the
+	// next day. The feed is a 134-byte file, and the random part keeps
+	// clients from hitting it in lockstep.
+	UpdateDelayConstPart = 15 * 60, // 15 min min time between update check requests
+	UpdateDelayRandPart = 15 * 60, // 15 min max - min time between update check requests
 
 	WrongPasscodeTimeout = 1500,
 
