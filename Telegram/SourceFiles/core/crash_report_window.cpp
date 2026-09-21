@@ -27,6 +27,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include <QtGui/QDesktopServices>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QTimer>
+#include <QtCore/QUrlQuery>
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
@@ -476,7 +477,7 @@ LastCrashedWindow::LastCrashedWindow(
 		}
 	}
 
-	_pleaseSendReport.setText(u"Please send us a crash report."_q);
+	_pleaseSendReport.setText(u"Please report this crash on GitHub."_q);
 	_yourReportName.setText(u"Crash ID: %1"_q.arg(QString(_minidumpName).replace(".dmp", "")));
 	_yourReportName.setCursor(style::cur_text);
 	_yourReportName.setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -500,7 +501,7 @@ LastCrashedWindow::LastCrashedWindow(
 		QDesktopServices::openUrl(u"https://github.com/svatoshgpt/komarugram"_q);
 	});
 
-	_send.setText(u"SEND CRASH REPORT"_q);
+	_send.setText(u"REPORT ON GITHUB"_q);
 	connect(&_send, &QPushButton::clicked, [=] { sendReport(); });
 
 	_sendSkip.setText(u"SKIP"_q);
@@ -580,21 +581,36 @@ void LastCrashedWindow::addReportFieldPart(const QLatin1String &name, const QLat
 }
 
 void LastCrashedWindow::sendReport() {
-	if (_checkReply) {
-		_checkReply->deleteLater();
-		_checkReply = nullptr;
+	// KomaruGram: this used to upload the report and the full minidump to
+	// AyuGram's Sentry. A minidump is process memory and may hold message
+	// text, so nothing leaves the machine now: the report becomes a GitHub
+	// issue draft that the user reads and submits themselves.
+	constexpr auto kMaxBody = 5000;
+	auto body = _reportTextNoUsername.trimmed();
+	auto note = QString();
+	if (body.size() > kMaxBody) {
+		body = body.left(kMaxBody);
+		note = u"\n\n_The report was shortened. Please attach the full "
+			"file saved with SAVE TO FILE._"_q;
 	}
-	if (_sendReply) {
-		_sendReply->deleteLater();
-		_sendReply = nullptr;
-	}
-
-	checkingFinished();
-
-	_pleaseSendReport.setText(u"Sending crash report..."_q);
-	_sendingState = SendingProgress;
-	_reportShown = false;
-	updateControls();
+	const auto version = getReportField(qstr("version"), qstr("Version:"));
+	auto query = QUrlQuery();
+	query.addQueryItem(
+		u"title"_q,
+		version.isEmpty()
+			? u"Crash report"_q
+			: u"Crash report (%1)"_q.arg(version));
+	query.addQueryItem(
+		u"body"_q,
+		u"**What were you doing when it crashed?**\n\n\n"
+		"**Crash report**\n```\n"_q
+			+ body
+			+ u"\n```"_q
+			+ note);
+	auto url = QUrl(u"https://github.com/svatoshgpt/komarugram/issues/new"_q);
+	url.setQuery(query);
+	QDesktopServices::openUrl(url);
+	processContinue();
 }
 
 QString LastCrashedWindow::minidumpFileName() {
@@ -607,76 +623,8 @@ QString LastCrashedWindow::minidumpFileName() {
 }
 
 void LastCrashedWindow::checkingFinished() {
-	if (_sendReply) return;
-
-	auto multipart = new QHttpMultiPart(QHttpMultiPart::FormDataType);
-
-	{
-		QString version = getReportField(qstr("version"), qstr("Version:"));
-		if (!version.isEmpty()) {
-			const auto sentryVersion = QString("ayugram-desktop@%1").arg(version);
-
-			QHttpPart reportPart;
-			reportPart.setHeader(QNetworkRequest::ContentDispositionHeader,
-			                     QVariant(u"form-data; name=\"%1\""_q.arg("sentry[release]")));
-			reportPart.setBody(sentryVersion.toUtf8());
-			multipart->append(reportPart);
-		}
-	}
-
-	{
-		QString dumpFile = minidumpFileName();
-		if (!dumpFile.isEmpty()) {
-			const auto dumpId = dumpFile.replace(".dmp", "");
-
-			QHttpPart reportPart;
-			reportPart.setHeader(QNetworkRequest::ContentDispositionHeader,
-			                     QVariant(u"form-data; name=\"%1\""_q.arg("sentry[tags][dump-id]")));
-			reportPart.setBody(dumpId.toUtf8());
-			multipart->append(reportPart);
-		}
-	}
-
-	QHttpPart reportPart;
-	reportPart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("application/octet-stream"));
-	reportPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant("form-data; name=\"report\"; filename=\"report.txt\""));
-	reportPart.setBody(getCrashReportRaw());
-	multipart->append(reportPart);
-
-	QString dmpName = minidumpFileName();
-	if (!dmpName.isEmpty()) {
-		QFile file(_minidumpFull);
-		if (file.open(QIODevice::ReadOnly)) {
-			QByteArray minidump = file.readAll();
-			file.close();
-
-			QHttpPart dumpPart;
-			dumpPart.setHeader(QNetworkRequest::ContentTypeHeader, QVariant("application/octet-stream"));
-			dumpPart.setHeader(QNetworkRequest::ContentDispositionHeader, QVariant(u"form-data; name=\"upload_file_minidump\"; filename=\"%1\""_q.arg(dmpName)));
-			dumpPart.setBody(minidump);
-			multipart->append(dumpPart);
-
-			_minidump.setText(u"+ %1 (%2 KB)"_q.arg(dmpName).arg(minidump.size() / 1024));
-		}
-	}
-
-	_sendReply = _sendManager.post(QNetworkRequest(u"https://sentry.radolyn.com/api/2/minidump/?sentry_key=cad638b2ec4a692e57c3dcc4af1508bf"_q), multipart);
-	multipart->setParent(_sendReply);
-
-	connect(
-		_sendReply,
-		&QNetworkReply::errorOccurred,
-		[=](QNetworkReply::NetworkError code) { sendingError(code); });
-	connect(
-		_sendReply,
-		&QNetworkReply::finished,
-		[=] { sendingFinished(); });
-	connect(
-		_sendReply,
-		&QNetworkReply::uploadProgress,
-		[=](qint64 sent, qint64 total) { sendingProgress(sent, total); });
-
-	updateControls();
+	// KomaruGram: crash reports go to GitHub from sendReport(); nothing is
+	// uploaded from here.
 }
 
 void LastCrashedWindow::updateControls() {

@@ -135,10 +135,7 @@ void AddCryptoDonate(
 	});
 }
 
-// Not wired into the section tree: the badge these details buy is handed
-// out by the upstream project, not by us. Kept for whenever there is
-// something of our own to put behind it.
-[[maybe_unused]] void BuildDonations(SectionBuilder &builder) {
+void BuildDonations(SectionBuilder &builder) {
 	builder.add([](const BuildContext &ctx) {
 		v::match(ctx, [&](const WidgetContext &wctx) {
 			const auto container = wctx.container;
@@ -146,14 +143,6 @@ void AddCryptoDonate(
 			AddSubsectionTitle(container, tr::ayu_SupportHeader());
 			AddCryptoDonate("Gram", QString("UQAirl_g-9BqSSTGqcX0LHGEyhN_ewZ0ucNakXGrw-h9tMY4"), container);
 			AddSkip(container);
-
-			AddDividerText(container,
-				tr::ayu_SupportDescription2(
-					lt_item,
-					rpl::single(
-						Ui::Text::Link(tr::ayu_SupportDescription1(tr::now), QString("tg://support"))
-					),
-					tr::marked));
 		}, [&](const SearchContext &sctx) {
 			sctx.entries->push_back({
 				.id = u"ayu/donate"_q,
@@ -223,7 +212,7 @@ const auto kMeta = BuildHelper({
 	auto ayu = AyuSectionBuilder(builder);
 
 	builder.addSkip();
-	// BuildDonations() is deliberately not called -- see its definition.
+	BuildDonations(builder);
 	BuildCrashReporting(builder, ayu);
 	BuildOtherThings(builder);
 });

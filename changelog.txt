@@ -1,3 +1,8 @@
+7.2.9-1.1 (21.09.26)
+
+- Gram donation details are back in Settings, Other.
+- After a crash, report it as a GitHub issue; nothing is uploaded.
+
 7.2.9-1 (21.09.26)
 
 - KomaruGram: materialgram design on an AyuGram feature base.
