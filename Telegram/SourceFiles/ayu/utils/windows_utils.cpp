@@ -47,10 +47,10 @@ void processIcon(QString shortcut, QString iconPath) {
 
 void processLegacy(const QString &iconPath) {
 	const auto appdata = QDir::fromNativeSeparators(qgetenv("APPDATA"));
-	auto shortcut = appdata + "/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/AyuGram Desktop.lnk";
-	if (!QFile::exists(shortcut)) {
-		shortcut = appdata + "/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/AyuGram.lnk";
-	}
+	// KomaruGram: these used to name AyuGram's shortcuts, which would have
+	// repainted a real AyuGram install with our icon. processIcon() does not
+	// check the target, so only our own names belong here.
+	auto shortcut = appdata + "/Microsoft/Internet Explorer/Quick Launch/User Pinned/TaskBar/KomaruGram.lnk";
 	if (!QFile::exists(shortcut)) {
 		return;
 	}
@@ -139,10 +139,11 @@ void processNewShortcuts(const QString &iconPath) {
 		return;
 	}
 
+	// The names AppUserModelId creates for KomaruGram.
 	const auto shortcuts = {
-		path + u"AyuGram Desktop/AyuGram.lnk"_q,
-		path + u"AyuGram/AyuGram.lnk"_q,
-		path + u"AyuGram.lnk"_q,
+		path + u"KomaruGram for Windows/KomaruGram.lnk"_q,
+		path + u"KomaruGram/KomaruGram.lnk"_q,
+		path + u"KomaruGram.lnk"_q,
 	};
 	for (const auto &shortcut : shortcuts) {
 		const auto native = QDir::toNativeSeparators(shortcut).toStdWString();

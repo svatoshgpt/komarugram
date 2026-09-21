@@ -21,7 +21,7 @@ namespace AyuAssets {
 QString appIcoPath() {
 	const auto &settings = AyuSettings::getInstance();
 	return cWorkingDir()
-		+ u"tdata/AyuGram-"_q
+		+ u"tdata/KomaruGram-"_q
 		+ settings.appIcon()
 		+ u".ico"_q;
 }
@@ -36,6 +36,17 @@ void loadAppIco() {
 		f.remove();
 	}
 	f.close();
+
+	// Earlier builds wrote the same file under the AyuGram name. Shortcuts
+	// are repointed at the new one on this launch, so the old copy is dead.
+	auto legacy = QFile(cWorkingDir()
+		+ u"tdata/AyuGram-"_q
+		+ settings.appIcon()
+		+ u".ico"_q);
+	if (legacy.exists()) {
+		legacy.setPermissions(QFile::WriteOther);
+		legacy.remove();
+	}
 	QFile::copy(qsl(":/gui/art/ayu/%1/app_icon.ico").arg(settings.appIcon()), iconPath);
 }
 
