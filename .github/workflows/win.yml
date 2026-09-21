@@ -17,6 +17,7 @@ jobs:
     runs-on: windows-latest
 
     strategy:
+      fail-fast: false
       matrix:
         arch: [x64, x64_x86]
 
@@ -242,7 +243,7 @@ jobs:
           esac
           ASSET="KomaruGram-$GITHUB_REF_NAME-$SUFFIX.exe"
           cp artifact/KomaruGram.exe "$ASSET"
-          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" --title "KomaruGram $GITHUB_REF_NAME" --notes "Built from $GITHUB_SHA." --verify-tag || true
+          if ! gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "KomaruGram $GITHUB_REF_NAME" --notes "Built from $GITHUB_SHA." --verify-tag || true
           fi
-          gh release upload "$GITHUB_REF_NAME" "$ASSET" --clobber
+          gh release upload "$GITHUB_REF_NAME" "$ASSET" -R "$GITHUB_REPOSITORY" --clobber

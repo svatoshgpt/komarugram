@@ -1,4 +1,5 @@
 name: Linux
+run-name: KomaruGram for Linux — ${{ github.ref_name }}
 
 on:
   push:
@@ -81,7 +82,7 @@ jobs:
       - name: Upload artifact to Release
         uses: softprops/action-gh-release@v3
         with:
-          name: ${{ env.TAGNAME }}
+          name: KomaruGram ${{ env.TAGNAME }}
           tag_name: ${{ env.TAGNAME }}
           token: ${{ secrets.GITHUB_TOKEN }}
           files: out/install/KomaruGram-${{ env.TAGNAME }}.tar.zst
