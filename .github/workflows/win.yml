@@ -190,6 +190,37 @@ jobs:
             ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-
             ${{ runner.OS }}-${{ matrix.arch }}-build-
 
+      - name: Update signing setup.
+        if: env.ONLY_CACHE == 'false'
+        shell: bash
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+        run: |
+          # Only tagged releases are signed. Everything else builds the
+          # updater into the client but never touches the private key.
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "BUILD_PACKER=OFF" >> $GITHUB_ENV
+            exit 0
+          fi
+          if [ -z "$UPDATE_PRIVATE_KEY" ]; then
+            echo "::error::The UPDATE_PRIVATE_KEY secret is not set."
+            exit 1
+          fi
+          echo "BUILD_PACKER=ON" >> $GITHUB_ENV
+          python - <<'EOF'
+          import json, os
+          key = os.environ['UPDATE_PRIVATE_KEY'].replace('\r\n', '\n').strip()
+          def lit(s):
+              return json.dumps(s + chr(10))
+          path = os.path.join(os.environ['TBUILD'], os.environ['REPO_NAME'],
+                              'Telegram', 'SourceFiles', '_other', 'packer_private.h')
+          with open(path, 'w', newline='\n') as f:
+              f.write('// Generated in CI from a secret. Never commit.\n')
+              f.write('const char *PrivateKey = ' + lit(key) + ';\n')
+              f.write('const char *PrivateBetaKey = "";\n')
+              f.write('static const char *AlphaPrivateKey = "";\n')
+          EOF
+
       - name: KomaruGram build.
         if: env.ONLY_CACHE == 'false'
         run: |
@@ -201,10 +232,46 @@ jobs:
           %TDESKTOP_BUILD_API% ^
           -D CMAKE_CONFIGURATION_TYPES=MinSizeRel ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
-          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF ^
+          -D KOMARUGRAM_BUILD_PACKER=%BUILD_PACKER% ^
           %TDESKTOP_BUILD_DEFINE%
 
           cmake --build ..\out --config MinSizeRel --parallel 1 -- /p:CL_MPCount=3 /p:UseMultiToolTask=true /p:EnforceProcessCountAcrossBuilds=true
+
+      - name: Pack update.
+        if: env.ONLY_CACHE == 'false' && env.BUILD_PACKER == 'ON'
+        shell: bash
+        run: |
+          VERSION=$(sed -n 's/.*constexpr auto AppVersion = \([0-9]*\);.*/\1/p' \
+            "$TBUILD/$REPO_NAME/Telegram/SourceFiles/core/version.h")
+          [ -n "$VERSION" ] || { echo "::error::AppVersion not found"; exit 1; }
+          echo "UPDATE_VERSION=$VERSION" >> $GITHUB_ENV
+
+          TARGET=""
+          [ "${{ matrix.arch }}" = "x64" ] && TARGET="-target win64"
+
+          cd "$TBUILD/$REPO_NAME/out/MinSizeRel"
+          ./Packer.exe -path KomaruGram.exe -path Updater.exe -version "$VERSION" $TARGET
+
+          mkdir -p "$GITHUB_WORKSPACE/update"
+          mv tx64upd* tupdate* "$GITHUB_WORKSPACE/update/" 2>/dev/null || true
+          ls -la "$GITHUB_WORKSPACE/update"
+          [ -n "$(ls -A "$GITHUB_WORKSPACE/update")" ] || { echo "::error::Packer wrote no update file"; exit 1; }
+
+      - name: Scrub signing material.
+        if: always()
+        shell: bash
+        run: |
+          # The private key is compiled into Packer. Nothing that carries it
+          # may reach the Actions cache, which a public repo cannot guard.
+          rm -f "$TBUILD/$REPO_NAME/Telegram/SourceFiles/_other/packer_private.h"
+          rm -f "$TBUILD/$REPO_NAME/out/MinSizeRel/Packer.exe" \
+                "$TBUILD/$REPO_NAME/out/MinSizeRel/Packer.pdb"
+          find "$TBUILD/$REPO_NAME/out" -type d -name 'Packer.dir' -prune -exec rm -rf {} + 2>/dev/null || true
+          if find "$TBUILD/$REPO_NAME/out" -iname '*packer*.obj' | grep -q .; then
+            echo "::error::Packer object files survived the scrub"
+            exit 1
+          fi
 
       - name: Build cache size.
         if: env.ONLY_CACHE == 'false'
@@ -224,6 +291,7 @@ jobs:
           set OUT=%TBUILD%\%REPO_NAME%\out\MinSizeRel
           mkdir artifact
           move %OUT%\KomaruGram.exe artifact/
+          move %OUT%\Updater.exe artifact/
       - uses: actions/upload-artifact@v7
         name: Upload artifact.
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
@@ -241,9 +309,19 @@ jobs:
             x64_x86) SUFFIX="x86";;
             *) SUFFIX="${{ matrix.arch }}";;
           esac
-          ASSET="KomaruGram-$GITHUB_REF_NAME-$SUFFIX.exe"
-          cp artifact/KomaruGram.exe "$ASSET"
-          if ! gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --title "KomaruGram $GITHUB_REF_NAME" --notes "Built from $GITHUB_SHA." --verify-tag || true
+          REPO="$GITHUB_REPOSITORY"
+          TAG="$GITHUB_REF_NAME"
+
+          # Updater.exe must sit next to the client or updates cannot apply.
+          ZIP="KomaruGram-$TAG-windows-$SUFFIX.zip"
+          python -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED); [z.write('artifact/'+n, n) for n in ('KomaruGram.exe','Updater.exe')]" "$ZIP"
+
+          # Every job writes the same feed, so whichever lands last is right.
+          V="$UPDATE_VERSION"
+          printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s"}}}\n' \
+            "$V" "$V" "$V" "$V" > current6
+
+          if ! gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" -R "$REPO" --title "KomaruGram $TAG" --notes "Built from $GITHUB_SHA." --verify-tag || true
           fi
-          gh release upload "$GITHUB_REF_NAME" "$ASSET" -R "$GITHUB_REPOSITORY" --clobber
+          gh release upload "$TAG" -R "$REPO" --clobber "$ZIP" update/* current6

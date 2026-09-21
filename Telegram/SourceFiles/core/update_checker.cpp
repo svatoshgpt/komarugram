@@ -717,6 +717,12 @@ bool UnpackUpdate(const QString &filepath) {
 	input.close();
 
 	if (Updates::IsV2UpdateFile(compressed)) {
+		// KomaruGram: v2 packages are verified against Telegram's root key,
+		// so a valid one is an official Telegram build, never ours.
+		if (!BuildIsCanary) {
+			LOG(("Update Error: v2 update packages are not accepted."));
+			return false;
+		}
 		if (UnpackUpdateV2(filepath, compressed)) {
 			return true;
 		} else if (BuildIsCanary) {
@@ -1249,6 +1255,14 @@ MtpChecker::MtpChecker(
 }
 
 void MtpChecker::start() {
+	if (!BuildIsCanary) {
+		// KomaruGram: tdhbcfeed is Telegram's own channel. Its v2 packages
+		// verify against Telegram's root key, so an official release there
+		// would replace this client with stock Telegram Desktop. Updates
+		// come from the HTTP feed only.
+		crl::on_main(this, [=] { fail(); });
+		return;
+	}
 	if (!_mtp.valid()) {
 		LOG(("Update Info: MTP is unavailable."));
 		crl::on_main(this, [=] { fail(); });

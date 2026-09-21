@@ -561,7 +561,7 @@ const QString &readAutoupdatePrefixRaw() {
 			return AutoupdatePrefix(value);
 		}
 	}
-	return AutoupdatePrefix("https://svatoshgpt.github.io/komarugram-updates/");
+	return AutoupdatePrefix("https://github.com/svatoshgpt/komarugram/releases/latest/download");
 }
 
 void writeAutoupdatePrefix(const QString &prefix) {
@@ -570,7 +570,7 @@ void writeAutoupdatePrefix(const QString &prefix) {
 	}
 
 	const auto current = readAutoupdatePrefixRaw();
-    const auto fixedPrefix = QString::fromStdString("https://svatoshgpt.github.io/komarugram-updates/");
+    const auto fixedPrefix = QString::fromStdString("https://github.com/svatoshgpt/komarugram/releases/latest/download");
 	if (current != fixedPrefix) {
 		AutoupdatePrefix(fixedPrefix);
 		QFile f(autoupdatePrefixFile());

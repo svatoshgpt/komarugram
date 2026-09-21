@@ -5,6 +5,7 @@
 - Nine popular font families bundled with the client.
 - Round Komaru app icon.
 - 32-bit Windows and Linux builds alongside 64-bit Windows.
+- Automatic updates on Windows, signed with a KomaruGram key.
 
 7.2.9 (16.09.26)
 

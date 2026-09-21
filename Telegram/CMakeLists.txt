@@ -2752,7 +2752,9 @@ if (NOT DESKTOP_APP_DISABLE_AUTOUPDATE AND NOT build_macstore AND NOT build_wins
         )
     endif()
 
-    if (DESKTOP_APP_SPECIAL_TARGET)
+    # KOMARUGRAM_BUILD_PACKER builds the signer without the rest of what
+    # DESKTOP_APP_SPECIAL_TARGET switches on for official builds.
+    if (DESKTOP_APP_SPECIAL_TARGET OR KOMARUGRAM_BUILD_PACKER)
         add_executable(Packer)
         init_target(Packer)
 
