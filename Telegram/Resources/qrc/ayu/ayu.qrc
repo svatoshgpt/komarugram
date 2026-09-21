@@ -12,6 +12,10 @@
         <file alias="icons/ayu/donates/support_logo.svg">../../icons/ayu/donates/support_logo.svg</file>
         <file alias="fonts/FiraCode-Bold.ttf">../../fonts/FiraCode-Bold.ttf</file>
         <file alias="fonts/FiraCode-Regular.ttf">../../fonts/FiraCode-Regular.ttf</file>
+        <file alias="fonts/GoogleSans-Bold.ttf">../../fonts/GoogleSans-Bold.ttf</file>
+        <file alias="fonts/GoogleSans-BoldItalic.ttf">../../fonts/GoogleSans-BoldItalic.ttf</file>
+        <file alias="fonts/GoogleSans-Italic.ttf">../../fonts/GoogleSans-Italic.ttf</file>
+        <file alias="fonts/GoogleSans-Regular.ttf">../../fonts/GoogleSans-Regular.ttf</file>
         <file alias="fonts/Inter-Bold.ttf">../../fonts/Inter-Bold.ttf</file>
         <file alias="fonts/Inter-BoldItalic.ttf">../../fonts/Inter-BoldItalic.ttf</file>
         <file alias="fonts/Inter-Italic.ttf">../../fonts/Inter-Italic.ttf</file>
