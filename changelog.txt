@@ -1,10 +1,10 @@
-7.0.9 (KomaruGram)
+7.2.9-1 (21.09.26)
 
-- KomaruGram: merge of materialgram (design) and AyuGram (features).
-- Material design, icons and palette from materialgram.
-- Ghost mode, message history, streamer mode, translator and more from AyuGram.
-- New Komaru cat app icon, KomaruGram branding throughout.
-- Auto-update disabled; releases are published on GitHub only.
+- KomaruGram: materialgram design on an AyuGram feature base.
+- Rebased onto Telegram Desktop 7.2.9.
+- Nine popular font families bundled with the client.
+- Round Komaru app icon.
+- 32-bit Windows and Linux builds alongside 64-bit Windows.
 
 7.2.9 (16.09.26)
 
