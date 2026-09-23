@@ -1,3 +1,10 @@
+7.2.9-1.2 (23.09.26)
+
+- Round app icon redrawn: the cat is centred and has room around it.
+- The same icon is used for the exe, shortcuts and Linux.
+- Updates are checked every 15-30 minutes instead of twice a day.
+- Start menu shortcuts now pick up the KomaruGram icon.
+
 7.2.9-1.1 (21.09.26)
 
 - Gram donation details are back in Settings, Other.
