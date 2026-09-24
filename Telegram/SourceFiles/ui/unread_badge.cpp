@@ -275,15 +275,22 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 	const auto paintStar = premiumStar && !paintVerify
 		&& !hidePremiumStatuses;
 
+	// KomaruGram: the exteraGram / AyuGram developer and supporter arrows can
+	// be hidden on their own, apart from premium statuses.
+	const auto hideExteraBadges = settings.hideExteraBadges();
 	const auto paintExteraCustom =
-		isCustomBadgePeer(getBareID(peer)) && !hidePremiumStatuses;
+		isCustomBadgePeer(getBareID(peer))
+		&& !hidePremiumStatuses
+		&& !hideExteraBadges;
 	const auto paintExteraDev = isExteraPeer(getBareID(peer))
 		&& !paintExteraCustom
-		&& !hidePremiumStatuses;
+		&& !hidePremiumStatuses
+		&& !hideExteraBadges;
 	const auto paintExteraSupporter = !paintExteraDev
 		&& isSupporterPeer(getBareID(peer))
 		&& !paintExteraCustom
-		&& !hidePremiumStatuses;
+		&& !hidePremiumStatuses
+		&& !hideExteraBadges;
 	const auto paintExtera = paintExteraDev || paintExteraSupporter;
 	auto exteraWidth = 0;
 	if (paintExteraDev) {

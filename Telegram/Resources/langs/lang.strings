@@ -8853,6 +8853,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_DisableOpenLinkWarning" = "Disable Open Link Warning";
 "ayu_DisableCustomBackgrounds" = "Disable Custom Backgrounds";
 "ayu_HidePremiumStatuses" = "Hide Premium Statuses";
+"ayu_HideExteraBadges" = "Hide Supporter Badges";
 "ayu_SmoothScroll" = "Smooth Scroll";
 "ayu_DisableNotificationsDelay" = "Disable Notify Delay";
 "ayu_LocalPremium" = "Local Telegram Premium";

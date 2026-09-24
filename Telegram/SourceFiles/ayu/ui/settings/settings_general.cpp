@@ -163,40 +163,11 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSubsectionTitle(tr::ayu_CategoryGeneral());
 
 	const auto controller = builder.controller();
-	ayu.addToggle({
-		.id = u"ayu/disableStories"_q,
-		.altIds = { u"ayu/hideStories"_q },
-		.title = tr::ayu_DisableStories(),
-		.getter = [=] { return settings->disableStories(); },
-		.setter = [=](bool enabled) {
-			AyuSettings::getInstance().setDisableStories(enabled);
-			ShowRestartPrompt(controller);
-		},
-	});
-
 	ayu.addSettingToggle({
 		.id = u"ayu/disableOpenLinkWarning"_q,
 		.title = tr::ayu_DisableOpenLinkWarning(),
 		.getter = &AyuSettings::disableOpenLinkWarning,
 		.setter = &AyuSettings::setDisableOpenLinkWarning,
-	});
-
-	ayu.addCollapsibleToggle({
-		.id = u"ayu/similarChannels"_q,
-		.title = tr::ayu_DisableSimilarChannels(),
-		.checkboxes = {
-			NestedEntry{
-				tr::ayu_CollapseSimilarChannels(tr::now),
-				[] { return AyuSettings::getInstance().collapseSimilarChannels(); },
-				[](bool v) { AyuSettings::getInstance().setCollapseSimilarChannels(v); }
-			},
-			NestedEntry{
-				tr::ayu_HideSimilarChannelsTab(tr::now),
-				[] { return AyuSettings::getInstance().hideSimilarChannels(); },
-				[](bool v) { AyuSettings::getInstance().setHideSimilarChannels(v); }
-			}
-		},
-		.toggledWhenAll = true,
 	});
 
 	ayu.addSettingToggle({

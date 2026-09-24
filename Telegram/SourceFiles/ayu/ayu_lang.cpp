@@ -50,6 +50,7 @@ void ApplyKomaruTranslations() {
 	}
 	const auto values = {
 		std::pair{ "ayu_AnonymousStatistics", u"Анонимная статистика"_q },
+		std::pair{ "ayu_HideExteraBadges", u"Скрыть значки поддержки"_q },
 		std::pair{
 			"ayu_AnonymousStatisticsDescription",
 			u"Отправляет в Google Analytics запуски, обновления и сбои "

@@ -598,6 +598,12 @@ void AyuSettings::setHidePremiumStatuses(bool val) {
 	save();
 }
 
+void AyuSettings::setHideExteraBadges(bool val) {
+	if (_hideExteraBadges.current() == val) return;
+	_hideExteraBadges = val;
+	save();
+}
+
 void AyuSettings::setShowOnlyAddedEmojisAndStickers(bool val) {
 	if (_showOnlyAddedEmojisAndStickers.current() == val) return;
 	_showOnlyAddedEmojisAndStickers = val;
@@ -1096,6 +1102,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"disableStories", s._disableStories.current()},
 		{"disableCustomBackgrounds", s._disableCustomBackgrounds.current()},
 		{"hidePremiumStatuses", s._hidePremiumStatuses.current()},
+		{"hideExteraBadges", s._hideExteraBadges.current()},
 		{"showOnlyAddedEmojisAndStickers", s._showOnlyAddedEmojisAndStickers.current()},
 		{"collapseSimilarChannels", s._collapseSimilarChannels.current()},
 		{"hideSimilarChannels", s._hideSimilarChannels.current()},
@@ -1201,6 +1208,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._disableStories = j.value("disableStories", defaults._disableStories.current());
 	s._disableCustomBackgrounds = j.value("disableCustomBackgrounds", defaults._disableCustomBackgrounds.current());
 	s._hidePremiumStatuses = j.value("hidePremiumStatuses", defaults._hidePremiumStatuses.current());
+	s._hideExteraBadges = j.value("hideExteraBadges", defaults._hideExteraBadges.current());
 	s._showOnlyAddedEmojisAndStickers = j.value("showOnlyAddedEmojisAndStickers", defaults._showOnlyAddedEmojisAndStickers.current());
 	s._collapseSimilarChannels = j.value("collapseSimilarChannels", defaults._collapseSimilarChannels.current());
 	s._hideSimilarChannels = j.value("hideSimilarChannels", defaults._hideSimilarChannels.current());

@@ -197,7 +197,9 @@ CustomBadge getCustomBadge(ID peerId) {
 
 [[nodiscard]] Info::Profile::Badge::Content ComputeExteraBadgeContent(
 		not_null<PeerData*> peer) {
-	if (isCustomBadgePeer(getBareID(peer))) {
+	if (AyuSettings::getInstance().hideExteraBadges()) {
+		return {};
+	} else if (isCustomBadgePeer(getBareID(peer))) {
 		return Info::Profile::Badge::Content{
 			.badge = Info::Profile::BadgeType::ExteraCustom,
 			.emojiStatusId = getCustomBadge(getBareID(peer)).emojiStatusId,

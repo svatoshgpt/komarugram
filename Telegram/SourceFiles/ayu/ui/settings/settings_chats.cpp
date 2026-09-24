@@ -52,29 +52,6 @@ void BuildStickersAndEmoji(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setUnlimitedRecentStickers,
 	});
 
-	ayu.addCollapsibleToggle({
-		.id = u"ayu/hideReactions"_q,
-		.title = tr::ayu_HideReactions(),
-		.checkboxes = {
-			NestedEntry{
-				tr::ayu_HideReactionsInChannels(tr::now),
-				[] { return !AyuSettings::getInstance().showChannelReactions(); },
-				[](bool v) { AyuSettings::getInstance().setShowChannelReactions(!v); }
-			},
-			NestedEntry{
-				tr::ayu_HideReactionsInGroups(tr::now),
-				[] { return !AyuSettings::getInstance().showGroupReactions(); },
-				[](bool v) { AyuSettings::getInstance().setShowGroupReactions(!v); }
-			},
-			NestedEntry{
-				tr::ayu_HideReactionsInPrivateChats(tr::now),
-				[] { return !AyuSettings::getInstance().showPrivateChatReactions(); },
-				[](bool v) { AyuSettings::getInstance().setShowPrivateChatReactions(!v); }
-			}
-		},
-		.toggledWhenAll = false,
-	});
-
 	ayu.addSectionDivider();
 }
 
@@ -198,13 +175,6 @@ void BuildMarks(
 		.setter = &AyuSettings::setRemoveMessageTail,
 	});
 
-	ayu.addSettingToggle({
-		.id = u"ayu/hideFastShare"_q,
-		.altIds = { u"ayu/hideShareButton"_q },
-		.title = tr::ayu_HideShareButton(),
-		.getter = &AyuSettings::hideFastShare,
-		.setter = &AyuSettings::setHideFastShare,
-	});
 	ayu.addSettingToggle({
 		.id = u"ayu/simpleQuotesAndReplies"_q,
 		.altIds = { u"ayu/disableColorfulReplies"_q, u"ayu/replyElements"_q },

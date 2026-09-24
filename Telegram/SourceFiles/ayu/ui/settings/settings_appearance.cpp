@@ -204,14 +204,83 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::disableCustomBackgrounds,
 		.setter = &AyuSettings::setDisableCustomBackgrounds,
 	});
+	const auto controller = builder.controller();
+
+	// Everything that hides part of the interface lives here, next to the
+	// premium statuses toggle.
 	ayu.addSettingToggle({
 		.id = u"ayu/hidePremiumStatuses"_q,
 		.title = tr::ayu_HidePremiumStatuses(),
 		.getter = &AyuSettings::hidePremiumStatuses,
 		.setter = &AyuSettings::setHidePremiumStatuses,
 	});
+	ayu.addSettingToggle({
+		.id = u"ayu/hideExteraBadges"_q,
+		.altIds = { u"ayu/hideSupporterBadges"_q },
+		.title = tr::ayu_HideExteraBadges(),
+		.getter = &AyuSettings::hideExteraBadges,
+		.setter = &AyuSettings::setHideExteraBadges,
+	});
+	ayu.addToggle({
+		.id = u"ayu/disableStories"_q,
+		.altIds = { u"ayu/hideStories"_q },
+		.title = tr::ayu_DisableStories(),
+		.getter = [=] { return settings->disableStories(); },
+		.setter = [=](bool enabled) {
+			AyuSettings::getInstance().setDisableStories(enabled);
+			ShowRestartPrompt(controller);
+		},
+	});
 
-	const auto controller = builder.controller();
+	ayu.addCollapsibleToggle({
+		.id = u"ayu/hideReactions"_q,
+		.title = tr::ayu_HideReactions(),
+		.checkboxes = {
+			NestedEntry{
+				tr::ayu_HideReactionsInChannels(tr::now),
+				[] { return !AyuSettings::getInstance().showChannelReactions(); },
+				[](bool v) { AyuSettings::getInstance().setShowChannelReactions(!v); }
+			},
+			NestedEntry{
+				tr::ayu_HideReactionsInGroups(tr::now),
+				[] { return !AyuSettings::getInstance().showGroupReactions(); },
+				[](bool v) { AyuSettings::getInstance().setShowGroupReactions(!v); }
+			},
+			NestedEntry{
+				tr::ayu_HideReactionsInPrivateChats(tr::now),
+				[] { return !AyuSettings::getInstance().showPrivateChatReactions(); },
+				[](bool v) { AyuSettings::getInstance().setShowPrivateChatReactions(!v); }
+			}
+		},
+		.toggledWhenAll = false,
+	});
+
+	ayu.addSettingToggle({
+		.id = u"ayu/hideFastShare"_q,
+		.altIds = { u"ayu/hideShareButton"_q },
+		.title = tr::ayu_HideShareButton(),
+		.getter = &AyuSettings::hideFastShare,
+		.setter = &AyuSettings::setHideFastShare,
+	});
+
+	ayu.addCollapsibleToggle({
+		.id = u"ayu/similarChannels"_q,
+		.title = tr::ayu_DisableSimilarChannels(),
+		.checkboxes = {
+			NestedEntry{
+				tr::ayu_CollapseSimilarChannels(tr::now),
+				[] { return AyuSettings::getInstance().collapseSimilarChannels(); },
+				[](bool v) { AyuSettings::getInstance().setCollapseSimilarChannels(v); }
+			},
+			NestedEntry{
+				tr::ayu_HideSimilarChannelsTab(tr::now),
+				[] { return AyuSettings::getInstance().hideSimilarChannels(); },
+				[](bool v) { AyuSettings::getInstance().setHideSimilarChannels(v); }
+			}
+		},
+		.toggledWhenAll = true,
+	});
+
 	builder.addButton({
 		.id = u"ayu/monoFont"_q,
 		.title = tr::ayu_MonospaceFont(),
