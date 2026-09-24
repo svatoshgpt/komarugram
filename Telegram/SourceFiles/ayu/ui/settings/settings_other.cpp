@@ -28,7 +28,6 @@
 #include "ui/widgets/buttons.h"
 #include "ui/wrap/vertical_layout.h"
 #include "window/window_session_controller.h"
-#include "window/themes/window_theme.h"
 
 #include <QGuiApplication>
 #include <QSvgRenderer>
@@ -42,17 +41,12 @@ namespace {
 
 struct Asset {
 	QString icon;
-	QColor background;
 };
 
 Asset getAsset(const QString &name) {
-	const auto isNightMode = Window::Theme::IsNightMode();
 	const auto normalized = name.toLower();
-	QString icon = QString(":/gui/icons/ayu/donates/%1.svg").arg(normalized);
-	QColor background = isNightMode ? QColor(0xEEEEEE) : QColor(0x242B2C);
 	return {
-		.icon = std::move(icon),
-		.background = std::move(background)
+		.icon = QString(":/gui/icons/ayu/donates/%1.svg").arg(normalized),
 	};
 }
 
@@ -70,11 +64,7 @@ QImage getImage(const QString &name) {
 		auto p = QPainter(&image);
 		auto hq = PainterHighQualityEnabler(p);
 
-		p.setPen(Qt::NoPen);
-		p.setBrush(iconData.background);
-		p.drawRoundedRect(Rect(size), size.width() / 4., size.height() / 4.);
-		p.setBrush(Qt::transparent);
-
+		// The coin logos carry their own colours; no plate behind them.
 		auto svgIcon = QSvgRenderer(iconData.icon);
 		svgIcon.render(&p, Rect(size));
 	}
