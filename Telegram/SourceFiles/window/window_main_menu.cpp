@@ -913,19 +913,29 @@ void MainMenu::setupMenu() {
 
 	const auto order = settings.drawerOrder();
 	if (!_controller->session().supportMode()) {
-		// The profile and the bots keep their separator while they
-		// lead the menu.
+		// The profile and the bots get a separator after them only while
+		// they lead the menu; moved further down they sit in the list like
+		// any other item.
+		const auto shown = [&](const QString &id) {
+			return (id == u"myProfile"_q)
+				? settings.showMyProfileInDrawer()
+				: (id == u"bots"_q)
+				? settings.showBotsInDrawer()
+				: true;
+		};
 		auto leading = true;
+		auto leadingShown = false;
 		for (const auto &id : order) {
 			const auto top = (id == u"myProfile"_q) || (id == u"bots"_q);
 			if (leading && !top) {
 				leading = false;
-				if (settings.showMyProfileInDrawer()
-					|| settings.showBotsInDrawer()) {
+				if (leadingShown) {
 					_menu->add(
 						object_ptr<Ui::PlainShadow>(_menu),
 						{ 0, st::mainMenuSkip, 0, st::mainMenuSkip });
 				}
+			} else if (leading && shown(id)) {
+				leadingShown = true;
 			}
 			addItem(id);
 		}

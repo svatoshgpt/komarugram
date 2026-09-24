@@ -9196,6 +9196,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_ShowInProfile" = "Show in Profile";
 "ayu_ProfileRegistrationDate" = "Registration Date";
 "ayu_ProfileDatacenter" = "Server (DC)";
+"ayu_ProfileHiddenPhotos" = "Hidden Profile Photos";
 "ayu_KomaruSupportProofInfo" = "Send a photo of the payment confirmation to **{item}**. Make sure the photo clearly shows the amount, date, and time of the transfer. Also tell which colors you want for the face and the particles around it.";
 "ayu_KomaruSupportBadgeInfo" = "After payment verification, you will receive a unique badge that will be displayed on your profile and visible to other users.";
 "ayu_MutualContactInfo" = "This contact is mutual.";

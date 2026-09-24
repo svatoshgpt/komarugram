@@ -291,8 +291,10 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	ayu.addCollapsibleToggle({
 		.id = u"ayu/profileInfo"_q,
 		.altIds = {
+			u"advanced/materialgram"_q,
 			u"advanced/materialgram_registration"_q,
 			u"advanced/materialgram_datacenter"_q,
+			u"advanced/materialgram_gamee"_q,
 		},
 		.title = tr::ayu_ShowInProfile(),
 		.checkboxes = {
@@ -309,6 +311,15 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 				[] { return Core::App().settings().datacenterEnabled(); },
 				[](bool v) {
 					Core::App().settings().setDatacenterEnabled(v);
+					Core::App().saveSettingsDelayed();
+				}
+			},
+			// Profile photos a user hid, fetched from the Gamee cache.
+			NestedEntry{
+				tr::ayu_ProfileHiddenPhotos(tr::now),
+				[] { return Core::App().settings().gameeEnabled(); },
+				[](bool v) {
+					Core::App().settings().setGameeEnabled(v);
 					Core::App().saveSettingsDelayed();
 				}
 			}

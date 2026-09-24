@@ -1318,37 +1318,6 @@ void BuildScreenReaderSection(SectionBuilder &builder) {
 	builder.addSkip();
 }
 
-void BuildMaterialgramSection(SectionBuilder &builder) {
-	const auto settings = &Core::App().settings();
-
-	builder.addDivider();
-	builder.addSkip();
-	builder.addSubsectionTitle({
-		.id = u"advanced/materialgram"_q,
-		.title = rpl::single(u"KomaruGram"_q),
-		.keywords = { u"materialgram"_q },
-	});
-
-	const auto gamee = builder.addButton({
-		.id = u"advanced/materialgram_gamee"_q,
-		.title = tr::lng_settings_profile_photo_privacy(),
-		.st = &st::settingsButtonNoIcon,
-		.toggled = rpl::single(settings->gameeEnabled()),
-		.keywords = { u"materialgram"_q, u"gamee"_q, u"profile"_q, u"photo"_q },
-	});
-	if (gamee) {
-		gamee->toggledValue(
-		) | rpl::filter([=](bool enabled) {
-			return (enabled != settings->gameeEnabled());
-		}) | rpl::on_next([=](bool enabled) {
-			settings->setGameeEnabled(enabled);
-			Core::App().saveSettingsDelayed();
-		}, gamee->lifetime());
-	}
-
-	builder.addSkip();
-}
-
 class Advanced : public Section<Advanced> {
 public:
 	Advanced(
@@ -1382,7 +1351,6 @@ const auto kMeta = BuildHelper({
 	BuildSystemIntegrationSection(builder);
 	BuildPerformanceSection(builder);
 	BuildSpellcheckerSection(builder);
-	BuildMaterialgramSection(builder);
 	BuildScreenReaderSection(builder);
 	if (autoUpdate) {
 		BuildUpdateSection(builder, false);

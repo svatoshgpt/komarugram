@@ -78,6 +78,7 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_SupportBoxReceiveBadgeHeader", u"Получите значок"_q },
 		std::pair{ "ayu_ProfileRegistrationDate", u"Дата регистрации"_q },
 		std::pair{ "ayu_ProfileDatacenter", u"Сервер (DC)"_q },
+		std::pair{ "ayu_ProfileHiddenPhotos", u"Скрытые фото профиля"_q },
 		std::pair{
 			"ayu_KomaruDeveloperPopup",
 			u"**{item}** — участник команды разработки **KomaruGram**."_q },
