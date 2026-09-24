@@ -1,3 +1,14 @@
+7.2.9-1.3.2 (24.09.26)
+
+- KomaruGram developers and supporters get a Komaru face next to their name, in their own colours, with moving particles.
+- tg://support opens the support box again: donate the Gram equivalent of $2.50 and send the proof to @kdecat.
+- Hide Supporter Badges hides the Komaru faces too.
+- Main menu items can be reordered by dragging them in Appearance.
+- Registration date and DC in profiles can be turned off in Appearance.
+- New defaults: scheduled sending, hidden similar channels tab, streamer mode in the tray.
+- Solid Komaru tray icon that stays sharp at small sizes.
+- Shorter link warning label and Russian send confirmation labels.
+
 7.2.9-1.3.1 (24.09.26)
 
 - Anonymous statistics report only updates and crashes, no longer launches.
