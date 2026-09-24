@@ -19,8 +19,13 @@ and is currently based on Telegram Desktop **7.2.9**.
 - **Design layer — materialgram:** Material colors and icons, reduced uppercase, snappier
   timeouts, faster uploads, higher media quality, more recent stickers, larger account limits.
 
-Crash reports stay on your machine: after a crash KomaruGram offers to open a prefilled
-GitHub issue, and you decide what to send. Nothing is uploaded automatically.
+After a crash KomaruGram offers to open a prefilled GitHub issue, and you decide what
+to send; the crash report and memory dump are not uploaded anywhere.
+
+KomaruGram sends anonymous statistics to Google Analytics: app launches, updates, and the
+fact of a crash with the crashed version. They carry a random ID that is not linked to your
+account; messages, contacts, phone number and usernames are never sent. Turn them off in
+Settings → KomaruGram Preferences → Other → Anonymous Statistics.
 
 ## Download
 
@@ -62,6 +67,9 @@ Pushing a tag builds Windows x64, Windows x86 and Linux x64 and publishes them a
 release. The workflows need these repository secrets:
 
 - `TDESKTOP_API_ID`, `TDESKTOP_API_HASH` — Telegram API credentials.
+- `GA_MEASUREMENT_ID`, `GA_API_SECRET` — Google Analytics 4 measurement ID and
+  Measurement Protocol API secret for anonymous statistics. Leave them unset to build
+  without statistics.
 - `UPDATE_PRIVATE_KEY` — RSA-2048 private key that signs Windows update packages.
   The matching public key is in `Telegram/SourceFiles/config.h`. Keep the private key
   safe: without it, installed clients cannot receive updates.

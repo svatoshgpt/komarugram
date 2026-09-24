@@ -159,6 +159,7 @@ jobs:
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
 
           API="-D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} -D TDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }}"
+          API="$API -D KOMARUGRAM_GA_MEASUREMENT_ID=${{ secrets.GA_MEASUREMENT_ID }} -D KOMARUGRAM_GA_API_SECRET=${{ secrets.GA_API_SECRET }}"
           echo "TDESKTOP_BUILD_API=$API" >> $GITHUB_ENV
 
       - name: Free up some disk space.

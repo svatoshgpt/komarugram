@@ -10,6 +10,7 @@
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "lang/lang_instance.h"
+#include "lang/lang_keys.h"
 #include "storage/localstorage.h"
 
 #include <QDir>
@@ -39,6 +40,26 @@ constexpr auto postfixes = {
 // AyuGram wording for these keys, so its values are dropped on the floor.
 bool IsLocallyOwned(const QString &key) {
 	return (key == qsl("ayu_SettingsDescription"));
+}
+
+// KomaruGram: keys that exist only in KomaruGram. The AyuGram pack has no
+// translations for them, so the Russian text is applied here.
+void ApplyKomaruTranslations() {
+	if (!Lang::Id().startsWith(u"ru"_q)) {
+		return;
+	}
+	const auto values = {
+		std::pair{ "ayu_AnonymousStatistics", u"Анонимная статистика"_q },
+		std::pair{
+			"ayu_AnonymousStatisticsDescription",
+			u"Отправляет в Google Analytics запуски, обновления и сбои "
+			"со случайным ID, не связанным с аккаунтом. Сообщения, "
+			"контакты, номер телефона и юзернеймы не отправляются."_q },
+	};
+	for (const auto &[key, value] : values) {
+		Lang::GetInstance().resetValue(key);
+		Lang::GetInstance().applyValue(key, value.toUtf8());
+	}
 }
 
 QString RebrandValue(QString value) {
@@ -230,5 +251,6 @@ void AyuLanguage::applyLanguageJson(QJsonDocument doc) {
 		Lang::GetInstance().resetValue(key.toUtf8());
 		Lang::GetInstance().applyValue(key.toUtf8(), val.toUtf8());
 	}
+	ApplyKomaruTranslations();
 	Lang::GetInstance().updatePluralRules();
 }

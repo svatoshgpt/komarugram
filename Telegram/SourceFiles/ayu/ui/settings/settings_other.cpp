@@ -8,6 +8,7 @@
 
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/features/analytics/komaru_analytics.h"
 #include "ayu/ui/boxes/donate_qr_box.h"
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
@@ -144,10 +145,18 @@ void BuildDonations(SectionBuilder &builder) {
 }
 
 void BuildCrashReporting(SectionBuilder &builder, AyuSectionBuilder &ayu) {
-#ifndef TDESKTOP_DISABLE_AUTOUPDATE
+	// Statistics are offered on every platform, but only in builds that
+	// carry Measurement Protocol credentials.
+	const auto statistics = KomaruAnalytics::Available();
+#ifdef TDESKTOP_DISABLE_AUTOUPDATE
+	if (!statistics) {
+		return;
+	}
+#endif
 	builder.addSkip();
 	builder.addSubsectionTitle(tr::ayu_CategoryOther());
 
+#ifndef TDESKTOP_DISABLE_AUTOUPDATE
 	ayu.addSettingToggle({
 		.id = u"ayu/crashReporting"_q,
 		.altIds = { u"ayu/crashlytics"_q },
@@ -159,6 +168,19 @@ void BuildCrashReporting(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	builder.addSkip();
 	builder.addDividerText(tr::ayu_CrashReportingDescription());
 #endif
+
+	if (statistics) {
+		builder.addSkip();
+		ayu.addSettingToggle({
+			.id = u"ayu/anonymousStatistics"_q,
+			.title = tr::ayu_AnonymousStatistics(),
+			.getter = &AyuSettings::sendAnonymousStatistics,
+			.setter = &AyuSettings::setSendAnonymousStatistics,
+			.icon = { &st::menuIconStats },
+		});
+		builder.addSkip();
+		builder.addDividerText(tr::ayu_AnonymousStatisticsDescription());
+	}
 }
 
 void BuildOtherThings(SectionBuilder &builder) {

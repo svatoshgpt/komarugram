@@ -7,6 +7,8 @@
 option(TDESKTOP_API_TEST "Use test API credentials." OFF)
 set(TDESKTOP_API_ID "0" CACHE STRING "Provide 'api_id' for the Telegram API access.")
 set(TDESKTOP_API_HASH "" CACHE STRING "Provide 'api_hash' for the Telegram API access.")
+set(KOMARUGRAM_GA_MEASUREMENT_ID "" CACHE STRING "GA4 measurement id for anonymous statistics. Empty builds them out.")
+set(KOMARUGRAM_GA_API_SECRET "" CACHE STRING "GA4 Measurement Protocol API secret for anonymous statistics.")
 
 if (TDESKTOP_API_TEST)
     set(TDESKTOP_API_ID 17349)
