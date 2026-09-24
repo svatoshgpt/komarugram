@@ -235,12 +235,7 @@ Cover::Cover(
 			_badge.widget(),
 			_badge.sizeTag());
 	});
-	const auto isCustomBadge = isCustomBadgePeer(getBareID(_user));
-	const auto isExtera = isExteraPeer(getBareID(_user));
-	const auto isSupporter = isSupporterPeer(getBareID(_user));
-	if (isExtera || isSupporter || isCustomBadge) {
-		_exteraBadge.setPremiumClickCallback(badgeClickHandler(_user));
-	}
+	_exteraBadge.setPremiumClickCallback(badgeClickHandler(_user));
 	rpl::merge(
 		_badge.updated(),
 		_exteraBadge.updated()

@@ -39,7 +39,8 @@ constexpr auto postfixes = {
 // KomaruGram: strings we write ourselves. The remote pack still ships the
 // AyuGram wording for these keys, so its values are dropped on the floor.
 bool IsLocallyOwned(const QString &key) {
-	return (key == qsl("ayu_SettingsDescription"));
+	return (key == qsl("ayu_SettingsDescription"))
+		|| (key == qsl("ayu_DisableOpenLinkWarning"));
 }
 
 // KomaruGram: keys that exist only in KomaruGram. The AyuGram pack has no
@@ -51,6 +52,48 @@ void ApplyKomaruTranslations() {
 	const auto values = {
 		std::pair{ "ayu_AnonymousStatistics", u"Анонимная статистика"_q },
 		std::pair{ "ayu_HideExteraBadges", u"Скрыть значки поддержки"_q },
+		std::pair{
+			"ayu_DisableOpenLinkWarning",
+			u"Не предупреждать о ссылках"_q },
+		std::pair{
+			"ayu_ConfirmationsTitle",
+			u"Спрашивать перед отправкой"_q },
+		std::pair{ "ayu_StickerConfirmation", u"Стикеры"_q },
+		std::pair{ "ayu_GIFConfirmation", u"GIF"_q },
+		std::pair{ "ayu_VoiceConfirmation", u"Голосовые сообщения"_q },
+		std::pair{ "ayu_RoundConfirmation", u"Видеосообщения"_q },
+		std::pair{ "ayu_ShowInProfile", u"Показывать в профиле"_q },
+		std::pair{ "ayu_SupportBoxHeader", u"Поддержать разработку"_q },
+		std::pair{
+			"ayu_SupportBoxInfo",
+			u"Поддерживая проект, вы не только вносите вклад в его развитие, "
+			"но и получаете уникальный значок."_q },
+		std::pair{ "ayu_SupportBoxMakeDonationHeader", u"Сделайте пожертвование"_q },
+		std::pair{ "ayu_SupportBoxSendProofHeader", u"Отправьте подтверждение оплаты"_q },
+		std::pair{
+			"ayu_KomaruSupportProofInfo",
+			u"Отправьте фото подтверждения платежа **{item}**. Убедитесь, что "
+			"на фото хорошо видны сумма, дата и время перевода. Также напишите, "
+			"какого цвета сделать морду и частицы вокруг неё."_q },
+		std::pair{ "ayu_SupportBoxReceiveBadgeHeader", u"Получите значок"_q },
+		std::pair{ "ayu_ProfileRegistrationDate", u"Дата регистрации"_q },
+		std::pair{ "ayu_ProfileDatacenter", u"Сервер (DC)"_q },
+		std::pair{
+			"ayu_KomaruDeveloperPopup",
+			u"**{item}** — участник команды разработки **KomaruGram**."_q },
+		std::pair{
+			"ayu_KomaruSupporterPopup",
+			u"**{item}** поддержал **KomaruGram** и получил уникальный значок. "
+			"Чтобы получить такой же, задонатьте от {amount} через "
+			"**@kdecat**."_q },
+		std::pair{
+			"ayu_KomaruSupportDonationInfo",
+			u"Переведите сумму в размере {amount} на любые реквизиты проекта. "
+			"Их можно найти в разделе **Другое** настроек приложения."_q },
+		std::pair{
+			"ayu_KomaruSupportBadgeInfo",
+			u"После проверки оплаты вы получите уникальный значок, который будет "
+			"отображаться в вашем профиле и будет виден другим пользователям."_q },
 		std::pair{
 			"ayu_AnonymousStatisticsDescription",
 			u"Отправляет в Google Analytics обновления и сбои "

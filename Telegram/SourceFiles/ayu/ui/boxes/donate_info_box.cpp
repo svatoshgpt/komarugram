@@ -7,7 +7,8 @@
 #include "ayu/ui/boxes/donate_info_box.h"
 
 #include "lang_auto.h"
-#include "ayu/utils/rc_manager.h"
+#include "ayu/features/komaru/komaru_badges.h"
+#include "base/timer.h"
 #include "core/ui_integration.h"
 #include "data/data_session.h"
 #include "info/channel_statistics/earn/earn_icons.h"
@@ -38,55 +39,43 @@
 namespace Ui {
 namespace {
 
-QImage MakeSupportLogo() {
-	const auto s = Size(st::supportLogoSize);
-	auto svg = QSvgRenderer(QString(":/gui/icons/ayu/donates/support_logo.svg"));
-	auto image = QImage(
-		s * style::DevicePixelRatio(),
-		QImage::Format_ARGB32_Premultiplied);
-	image.setDevicePixelRatio(style::DevicePixelRatio());
-	image.fill(Qt::transparent);
-	{
-		auto p = QPainter(&image);
-		svg.render(&p, Rect(s));
-	}
-	return image;
-}
+// Who takes the donations and the proof of them.
+constexpr auto kDonateUsername = "kdecat";
 
+// The face a supporter gets, with its particles moving. It is drawn in the
+// text colour: supporters choose their own colours when they send proof.
 object_ptr<Ui::RpWidget> CreateTopLogoWidget(
-	not_null<Ui::RpWidget*> parent) {
-	auto w = object_ptr<Ui::RpWidget>(parent);
-	const auto raw = w.data();
+		not_null<Ui::RpWidget*> parent) {
+	auto result = object_ptr<Ui::RpWidget>(parent);
+	const auto raw = result.data();
 
-	const auto logo = MakeSupportLogo();
-
+	const auto timer = raw->lifetime().make_state<base::Timer>([=] {
+		raw->update();
+	});
+	if (KomaruBadges::Animated()) {
+		timer->callEach(KomaruBadges::kFrameDelay);
+	}
 	raw->paintRequest(
-	) | rpl::on_next(
-		[=](QRect)
-		{
-			QPainter p(raw);
-			PainterHighQualityEnabler hq(p);
+	) | rpl::on_next([=] {
+		auto p = QPainter(raw);
+		const auto size = std::min(raw->width(), raw->height());
+		const auto color = st::windowBoldFg->c;
+		KomaruBadges::Paint(
+			p,
+			QRect(
+				(raw->width() - size) / 2,
+				(raw->height() - size) / 2,
+				size,
+				size),
+			KomaruBadges::Entry{
+				.kind = KomaruBadges::Kind::Supporter,
+				.face = color,
+				.particles = color,
+			},
+			crl::now());
+	}, raw->lifetime());
 
-			const auto original = logo.size() / style::DevicePixelRatio();
-			const auto maxWidth = raw->width() - rect::m::sum::h(st::boxRowPadding);
-			const auto maxHeight = raw->height();
-			if (original.isEmpty() || maxWidth <= 0 || maxHeight <= 0) {
-				return;
-			}
-			const auto scale = std::min(
-				double(maxWidth) / double(original.width()),
-				double(maxHeight) / double(original.height()));
-			const auto target = QSize(
-				int(original.width() * scale),
-				int(original.height() * scale));
-			const auto x = (raw->width() - target.width()) / 2;
-			const auto y = (raw->height() - target.height()) / 2;
-			const auto rect = QRect(QPoint(x, y), target);
-			p.drawImage(rect, logo);
-		},
-		raw->lifetime());
-
-	return w;
+	return result;
 }
 
 object_ptr<Ui::RpWidget> InfoRow(
@@ -165,30 +154,19 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 	Ui::AddSkip(box->verticalLayout());
 	Ui::AddSkip(box->verticalLayout());
 
-	auto emojiHelper = Ui::Text::CustomEmojiHelper();
-	const auto tonSymbol = emojiHelper.paletteDependent({
-		.factory = [=]
-		{
-			return Ui::Earn::IconCurrencyColored(
-				st::boxDividerLabel.style.font,
-				st::boxDividerLabel.textFg->c);
-		},
-		.margin = st::channelEarnCurrencyLearnMargins
-	});
-
-	const auto dollarAmount = RCManager::getInstance().donateAmountUsd().prepend("$");
-	const auto tonAmount = RCManager::getInstance().donateAmountTon();
-	const auto rubleAmount = RCManager::getInstance().donateAmountRub().append("₽");
-
-	const auto innerText = TextWithEntities{}.append(tonSymbol).append(tonAmount).append(", ").append(rubleAmount);
-	const auto str = tr::ayu_SupportBoxMakeDonationInfo(
+	// The badge costs a fixed sum in dollars; the Gram amount follows
+	// the latest exchange rate.
+	const auto usd = u"$"_q
+		+ QString::number(KomaruBadges::kDonateUsd, 'f', 2);
+	const auto gram = KomaruBadges::DonateGramAmount();
+	auto amount = gram.isEmpty()
+		? tr::bold(usd)
+		: tr::bold(gram + u" Gram"_q).append(u" (≈ "_q + usd + ')');
+	const auto str = tr::ayu_KomaruSupportDonationInfo(
 		tr::now,
-		lt_amount1,
-		TextWithEntities{dollarAmount},
-		lt_amount2,
-		innerText,
-		tr::rich
-	);
+		lt_amount,
+		std::move(amount),
+		tr::rich);
 
 	box->verticalLayout()->add(InfoRow(
 		box->verticalLayout(),
@@ -196,16 +174,18 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 		tr::ayu_SupportBoxMakeDonationHeader(tr::now),
 		str,
 		&st::menuIconEarn,
-		emojiHelper.context()));
+		Core::TextContext({
+			.session = &controller->session(),
+		})));
 
 	Ui::AddSkip(box->verticalLayout());
 
-	const auto username = RCManager::getInstance().donateUsername();
+	const auto username = u"@"_q + QString::fromLatin1(kDonateUsername);
 	auto usernameTrimmed = username;
 	if (usernameTrimmed.startsWith('@')) {
 		usernameTrimmed.remove(0, 1);
 	}
-	const TextWithEntities proofText = tr::ayu_SupportBoxSendProofInfo(
+	const TextWithEntities proofText = tr::ayu_KomaruSupportProofInfo(
 		tr::now,
 		lt_item,
 		Ui::Text::Link(username, controller->session().createInternalLinkFull(usernameTrimmed)),
@@ -227,7 +207,7 @@ void FillDonateInfoBox(not_null<Ui::GenericBox*> box, not_null<Window::SessionCo
 		&controller->session(),
 		tr::ayu_SupportBoxReceiveBadgeHeader(tr::now),
 		TextWithEntities{
-			tr::ayu_SupportBoxReceiveBadgeInfo(tr::now)
+			tr::ayu_KomaruSupportBadgeInfo(tr::now)
 		},
 		&st::menuIconStarRefShare,
 		Core::TextContext({

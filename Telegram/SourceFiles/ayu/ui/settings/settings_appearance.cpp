@@ -15,6 +15,8 @@
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
+#include "core/application.h"
+#include "core/core_settings.h"
 #include "inline_bots/bot_attach_web_view.h"
 #include "main/main_session.h"
 #include "settings/settings_builder.h"
@@ -24,11 +26,14 @@
 #include "styles/style_dialogs.h"
 #include "styles/style_layers.h"
 #include "styles/style_menu_icons.h"
+#include "styles/style_polls.h"
 #include "styles/style_settings.h"
 #include "ui/painter.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/padding_wrap.h"
 #include "ui/wrap/vertical_layout.h"
+#include "ui/wrap/vertical_layout_reorder.h"
+#include "ui/widgets/buttons.h"
 #include "window/window_session_controller.h"
 
 namespace Settings {
@@ -281,6 +286,36 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.toggledWhenAll = true,
 	});
 
+	// The rows materialgram adds to user profiles. They used to sit in
+	// Advanced, so their old ids still lead here from search.
+	ayu.addCollapsibleToggle({
+		.id = u"ayu/profileInfo"_q,
+		.altIds = {
+			u"advanced/materialgram_registration"_q,
+			u"advanced/materialgram_datacenter"_q,
+		},
+		.title = tr::ayu_ShowInProfile(),
+		.checkboxes = {
+			NestedEntry{
+				tr::ayu_ProfileRegistrationDate(tr::now),
+				[] { return Core::App().settings().birthDateEnabled(); },
+				[](bool v) {
+					Core::App().settings().setBirthDateEnabled(v);
+					Core::App().saveSettingsDelayed();
+				}
+			},
+			NestedEntry{
+				tr::ayu_ProfileDatacenter(tr::now),
+				[] { return Core::App().settings().datacenterEnabled(); },
+				[](bool v) {
+					Core::App().settings().setDatacenterEnabled(v);
+					Core::App().saveSettingsDelayed();
+				}
+			}
+		},
+		.toggledWhenAll = false,
+	});
+
 	builder.addButton({
 		.id = u"ayu/monoFont"_q,
 		.title = tr::ayu_MonospaceFont(),
@@ -344,101 +379,253 @@ void BuildTrayElements(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 	ayu.addSectionDivider();
 }
 
-void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &ayu) {
+struct DrawerItem {
+	QString settingId;
+	rpl::producer<QString> title;
+	IconDescriptor icon;
+	Fn<bool()> getter;
+	Fn<void(bool)> setter;
+};
+
+[[nodiscard]] DrawerItem LookupDrawerItem(const QString &id) {
+	using Getter = bool (AyuSettings::*)() const;
+	using Setter = void (AyuSettings::*)(bool);
+	const auto toggle = [](
+			QString settingId,
+			rpl::producer<QString> title,
+			IconDescriptor icon,
+			Getter getter,
+			Setter setter) {
+		return DrawerItem{
+			.settingId = std::move(settingId),
+			.title = std::move(title),
+			.icon = std::move(icon),
+			.getter = [=] { return (AyuSettings::getInstance().*getter)(); },
+			.setter = [=](bool v) { (AyuSettings::getInstance().*setter)(v); },
+		};
+	};
+	if (id == u"myProfile"_q) {
+		return toggle(
+			u"ayu/showMyProfileInDrawer"_q,
+			tr::lng_menu_my_profile(),
+			{ &st::menuIconProfile },
+			&AyuSettings::showMyProfileInDrawer,
+			&AyuSettings::setShowMyProfileInDrawer);
+	} else if (id == u"bots"_q) {
+		return toggle(
+			u"ayu/showBotsInDrawer"_q,
+			tr::lng_filters_type_bots(),
+			{ &st::menuIconBot },
+			&AyuSettings::showBotsInDrawer,
+			&AyuSettings::setShowBotsInDrawer);
+	} else if (id == u"newGroup"_q) {
+		return toggle(
+			u"ayu/showNewGroupInDrawer"_q,
+			tr::lng_create_group_title(),
+			{ &st::menuIconGroups },
+			&AyuSettings::showNewGroupInDrawer,
+			&AyuSettings::setShowNewGroupInDrawer);
+	} else if (id == u"newChannel"_q) {
+		return toggle(
+			u"ayu/showNewChannelInDrawer"_q,
+			tr::lng_create_channel_title(),
+			{ &st::menuIconChannel },
+			&AyuSettings::showNewChannelInDrawer,
+			&AyuSettings::setShowNewChannelInDrawer);
+	} else if (id == u"contacts"_q) {
+		return toggle(
+			u"ayu/showContactsInDrawer"_q,
+			tr::lng_menu_contacts(),
+			{ &st::menuIconUserShow },
+			&AyuSettings::showContactsInDrawer,
+			&AyuSettings::setShowContactsInDrawer);
+	} else if (id == u"calls"_q) {
+		return toggle(
+			u"ayu/showCallsInDrawer"_q,
+			tr::lng_menu_calls(),
+			{ &st::menuIconPhone },
+			&AyuSettings::showCallsInDrawer,
+			&AyuSettings::setShowCallsInDrawer);
+	} else if (id == u"savedMessages"_q) {
+		return toggle(
+			u"ayu/showSavedMessagesInDrawer"_q,
+			tr::lng_saved_messages(),
+			{ &st::menuIconSavedMessages },
+			&AyuSettings::showSavedMessagesInDrawer,
+			&AyuSettings::setShowSavedMessagesInDrawer);
+	} else if (id == u"lread"_q) {
+		return toggle(
+			u"ayu/showLReadToggleInDrawer"_q,
+			tr::ayu_LReadMessages(),
+			{ &st::ayuLReadMenuIcon },
+			&AyuSettings::showLReadToggleInDrawer,
+			&AyuSettings::setShowLReadToggleInDrawer);
+	} else if (id == u"sread"_q) {
+		return toggle(
+			u"ayu/showSReadToggleInDrawer"_q,
+			tr::ayu_SReadMessages(),
+			{ &st::ayuSReadMenuIcon },
+			&AyuSettings::showSReadToggleInDrawer,
+			&AyuSettings::setShowSReadToggleInDrawer);
+	} else if (id == u"nightMode"_q) {
+		return toggle(
+			u"ayu/showNightModeToggleInDrawer"_q,
+			tr::lng_menu_night_mode(),
+			{ &st::menuIconNightMode },
+			&AyuSettings::showNightModeToggleInDrawer,
+			&AyuSettings::setShowNightModeToggleInDrawer);
+	} else if (id == u"ghost"_q) {
+		return toggle(
+			u"ayu/showGhostToggleInDrawer"_q,
+			tr::ayu_GhostModeToggle(),
+			{ &st::ayuGhostIcon },
+			&AyuSettings::showGhostToggleInDrawer,
+			&AyuSettings::setShowGhostToggleInDrawer);
+	} else if (id == u"streamer"_q) {
+		return toggle(
+			u"ayu/showStreamerToggleInDrawer"_q,
+			tr::ayu_StreamerModeToggle(),
+			{ &st::ayuStreamerModeMenuIcon },
+			&AyuSettings::showStreamerToggleInDrawer,
+			&AyuSettings::setShowStreamerToggleInDrawer);
+	}
+	// The settings entry is always in the menu; it can only move.
+	return DrawerItem{
+		.settingId = u"ayu/drawerSettings"_q,
+		.title = tr::lng_menu_settings(),
+		.icon = { &st::menuIconSettings },
+	};
+}
+
+// A settings row with room on the left for the drag handle.
+[[nodiscard]] const style::SettingsButton &DrawerRowStyle() {
+	static const auto result = [] {
+		auto st = st::settingsButton;
+		const auto shift = st::pollBoxMenuPollOrderIcon.width();
+		st.padding.setLeft(st.padding.left() + shift);
+		st.iconLeft += shift;
+		return st;
+	}();
+	return result;
+}
+
+[[nodiscard]] not_null<Ui::RpWidget*> AddDragHandle(
+		not_null<Ui::SettingsButton*> button) {
+	const auto &icon = st::pollBoxMenuPollOrderIcon;
+	// A button of its own, so a press on the handle never toggles the row.
+	const auto handle = Ui::CreateChild<Ui::AbstractButton>(button.get());
+	handle->resize(icon.width(), icon.height());
+	handle->setCursor(Qt::SizeVerCursor);
+	handle->paintRequest(
+	) | rpl::on_next([=] {
+		auto p = QPainter(handle);
+		icon.paint(p, 0, 0, handle->width());
+	}, handle->lifetime());
+	button->sizeValue(
+	) | rpl::on_next([=](QSize size) {
+		handle->moveToLeft(
+			st::settingsButton.iconLeft / 2,
+			(size.height() - handle->height()) / 2);
+	}, handle->lifetime());
+	return handle;
+}
+
+void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 	builder.addSubsectionTitle(tr::ayu_DrawerElementsHeader());
 
-	ayu.addSettingToggle({
-		.id = u"ayu/showMyProfileInDrawer"_q,
-		.title = tr::lng_menu_my_profile(),
-		.getter = &AyuSettings::showMyProfileInDrawer,
-		.setter = &AyuSettings::setShowMyProfileInDrawer,
-		.icon = { &st::menuIconProfile },
-	});
-
 	const auto controller = builder.controller();
-	if (controller && HasDrawerBots(controller)) {
-		ayu.addSettingToggle({
-			.id = u"ayu/showBotsInDrawer"_q,
-			.title = tr::lng_filters_type_bots(),
-			.getter = &AyuSettings::showBotsInDrawer,
-			.setter = &AyuSettings::setShowBotsInDrawer,
-			.icon = { &st::menuIconBot },
-		});
+	const auto hasBots = controller && HasDrawerBots(controller);
+#if defined Q_OS_WIN || defined Q_OS_MAC
+	constexpr auto hasStreamer = true;
+#else // Q_OS_WIN || Q_OS_MAC
+	constexpr auto hasStreamer = false;
+#endif // Q_OS_WIN || Q_OS_MAC
+
+	// Rows follow the saved order and are dragged by their handles.
+	auto shown = std::vector<QString>();
+	for (const auto &id : AyuSettings::getInstance().drawerOrder()) {
+		if ((id == u"bots"_q && !hasBots)
+			|| (id == u"streamer"_q && !hasStreamer)) {
+			continue;
+		}
+		shown.push_back(id);
 	}
 
-	ayu.addSettingToggle({
-		.id = u"ayu/showNewGroupInDrawer"_q,
-		.title = tr::lng_create_group_title(),
-		.getter = &AyuSettings::showNewGroupInDrawer,
-		.setter = &AyuSettings::setShowNewGroupInDrawer,
-		.icon = { &st::menuIconGroups },
+	// The rows get a layout of their own, so the reorder moves only them.
+	auto handles = std::vector<not_null<Ui::RpWidget*>>();
+	const auto list = builder.scope([&] {
+		for (const auto &id : shown) {
+			auto item = LookupDrawerItem(id);
+			const auto getter = item.getter;
+			const auto setter = item.setter;
+			const auto button = builder.addButton({
+				.id = item.settingId,
+				.title = std::move(item.title),
+				.st = &DrawerRowStyle(),
+				.icon = std::move(item.icon),
+				.toggled = (getter
+					? rpl::producer<bool>(rpl::single(getter()))
+					: rpl::producer<bool>()),
+			});
+			if (!button) {
+				continue;
+			}
+			if (getter) {
+				button->toggledValue(
+				) | rpl::filter([=](bool enabled) {
+					return (enabled != getter());
+				}) | rpl::on_next([=](bool enabled) {
+					setter(enabled);
+				}, button->lifetime());
+			}
+			handles.push_back(AddDragHandle(button));
+		}
 	});
-	ayu.addSettingToggle({
-		.id = u"ayu/showNewChannelInDrawer"_q,
-		.title = tr::lng_create_channel_title(),
-		.getter = &AyuSettings::showNewChannelInDrawer,
-		.setter = &AyuSettings::setShowNewChannelInDrawer,
-		.icon = { &st::menuIconChannel },
-	});
-	ayu.addSettingToggle({
-		.id = u"ayu/showContactsInDrawer"_q,
-		.title = tr::lng_menu_contacts(),
-		.getter = &AyuSettings::showContactsInDrawer,
-		.setter = &AyuSettings::setShowContactsInDrawer,
-		.icon = { &st::menuIconUserShow },
-	});
-	ayu.addSettingToggle({
-		.id = u"ayu/showCallsInDrawer"_q,
-		.title = tr::lng_menu_calls(),
-		.getter = &AyuSettings::showCallsInDrawer,
-		.setter = &AyuSettings::setShowCallsInDrawer,
-		.icon = { &st::menuIconPhone },
-	});
-	ayu.addSettingToggle({
-		.id = u"ayu/showSavedMessagesInDrawer"_q,
-		.title = tr::lng_saved_messages(),
-		.getter = &AyuSettings::showSavedMessagesInDrawer,
-		.setter = &AyuSettings::setShowSavedMessagesInDrawer,
-		.icon = { &st::menuIconSavedMessages },
-	});
-	ayu.addSettingToggle({
-		.id = u"ayu/showLReadToggleInDrawer"_q,
-		.title = tr::ayu_LReadMessages(),
-		.getter = &AyuSettings::showLReadToggleInDrawer,
-		.setter = &AyuSettings::setShowLReadToggleInDrawer,
-		.icon = { &st::ayuLReadMenuIcon },
-	});
-	ayu.addSettingToggle({
-		.id = u"ayu/showSReadToggleInDrawer"_q,
-		.title = tr::ayu_SReadMessages(),
-		.getter = &AyuSettings::showSReadToggleInDrawer,
-		.setter = &AyuSettings::setShowSReadToggleInDrawer,
-		.icon = { &st::ayuSReadMenuIcon },
-	});
-	ayu.addSettingToggle({
-		.id = u"ayu/showNightModeToggleInDrawer"_q,
-		.title = tr::lng_menu_night_mode(),
-		.getter = &AyuSettings::showNightModeToggleInDrawer,
-		.setter = &AyuSettings::setShowNightModeToggleInDrawer,
-		.icon = { &st::menuIconNightMode },
-	});
-	ayu.addSettingToggle({
-		.id = u"ayu/showGhostToggleInDrawer"_q,
-		.title = tr::ayu_GhostModeToggle(),
-		.getter = &AyuSettings::showGhostToggleInDrawer,
-		.setter = &AyuSettings::setShowGhostToggleInDrawer,
-		.icon = { &st::ayuGhostIcon },
-	});
+	if (!list || handles.size() != shown.size()) {
+		builder.addSkip();
+		return;
+	}
 
-#if defined Q_OS_WIN || defined Q_OS_MAC
-	ayu.addSettingToggle({
-		.id = u"ayu/showStreamerToggleInDrawer"_q,
-		.title = tr::ayu_StreamerModeToggle(),
-		.getter = &AyuSettings::showStreamerToggleInDrawer,
-		.setter = &AyuSettings::setShowStreamerToggleInDrawer,
-		.icon = { &st::ayuStreamerModeMenuIcon },
+	struct Rows {
+		std::vector<QString> ids;
+		std::vector<not_null<Ui::RpWidget*>> handles;
+	};
+	const auto rows = list->lifetime().make_state<Rows>(Rows{
+		.ids = std::move(shown),
+		.handles = std::move(handles),
 	});
-#endif
+	const auto reorder = list->lifetime().make_state<
+		Ui::VerticalLayoutReorder>(list);
+	reorder->setMouseEventProxy([=](int index) -> not_null<Ui::RpWidget*> {
+		return rows->handles[index];
+	});
+	reorder->updates(
+	) | rpl::on_next([=](Ui::VerticalLayoutReorder::Single data) {
+		using ReorderState = Ui::VerticalLayoutReorder::State;
+		if (data.state != ReorderState::Applied) {
+			return;
+		}
+		const auto move = [&](auto &vector) {
+			auto moved = std::move(vector[data.oldPosition]);
+			vector.erase(begin(vector) + data.oldPosition);
+			vector.insert(begin(vector) + data.newPosition, std::move(moved));
+		};
+		move(rows->ids);
+		move(rows->handles);
+
+		// Items not listed here (bots when there are none, the streamer
+		// toggle on Linux) keep their places; the listed ones fill the
+		// remaining places in their new order.
+		auto order = AyuSettings::getInstance().drawerOrder();
+		auto next = begin(rows->ids);
+		for (auto &id : order) {
+			if (ranges::contains(rows->ids, id)) {
+				id = *next++;
+			}
+		}
+		AyuSettings::getInstance().setDrawerOrder(order);
+	}, list->lifetime());
+	reorder->start();
 
 	builder.addSkip();
 }

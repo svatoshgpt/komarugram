@@ -165,8 +165,8 @@ private:
 	rpl::variable<bool> _sendOnlinePackets = true;
 	rpl::variable<bool> _sendUploadProgress = true;
 	rpl::variable<bool> _sendOfflinePacketAfterOnline = false;
-	rpl::variable<bool> _markReadAfterAction = true;
-	rpl::variable<bool> _useScheduledMessages = false;
+	rpl::variable<bool> _markReadAfterAction = false;
+	rpl::variable<bool> _useScheduledMessages = true;
 	rpl::variable<SendWithoutSoundOption> _sendWithoutSound = SendWithoutSoundOption::Never;
 	rpl::variable<bool> _suggestGhostModeBeforeViewingStory = false;
 	rpl::variable<bool> _ghostModeActive = false;
@@ -333,6 +333,11 @@ public:
 	[[nodiscard]] bool showGhostToggleInTray() const { return _showGhostToggleInTray.current(); }
 	[[nodiscard]] bool showStreamerToggleInTray() const { return _showStreamerToggleInTray.current(); }
 	[[nodiscard]] const QString &monoFont() const { return _monoFont.current(); }
+
+	// Main menu items in the order the user arranged them. Always holds
+	// every known item once; ids come from DefaultDrawerOrder().
+	[[nodiscard]] std::vector<QString> drawerOrder() const;
+	[[nodiscard]] static const std::vector<QString> &DefaultDrawerOrder();
 	[[nodiscard]] bool hideNotificationCounters() const { return _hideNotificationCounters.current(); }
 	[[nodiscard]] bool hideNotificationBadge() const { return _hideNotificationBadge.current(); }
 	[[nodiscard]] bool hideAllChatsFolder() const { return _hideAllChatsFolder.current(); }
@@ -422,6 +427,7 @@ public:
 	void setShowGhostToggleInTray(bool val);
 	void setShowStreamerToggleInTray(bool val);
 	void setMonoFont(const QString &val);
+	void setDrawerOrder(const std::vector<QString> &order);
 	void setHideNotificationCounters(bool val);
 	void setHideNotificationBadge(bool val);
 	void setHideAllChatsFolder(bool val);
@@ -645,7 +651,7 @@ private:
 	rpl::variable<bool> _disableCustomBackgrounds = false;
 	rpl::variable<bool> _showOnlyAddedEmojisAndStickers = false;
 	rpl::variable<bool> _collapseSimilarChannels = true;
-	rpl::variable<bool> _hideSimilarChannels = false;
+	rpl::variable<bool> _hideSimilarChannels = true;
 	rpl::variable<int> _messageBubbleRadius = 16;
 	rpl::variable<bool> _disableOpenLinkWarning = false;
 	rpl::variable<double> _wideMultiplier = 1.0;
@@ -695,10 +701,11 @@ private:
 	rpl::variable<bool> _showGhostToggleInDrawer = true;
 	rpl::variable<bool> _showStreamerToggleInDrawer = true;
 	rpl::variable<bool> _showGhostToggleInTray = true;
-	rpl::variable<bool> _showStreamerToggleInTray = false;
+	rpl::variable<bool> _showStreamerToggleInTray = true;
 	rpl::variable<bool> _hidePremiumStatuses = false;
 	rpl::variable<bool> _hideExteraBadges = false;
 	rpl::variable<QString> _monoFont;
+	rpl::variable<QString> _drawerOrder; // Comma-separated item ids.
 	rpl::variable<bool> _hideNotificationCounters = false;
 	rpl::variable<bool> _hideNotificationBadge = false;
 	rpl::variable<bool> _hideAllChatsFolder = false;

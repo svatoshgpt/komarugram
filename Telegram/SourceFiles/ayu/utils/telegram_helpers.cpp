@@ -15,6 +15,7 @@
 #include "ayu/data/entities.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
+#include "ayu/features/komaru/komaru_badges.h"
 #include "ayu/ui/toasts.h"
 #include "ayu/utils/rc_manager.h"
 #include "core/core_settings.h"
@@ -103,7 +104,8 @@ BadgeToastIcon::BadgeToastIcon(
 	0,
 	Info::Profile::BadgeType::Extera
 		| Info::Profile::BadgeType::ExteraSupporter
-		| Info::Profile::BadgeType::ExteraCustom) {
+		| Info::Profile::BadgeType::ExteraCustom
+		| Info::Profile::BadgeType::Komaru) {
 	setAttribute(Qt::WA_TransparentForMouseEvents);
 	_badge.setOverrideStyle(&st::exteraBadgeToastBadge);
 	_badge.updated() | rpl::on_next([=] {
@@ -197,27 +199,43 @@ CustomBadge getCustomBadge(ID peerId) {
 
 [[nodiscard]] Info::Profile::Badge::Content ComputeExteraBadgeContent(
 		not_null<PeerData*> peer) {
+	using Info::Profile::BadgeType;
 	if (AyuSettings::getInstance().hideExteraBadges()) {
 		return {};
-	} else if (isCustomBadgePeer(getBareID(peer))) {
-		return Info::Profile::Badge::Content{
-			.badge = Info::Profile::BadgeType::ExteraCustom,
-			.emojiStatusId = getCustomBadge(getBareID(peer)).emojiStatusId,
-		};
-	} else if (isExteraPeer(getBareID(peer))) {
-		return Info::Profile::Badge::Content{
-			.badge = Info::Profile::BadgeType::Extera,
-		};
-	} else if (isSupporterPeer(getBareID(peer))) {
-		return Info::Profile::Badge::Content{
-			.badge = Info::Profile::BadgeType::ExteraSupporter,
-		};
 	}
-	return {};
+	const auto id = getBareID(peer);
+	auto result = Info::Profile::Badge::Content();
+	if (isCustomBadgePeer(id)) {
+		result.badge = BadgeType::ExteraCustom;
+		result.emojiStatusId = getCustomBadge(id).emojiStatusId;
+	} else if (isExteraPeer(id)) {
+		result.badge = BadgeType::Extera;
+	} else if (isSupporterPeer(id)) {
+		result.badge = BadgeType::ExteraSupporter;
+	}
+
+	// KomaruGram faces go in front of the arrow, or stand alone.
+	result.komaruDeveloper = (KomaruBadges::Developer(id) != nullptr);
+	result.komaruSupporter = (KomaruBadges::Supporter(id) != nullptr);
+	if (result.komaruDeveloper || result.komaruSupporter) {
+		result.komaruPeer = id;
+		if (result.badge == BadgeType::None) {
+			result.badge = BadgeType::Komaru;
+		}
+	}
+	return result;
 }
 
 rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<PeerData*> peer) {
-	return rpl::single(ComputeExteraBadgeContent(peer));
+	// The KomaruGram lists arrive from the network after the profile may
+	// already be open, so follow them and the hide setting.
+	return rpl::single(rpl::empty) | rpl::then(rpl::merge(
+		KomaruBadges::Updated(),
+		AyuSettings::getInstance().hideExteraBadgesChanges(
+		) | rpl::to_empty
+	)) | rpl::map([=] {
+		return ComputeExteraBadgeContent(peer);
+	}) | rpl::distinct_until_changed();
 }
 
 Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
@@ -227,9 +245,31 @@ Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
 		const auto isCustomBadge = isCustomBadgePeer(getBareID(peer));
 		const auto isExtera = isExteraPeer(getBareID(peer));
 		const auto isSupporter = isSupporterPeer(getBareID(peer));
+		const auto komaruDeveloper = badge.komaruDeveloper;
+		const auto komaruSupporter = badge.komaruSupporter;
 
 		TextWithEntities text;
-		if (isCustomBadge) {
+		if (komaruDeveloper) {
+			text = tr::ayu_KomaruDeveloperPopup(
+				tr::now,
+				lt_item,
+				TextWithEntities{peer->name()},
+				tr::rich);
+		} else if (komaruSupporter) {
+			const auto usd = u"$"_q
+				+ QString::number(KomaruBadges::kDonateUsd, 'f', 2);
+			const auto gram = KomaruBadges::DonateGramAmount();
+			const auto amount = gram.isEmpty()
+				? usd
+				: (gram + u" Gram (≈ "_q + usd + ')');
+			text = tr::ayu_KomaruSupporterPopup(
+				tr::now,
+				lt_item,
+				TextWithEntities{peer->name()},
+				lt_amount,
+				TextWithEntities{amount},
+				tr::rich);
+		} else if (isCustomBadge) {
 			const auto custom = getCustomBadge(getBareID(peer));
 			text = custom.text.isEmpty()
 					   ? (isExtera

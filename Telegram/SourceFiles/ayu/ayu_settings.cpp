@@ -207,8 +207,8 @@ void from_json(const nlohmann::json &j, GhostModeAccountSettings &s) {
 	s._sendOnlinePackets = j.value("sendOnlinePackets", true);
 	s._sendUploadProgress = j.value("sendUploadProgress", true);
 	s._sendOfflinePacketAfterOnline = j.value("sendOfflinePacketAfterOnline", false);
-	s._markReadAfterAction = j.value("markReadAfterAction", true);
-	s._useScheduledMessages = j.value("useScheduledMessages", false);
+	s._markReadAfterAction = j.value("markReadAfterAction", false);
+	s._useScheduledMessages = j.value("useScheduledMessages", true);
 	const auto sendWithoutSound = j.find("sendWithoutSound");
 	s._sendWithoutSound = (sendWithoutSound == j.end())
 		? SendWithoutSoundOption::Never
@@ -385,8 +385,8 @@ void AyuSettings::load() {
 					{"sendOnlinePackets", p.value("sendOnlinePackets", true)},
 					{"sendUploadProgress", p.value("sendUploadProgress", true)},
 					{"sendOfflinePacketAfterOnline", p.value("sendOfflinePacketAfterOnline", false)},
-					{"markReadAfterAction", p.value("markReadAfterAction", true)},
-					{"useScheduledMessages", p.value("useScheduledMessages", false)},
+					{"markReadAfterAction", p.value("markReadAfterAction", false)},
+					{"useScheduledMessages", p.value("useScheduledMessages", true)},
 					{"sendWithoutSound", p.value("sendWithoutSound", false)}
 				}}
 			});
@@ -927,6 +927,53 @@ void AyuSettings::setShowStreamerToggleInTray(bool val) {
 	save();
 }
 
+const std::vector<QString> &AyuSettings::DefaultDrawerOrder() {
+	static const auto result = std::vector<QString>{
+		u"myProfile"_q,
+		u"bots"_q,
+		u"newGroup"_q,
+		u"newChannel"_q,
+		u"contacts"_q,
+		u"calls"_q,
+		u"savedMessages"_q,
+		u"lread"_q,
+		u"sread"_q,
+		u"settings"_q,
+		u"nightMode"_q,
+		u"ghost"_q,
+		u"streamer"_q,
+	};
+	return result;
+}
+
+std::vector<QString> AyuSettings::drawerOrder() const {
+	const auto &defaults = DefaultDrawerOrder();
+	auto result = std::vector<QString>();
+	for (const auto &id : _drawerOrder.current().split(',')) {
+		if (ranges::contains(defaults, id) && !ranges::contains(result, id)) {
+			result.push_back(id);
+		}
+	}
+	// Items the saved order does not know about yet go to the end.
+	for (const auto &id : defaults) {
+		if (!ranges::contains(result, id)) {
+			result.push_back(id);
+		}
+	}
+	return result;
+}
+
+void AyuSettings::setDrawerOrder(const std::vector<QString> &order) {
+	auto joined = QStringList();
+	for (const auto &id : order) {
+		joined.push_back(id);
+	}
+	const auto value = joined.join(',');
+	if (_drawerOrder.current() == value) return;
+	_drawerOrder = value;
+	save();
+}
+
 void AyuSettings::setMonoFont(const QString &val) {
 	if (_monoFont.current() == val) return;
 	_monoFont = val;
@@ -1157,6 +1204,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"showGhostToggleInTray", s._showGhostToggleInTray.current()},
 		{"showStreamerToggleInTray", s._showStreamerToggleInTray.current()},
 		{"monoFont", s._monoFont.current()},
+		{"drawerOrder", s._drawerOrder.current()},
 		{"hideNotificationCounters", s._hideNotificationCounters.current()},
 		{"hideNotificationBadge", s._hideNotificationBadge.current()},
 		{"hideAllChatsFolder", s._hideAllChatsFolder.current()},
@@ -1263,6 +1311,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._showGhostToggleInTray = j.value("showGhostToggleInTray", defaults._showGhostToggleInTray.current());
 	s._showStreamerToggleInTray = j.value("showStreamerToggleInTray", defaults._showStreamerToggleInTray.current());
 	s._monoFont = j.value("monoFont", defaults._monoFont.current());
+	s._drawerOrder = j.value("drawerOrder", defaults._drawerOrder.current());
 	s._hideNotificationCounters = j.value("hideNotificationCounters", defaults._hideNotificationCounters.current());
 	s._hideNotificationBadge = j.value("hideNotificationBadge", defaults._hideNotificationBadge.current());
 	s._hideAllChatsFolder = j.value("hideAllChatsFolder", defaults._hideAllChatsFolder.current());

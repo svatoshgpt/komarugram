@@ -112,6 +112,8 @@ set(ayugram_files
         ayu/ayu_worker.h
         ayu/features/analytics/komaru_analytics.cpp
         ayu/features/analytics/komaru_analytics.h
+        ayu/features/komaru/komaru_badges.cpp
+        ayu/features/komaru/komaru_badges.h
         ayu/ayu_url_handlers.cpp
         ayu/ayu_url_handlers.h
         ayu/ayu_state.cpp

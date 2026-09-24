@@ -1,5 +1,8 @@
 <RCC>
     <qresource prefix="/gui">
+        <file alias="art/ayu/komaru_badge.svg">../../art/ayu/komaru_badge.svg</file>
+        <file alias="art/ayu/komaru_dev_face.svg">../../art/ayu/komaru_dev_face.svg</file>
+        <file alias="art/ayu/komaru_dev_rosette.svg">../../art/ayu/komaru_dev_rosette.svg</file>
         <file alias="art/ayu/default/app.png">../../art/ayu/default/app.png</file>
         <file alias="art/ayu/default/app.svg">../../art/ayu/default/app.svg</file>
         <file alias="art/ayu/default/app_icon.ico">../../art/ayu/default/app_icon.ico</file>

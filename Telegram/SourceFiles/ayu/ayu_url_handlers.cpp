@@ -8,6 +8,7 @@
 
 #include "lang_auto.h"
 #include "mainwindow.h"
+#include "ayu/ui/boxes/donate_info_box.h"
 #include "ayu/ui/settings/settings_main.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "base/qthelp_url.h"
@@ -137,6 +138,7 @@ bool HandleSupport(
 	if (!controller) {
 		return false;
 	}
+	controller->show(Box(Ui::FillDonateInfoBox, controller));
 	return true;
 }
 

@@ -134,6 +134,14 @@ void BuildDonations(SectionBuilder &builder) {
 			AddSubsectionTitle(container, tr::ayu_SupportHeader());
 			AddCryptoDonate("Gram", QString("UQAirl_g-9BqSSTGqcX0LHGEyhN_ewZ0ucNakXGrw-h9tMY4"), container);
 			AddSkip(container);
+
+			AddDividerText(container,
+				tr::ayu_SupportDescription2(
+					lt_item,
+					rpl::single(tr::link(
+						tr::ayu_SupportDescription1(tr::now),
+						u"tg://support"_q)),
+					tr::marked));
 		}, [&](const SearchContext &sctx) {
 			sctx.entries->push_back({
 				.id = u"ayu/donate"_q,

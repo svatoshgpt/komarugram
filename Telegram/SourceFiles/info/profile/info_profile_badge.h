@@ -14,6 +14,10 @@ namespace style {
 struct InfoPeerBadge;
 } // namespace style
 
+namespace base {
+class Timer;
+} // namespace base
+
 namespace Data {
 enum class CustomEmojiSizeTag : uchar;
 } // namespace Data
@@ -46,6 +50,7 @@ enum class BadgeType : ushort {
 	Extera = 0x40,
 	ExteraSupporter = 0x80,
 	ExteraCustom = 0x100,
+	Komaru = 0x200,
 };
 inline constexpr bool is_flag_type(BadgeType) { return true; }
 
@@ -54,6 +59,11 @@ public:
 	struct Content {
 		BadgeType badge = BadgeType::None;
 		EmojiStatusId emojiStatusId;
+
+		// KomaruGram faces drawn before the badge itself.
+		uint64 komaruPeer = 0;
+		bool komaruDeveloper = false;
+		bool komaruSupporter = false;
 
 		friend inline bool operator==(Content, Content) = default;
 	};
@@ -90,6 +100,7 @@ private:
 	EmojiStatusPanel *_emojiStatusPanel = nullptr;
 	const int _customStatusLoopsLimit = 0;
 	std::unique_ptr<Ui::Text::CustomEmoji> _emojiStatus;
+	std::unique_ptr<base::Timer> _komaruTimer;
 	base::flags<BadgeType> _allowed;
 	Content _content;
 	Fn<void()> _premiumClickCallback;

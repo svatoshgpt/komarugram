@@ -14,6 +14,10 @@ namespace style {
 struct VerifiedBadge;
 } // namespace style
 
+namespace KomaruBadges {
+struct Entry;
+} // namespace KomaruBadges
+
 namespace Ui {
 
 class UnreadBadge : public RpWidget {
@@ -102,8 +106,15 @@ private:
 	int drawExteraCustom(Painter &p, const Descriptor &descriptor);
 	int drawExteraOfficial(Painter &p, const Descriptor &descriptor);
 	int drawExteraSupporter(Painter &p, const Descriptor &descriptor);
+	int drawKomaru(
+		Painter &p,
+		const Descriptor &descriptor,
+		const KomaruBadges::Entry &entry);
+
+	struct KomaruAnimation;
 
 	std::unique_ptr<EmojiStatus> _emojiStatus;
+	std::unique_ptr<KomaruAnimation> _komaruAnimation;
 	std::unique_ptr<EmojiStatus> _exteraCustomStatus;
 	mutable std::unique_ptr<BotVerifiedData> _botVerifiedData;
 

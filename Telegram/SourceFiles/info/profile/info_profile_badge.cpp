@@ -24,6 +24,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "styles/style_info.h"
 
 // AyuGram includes
+#include "ayu/features/komaru/komaru_badges.h"
+#include "base/timer.h"
 #include "styles/style_ayu_icons.h"
 
 
@@ -35,7 +37,41 @@ namespace {
 		|| (content.badge == BadgeType::Verified && content.emojiStatusId)
 		|| (content.badge == BadgeType::Extera)
 		|| (content.badge == BadgeType::ExteraSupporter)
-		|| (content.badge == BadgeType::ExteraCustom);
+		|| (content.badge == BadgeType::ExteraCustom)
+		|| (content.badge == BadgeType::Komaru);
+}
+
+[[nodiscard]] int KomaruFacesCount(const Badge::Content &content) {
+	return (content.komaruDeveloper ? 1 : 0)
+		+ (content.komaruSupporter ? 1 : 0);
+}
+
+// Looks the faces up on every paint: the lists are replaced when they
+// refresh, so their entries cannot be kept.
+void PaintKomaruFaces(
+		QPainter &p,
+		const Badge::Content &content,
+		int left,
+		int height) {
+	const auto &icon = st::infoExteraSupporterBadge;
+	const auto now = crl::now();
+	const auto top = (height - icon.height()) / 2;
+	const auto paint = [&](const KomaruBadges::Entry *entry) {
+		if (entry) {
+			KomaruBadges::Paint(
+				p,
+				QRect(left, top, icon.width(), icon.height()),
+				*entry,
+				now);
+		}
+		left += icon.width();
+	};
+	if (content.komaruDeveloper) {
+		paint(KomaruBadges::Developer(content.komaruPeer));
+	}
+	if (content.komaruSupporter) {
+		paint(KomaruBadges::Supporter(content.komaruPeer));
+	}
 }
 
 } // namespace
@@ -70,19 +106,24 @@ Ui::RpWidget *Badge::widget() const {
 }
 
 void Badge::setContent(Content content) {
-	if (!(_allowed & content.badge)
+	// KomaruGram faces go wherever the supporter arrow is allowed.
+	const auto permission = (content.badge == BadgeType::Komaru)
+		? BadgeType::ExteraSupporter
+		: content.badge;
+	if (!(_allowed & permission)
 		|| (!_session->premiumBadgesShown()
 			&& content.badge == BadgeType::Premium)) {
 		content.badge = BadgeType::None;
 	}
-	if (!(_allowed & content.badge)) {
-		content.badge = BadgeType::None;
+	if (content.badge == BadgeType::None) {
+		content = Content();
 	}
 	if (_content == content) {
 		return;
 	}
 	_content = content;
 	_emojiStatus = nullptr;
+	_komaruTimer = nullptr;
 	_view.destroy();
 	if (_content.badge == BadgeType::None) {
 		_updated.fire({});
@@ -111,6 +152,18 @@ void Badge::setContent(Content content) {
 		Unexpected("badge type");
 	}());
 	_view->show();
+	const auto faces = _content;
+	const auto facesWidth = KomaruFacesCount(_content)
+		* st::infoExteraSupporterBadge.width();
+	if (facesWidth > 0) {
+		_komaruTimer = std::make_unique<base::Timer>([=] {
+			const auto paused = _animationPaused && _animationPaused();
+			if (_view && !paused && KomaruBadges::Animated()) {
+				_view->update();
+			}
+		});
+		_komaruTimer->callEach(KomaruBadges::kFrameDelay);
+	}
 	switch (_content.badge) {
 	case BadgeType::ExteraCustom:
 	case BadgeType::Verified:
@@ -144,15 +197,24 @@ void Badge::setContent(Content content) {
 					_customStatusLoopsLimit);
 			}
 		}
-		const auto width = emoji + (icon ? icon->width() : 0);
+		// Only the custom badge from the supporter list carries faces here.
+		const auto prefix = (_content.badge == BadgeType::ExteraCustom)
+			? facesWidth
+			: 0;
+		const auto width = prefix + emoji + (icon ? icon->width() : 0);
 		const auto height = std::max(emoji, icon ? icon->height() : 0);
 		_view->resize(width, height);
 		_view->paintRequest(
 		) | rpl::on_next([=, check = _view.data()]{
+			if (prefix) {
+				auto p = QPainter(check);
+				PaintKomaruFaces(p, faces, 0, check->height());
+			}
 			if (_emojiStatus) {
 				auto args = Ui::Text::CustomEmoji::Context{
 					.textColor = style.premiumFg->c,
 					.now = crl::now(),
+					.position = QPoint(prefix, 0),
 					.paused = ((_animationPaused && _animationPaused())
 						|| On(PowerSaving::kEmojiStatus)),
 				};
@@ -167,23 +229,27 @@ void Badge::setContent(Content content) {
 				if (_overrideSt && !iconForeground) {
 					icon->paint(
 						p,
-						emoji,
+						prefix + emoji,
 						0,
 						check->width(),
 						_overrideSt->premiumFg->c);
 				} else {
-					icon->paint(p, emoji, 0, check->width());
+					icon->paint(p, prefix + emoji, 0, check->width());
 				}
 				if (iconForeground) {
 					if (_overrideSt) {
 						iconForeground->paint(
 							p,
-							emoji,
+							prefix + emoji,
 							0,
 							check->width(),
 							_overrideSt->premiumFg->c);
 					} else {
-						iconForeground->paint(p, emoji, 0, check->width());
+						iconForeground->paint(
+							p,
+							prefix + emoji,
+							0,
+							check->width());
 					}
 				}
 			}
@@ -224,16 +290,29 @@ void Badge::setContent(Content content) {
 							   : &st::infoExteraSupporterBadge);
 		const auto skip = st::infoVerifiedCheckPosition.x();
 		_view->resize(
-			icon->width() + skip,
+			skip + facesWidth + icon->width(),
 			icon->height());
 		_view->paintRequest(
 		) | rpl::on_next([=, check = _view.data()]{
 			Painter p(check);
+			PaintKomaruFaces(p, faces, skip, check->height());
+			const auto left = skip + facesWidth;
 			if (_overrideSt) {
-				icon->paint(p, skip, 0, check->width(), _overrideSt->premiumFg->c);
+				icon->paint(p, left, 0, check->width(), _overrideSt->premiumFg->c);
 			} else {
-				icon->paint(p, skip, 0, check->width());
+				icon->paint(p, left, 0, check->width());
 			}
+		}, _view->lifetime());
+	} break;
+	case BadgeType::Komaru: {
+		const auto skip = st::infoVerifiedCheckPosition.x();
+		_view->resize(
+			skip + facesWidth,
+			st::infoExteraSupporterBadge.height());
+		_view->paintRequest(
+		) | rpl::on_next([=, check = _view.data()]{
+			auto p = QPainter(check);
+			PaintKomaruFaces(p, faces, skip, check->height());
 		}, _view->lifetime());
 	} break;
 	}

@@ -1329,40 +1329,6 @@ void BuildMaterialgramSection(SectionBuilder &builder) {
 		.keywords = { u"materialgram"_q },
 	});
 
-	const auto registration = builder.addButton({
-		.id = u"advanced/materialgram_registration"_q,
-		.title = tr::lng_materialgram_info_registration(),
-		.st = &st::settingsButtonNoIcon,
-		.toggled = rpl::single(settings->birthDateEnabled()),
-		.keywords = { u"materialgram"_q, u"registration"_q, u"date"_q },
-	});
-	if (registration) {
-		registration->toggledValue(
-		) | rpl::filter([=](bool enabled) {
-			return (enabled != settings->birthDateEnabled());
-		}) | rpl::on_next([=](bool enabled) {
-			settings->setBirthDateEnabled(enabled);
-			Core::App().saveSettingsDelayed();
-		}, registration->lifetime());
-	}
-
-	const auto datacenter = builder.addButton({
-		.id = u"advanced/materialgram_datacenter"_q,
-		.title = tr::lng_materialgram_info_dc(),
-		.st = &st::settingsButtonNoIcon,
-		.toggled = rpl::single(settings->datacenterEnabled()),
-		.keywords = { u"materialgram"_q, u"datacenter"_q, u"dc"_q },
-	});
-	if (datacenter) {
-		datacenter->toggledValue(
-		) | rpl::filter([=](bool enabled) {
-			return (enabled != settings->datacenterEnabled());
-		}) | rpl::on_next([=](bool enabled) {
-			settings->setDatacenterEnabled(enabled);
-			Core::App().saveSettingsDelayed();
-		}, datacenter->lifetime());
-	}
-
 	const auto gamee = builder.addButton({
 		.id = u"advanced/materialgram_gamee"_q,
 		.title = tr::lng_settings_profile_photo_privacy(),

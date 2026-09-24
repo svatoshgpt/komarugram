@@ -23,6 +23,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/komaru/komaru_badges.h"
+#include "base/timer.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "styles/style_info.h"
 
@@ -126,6 +128,18 @@ struct PeerBadge::EmojiStatus {
 	QColor lastColor;
 	int skip = 0;
 	bool painted = false;
+};
+
+struct PeerBadge::KomaruAnimation {
+	KomaruAnimation() : timer([this] {
+		if (repaint) {
+			repaint();
+		}
+	}) {
+	}
+
+	Fn<void()> repaint;
+	base::Timer timer;
 };
 
 struct PeerBadge::BotVerifiedData {
@@ -298,6 +312,21 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 	} else if (paintExteraSupporter) {
 		exteraWidth = descriptor.exteraSupporter->width();
 	}
+
+	// KomaruGram faces sit between the name and the arrow: the developer
+	// face first, then the supporter one. They hide with the arrows.
+	const auto komaruDeveloper = hideExteraBadges
+		? nullptr
+		: KomaruBadges::Developer(getBareID(peer));
+	const auto komaruSupporter = hideExteraBadges
+		? nullptr
+		: KomaruBadges::Supporter(getBareID(peer));
+	const auto komaruSize = descriptor.exteraSupporter->width();
+	const auto komaruWidth = (komaruDeveloper ? komaruSize : 0)
+		+ (komaruSupporter ? komaruSize : 0);
+	const auto paintKomaru = (komaruWidth > 0);
+	const auto paintTail = paintExtera || paintKomaru;
+	const auto tailWidth = exteraWidth + komaruWidth;
 	const auto customEmojiSkip = (st::emojiSize
 		- Ui::Text::AdjustCustomEmojiSize(st::emojiSize)) / 2;
 	const auto exteraCustomWidth = paintExteraCustom
@@ -317,11 +346,11 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 		if (paintExteraCustom) {
 			rectForName.setWidth(rectForName.width() - exteraCustomWidth);
 		}
-		if (paintExtera) {
-			rectForName.setWidth(rectForName.width() - exteraWidth);
+		if (paintTail) {
+			rectForName.setWidth(rectForName.width() - tailWidth);
 		}
 		result += drawPremiumEmojiStatus(p, descriptor);
-		if (!paintVerify && !paintExteraCustom && !paintExtera) {
+		if (!paintVerify && !paintExteraCustom && !paintTail) {
 			return result;
 		}
 		if (verifyAfterEmojiWidth) {
@@ -330,41 +359,61 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 		if (paintExteraCustom) {
 			rectForName.setWidth(rectForName.width() + exteraCustomWidth);
 		}
-		if (paintExtera) {
-			rectForName.setWidth(rectForName.width() + exteraWidth);
+		if (paintTail) {
+			rectForName.setWidth(rectForName.width() + tailWidth);
 		}
 		descriptor.nameWidth += result;
 	}
 
 	if (paintExteraCustom) {
 		auto &rectForName = descriptor.rectForName;
-		if (paintVerify) {
-			rectForName.setWidth(rectForName.width() - verifyWidth);
-		}
+		const auto reserve = komaruWidth + (paintVerify ? verifyWidth : 0);
+		rectForName.setWidth(rectForName.width() - reserve);
 		result += drawExteraCustom(p, descriptor);
-		if (!paintVerify) {
+		if (!paintVerify && !paintKomaru) {
 			return result;
 		}
-		if (paintVerify) {
-			rectForName.setWidth(rectForName.width() + verifyWidth);
-		}
+		rectForName.setWidth(rectForName.width() + reserve);
 		descriptor.nameWidth += result;
 	} else if (_emojiStatus) {
 		_emojiStatus->painted = false;
 	}
 
-	if (paintExtera) {
+	if (paintTail) {
+		// Draws one badge while keeping room for the ones after it.
+		auto &rectForName = descriptor.rectForName;
+		const auto drawKeeping = [&](int after, auto &&draw) {
+			rectForName.setWidth(rectForName.width() - after);
+			const auto width = draw();
+			rectForName.setWidth(rectForName.width() + after);
+			result += width;
+			descriptor.nameWidth += width;
+		};
+		// The arrow takes the place of the verified check, as before.
+		const auto afterKomaru = exteraWidth
+			+ ((paintVerify && !paintExtera) ? verifyWidth : 0);
 		if (paintStar) {
-			auto &rectForName = descriptor.rectForName;
-			rectForName.setWidth(rectForName.width() - exteraWidth);
-			result += drawPremiumStar(p, descriptor);
-			rectForName.setWidth(rectForName.width() + exteraWidth);
-			descriptor.nameWidth += result;
+			drawKeeping(komaruWidth + afterKomaru, [&] {
+				return drawPremiumStar(p, descriptor);
+			});
+		}
+		if (komaruDeveloper) {
+			const auto supporter = komaruSupporter ? komaruSize : 0;
+			drawKeeping(supporter + afterKomaru, [&] {
+				return drawKomaru(p, descriptor, *komaruDeveloper);
+			});
+		}
+		if (komaruSupporter) {
+			drawKeeping(afterKomaru, [&] {
+				return drawKomaru(p, descriptor, *komaruSupporter);
+			});
 		}
 		if (paintExteraDev) {
 			result += drawExteraOfficial(p, descriptor);
-		} else {
+		} else if (paintExteraSupporter) {
 			result += drawExteraSupporter(p, descriptor);
+		} else if (paintVerify) {
+			result += drawVerifyCheck(p, descriptor);
 		}
 		return result;
 	}
@@ -540,6 +589,33 @@ int PeerBadge::drawExteraSupporter(Painter &p, const Descriptor &descriptor) {
 		rectForName.x() + qMin(nameWidth, rectForName.width() - iconw),
 		rectForName.y(),
 		descriptor.outerWidth);
+	return iconw;
+}
+
+int PeerBadge::drawKomaru(
+		Painter &p,
+		const Descriptor &descriptor,
+		const KomaruBadges::Entry &entry) {
+	const auto icon = descriptor.exteraSupporter;
+	const auto iconw = icon->width();
+	const auto rectForName = descriptor.rectForName;
+	const auto left = rectForName.x()
+		+ std::min(descriptor.nameWidth, rectForName.width() - iconw);
+	const auto now = descriptor.now ? descriptor.now : crl::now();
+	KomaruBadges::Paint(
+		p,
+		QRect(left, rectForName.y(), iconw, icon->height()),
+		entry,
+		now);
+	if (!descriptor.paused && KomaruBadges::Animated()) {
+		if (!_komaruAnimation) {
+			_komaruAnimation = std::make_unique<KomaruAnimation>();
+		}
+		_komaruAnimation->repaint = descriptor.customEmojiRepaint;
+		if (!_komaruAnimation->timer.isActive()) {
+			_komaruAnimation->timer.callOnce(KomaruBadges::kFrameDelay);
+		}
+	}
 	return iconw;
 }
 

@@ -520,12 +520,9 @@ TopBar::TopBar(
 			_botVerify->updated());
 	}
 	if (_exteraBadge) {
-		const auto isCustomBadge = isCustomBadgePeer(getBareID(_peer));
-		const auto isExtera = isExteraPeer(getBareID(_peer));
-		const auto isSupporter = isSupporterPeer(getBareID(_peer));
-		if (isExtera || isSupporter || isCustomBadge) {
-			_exteraBadge->setPremiumClickCallback(badgeClickHandler(_peer));
-		}
+		// The handler works out what was clicked; the KomaruGram lists can
+		// arrive after this, so it is set up regardless.
+		_exteraBadge->setPremiumClickCallback(badgeClickHandler(_peer));
 		badgeUpdates = rpl::merge(
 			std::move(badgeUpdates),
 			_exteraBadge->updated());
