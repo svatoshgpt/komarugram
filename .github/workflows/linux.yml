@@ -88,3 +88,6 @@ jobs:
           tag_name: ${{ env.TAGNAME }}
           token: ${{ secrets.GITHUB_TOKEN }}
           files: out/install/KomaruGram-${{ env.TAGNAME }}.tar.zst
+          # The Windows feed job marks the release latest once the update
+          # feed is uploaded; until then clients keep the previous one.
+          make_latest: false

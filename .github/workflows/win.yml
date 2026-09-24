@@ -317,8 +317,10 @@ jobs:
           ZIP="KomaruGram-$TAG-windows-$SUFFIX.zip"
           python -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED); [z.write('artifact/'+n, n) for n in ('KomaruGram.exe','Updater.exe')]" "$ZIP"
 
+          # Not marked latest yet: the update feed is served from the latest
+          # release, so the feed job promotes it once current6 is in place.
           if ! gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
-            gh release create "$TAG" -R "$REPO" --title "KomaruGram $TAG" --notes "Built from $GITHUB_SHA." --verify-tag || true
+            gh release create "$TAG" -R "$REPO" --title "KomaruGram $TAG" --notes "Built from $GITHUB_SHA." --verify-tag --latest=false || true
           fi
           gh release upload "$TAG" -R "$REPO" --clobber "$ZIP" update/*
 
@@ -356,3 +358,4 @@ jobs:
           printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s"}}}\n' \
             "$V" "$V" "$V" "$V" > current6
           gh release upload "$TAG" -R "$REPO" --clobber current6
+          gh release edit "$TAG" -R "$REPO" --latest
