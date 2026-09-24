@@ -391,9 +391,8 @@ void BuildSectionButtons(SectionBuilder &builder) {
 		.icon = { &st::menuIconPremium },
 		.keywords = { u"ayu"_q },
 	});
-	builder.addSkip();
-	builder.addDivider();
-	builder.addSkip();
+	// KomaruGram: the preferences button starts the list of sections
+	// instead of sitting between two dividers of its own.
 
 	if (!session->supportMode()) {
 		builder.addSectionButton({
@@ -744,7 +743,7 @@ void Main::setupContent() {
 			.isPaused = isPaused,
 			.highlights = highlights,
 		});
-		builder.addDivider();
+		// KomaruGram: no divider band between the cover and the sections.
 		builder.addSkip();
 		BuildValidationSuggestions(builder);
 		BuildSectionButtons(builder);
