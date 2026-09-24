@@ -317,12 +317,42 @@ jobs:
           ZIP="KomaruGram-$TAG-windows-$SUFFIX.zip"
           python -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED); [z.write('artifact/'+n, n) for n in ('KomaruGram.exe','Updater.exe')]" "$ZIP"
 
-          # Every job writes the same feed, so whichever lands last is right.
-          V="$UPDATE_VERSION"
-          printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s"}}}\n' \
-            "$V" "$V" "$V" "$V" > current6
-
           if ! gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
             gh release create "$TAG" -R "$REPO" --title "KomaruGram $TAG" --notes "Built from $GITHUB_SHA." --verify-tag || true
           fi
-          gh release upload "$TAG" -R "$REPO" --clobber "$ZIP" update/* current6
+          gh release upload "$TAG" -R "$REPO" --clobber "$ZIP" update/*
+
+  feed:
+    name: Update feed
+    # Runs only when every Windows build succeeded. Publishing the feed from
+    # the build jobs let the first one to finish point clients at a package
+    # the other had not uploaded yet, or never would.
+    needs: windows
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get version.
+        uses: actions/checkout@v7
+        with:
+          sparse-checkout: Telegram/SourceFiles/core/version.h
+          sparse-checkout-cone-mode: false
+
+      - name: Publish update feed.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="$GITHUB_REPOSITORY"
+          TAG="$GITHUB_REF_NAME"
+          V=$(sed -n 's/.*constexpr auto AppVersion = \([0-9]*\);.*/\1/p' \
+            Telegram/SourceFiles/core/version.h)
+          [ -n "$V" ] || { echo "::error::AppVersion not found"; exit 1; }
+
+          ASSETS=$(gh release view "$TAG" -R "$REPO" --json assets --jq '.assets[].name')
+          for f in "tx64upd$V" "tupdate$V"; do
+            grep -qx "$f" <<< "$ASSETS" || { echo "::error::$f is not in the release"; exit 1; }
+          done
+
+          printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s"}}}\n' \
+            "$V" "$V" "$V" "$V" > current6
+          gh release upload "$TAG" -R "$REPO" --clobber current6
