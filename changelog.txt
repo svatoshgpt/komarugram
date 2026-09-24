@@ -1,3 +1,9 @@
+7.2.9-1.3.1 (24.09.26)
+
+- Anonymous statistics report only updates and crashes, no longer launches.
+- The main menu no longer shows the app name and version; they are in KomaruGram settings.
+- The update feed is published only after both Windows builds are ready.
+
 7.2.9-1.3 (24.09.26)
 
 - Anonymous statistics: launches, updates and crashes, with a random ID not tied to your account. Turn them off in Settings, Other.

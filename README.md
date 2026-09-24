@@ -75,9 +75,9 @@ release. The workflows need these repository secrets:
   safe: without it, installed clients cannot receive updates.
 
 The release version comes from `Telegram/SourceFiles/core/version.h`. KomaruGram
-numbers its releases on top of the Telegram Desktop base as `patch * 10 + fix`:
-7.2.9-k1.2 is `7002092`. The number must grow with every release, or installed
-clients will not see the update.
+numbers its releases on top of the Telegram Desktop base: the base's number times ten
+plus a release counter, so 7.2.9-k1.2 is `7002092` and 7.2.9-k1.3.1 is `7002094`. Every
+release takes the next number, or installed clients will not see the update.
 
 ## Support the project
 
