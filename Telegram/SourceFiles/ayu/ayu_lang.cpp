@@ -83,6 +83,9 @@ void ApplyKomaruTranslations() {
 			"ayu_KomaruDeveloperPopup",
 			u"**{item}** — участник команды разработки **KomaruGram**."_q },
 		std::pair{
+			"ayu_KomaruOfficialResourcePopup",
+			u"**{item}** — официальный ресурс **KomaruGram**."_q },
+		std::pair{
 			"ayu_KomaruSupporterPopup",
 			u"**{item}** поддержал **KomaruGram** и получил уникальный значок. "
 			"Чтобы получить такой же, задонатьте от {amount} через "

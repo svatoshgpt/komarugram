@@ -95,8 +95,9 @@ struct State {
 				? QColor(QRgb(0xFF000000U | rgb))
 				: fallback;
 		};
-		auto face = color(1, kDefaultFace);
-		auto particles = color(2, face);
+		// A line with a single colour uses it for both.
+		auto particles = color(1, kDefaultFace);
+		auto face = color(2, particles);
 		auto ok = false;
 		const auto alpha = (parts.size() > 3)
 			? parts[3].trimmed().toInt(&ok)

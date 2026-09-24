@@ -250,11 +250,18 @@ Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
 
 		TextWithEntities text;
 		if (komaruDeveloper) {
-			text = tr::ayu_KomaruDeveloperPopup(
-				tr::now,
-				lt_item,
-				TextWithEntities{peer->name()},
-				tr::rich);
+			// Channels in the developer list are the project's own.
+			text = peer->isUser()
+				? tr::ayu_KomaruDeveloperPopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{peer->name()},
+					tr::rich)
+				: tr::ayu_KomaruOfficialResourcePopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{peer->name()},
+					tr::rich);
 		} else if (komaruSupporter) {
 			const auto usd = u"$"_q
 				+ QString::number(KomaruBadges::kDonateUsd, 'f', 2);

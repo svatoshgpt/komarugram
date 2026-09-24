@@ -2,9 +2,10 @@
 //
 // Badges for KomaruGram developers and supporters. Both lists live in a gist:
 // badges.txt for developers and donates.txt for supporters, one person per
-// line as "id,#face,#particles,alpha". The Komaru face is drawn in the first
-// colour with animated particles around it in the second, and the alpha
-// applies to both.
+// line as "id,#particles,#face,alpha", the order the mobile client reads
+// them in. The Komaru face (and a developer's rosette) is drawn in the
+// second colour with animated particles around it in the first, and the
+// alpha applies to both. Channels are listed by their bare id, without -100.
 #pragma once
 
 #include <crl/crl_time.h>
