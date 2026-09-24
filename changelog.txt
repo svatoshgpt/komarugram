@@ -1,3 +1,14 @@
+7.2.9-1.3.3 (24.09.26)
+
+- Komaru faces and exteraGram / AyuGram badges show right after launch and update without a scroll or hover.
+- Badge colours are read as particles first, face second, like in the mobile client.
+- Partners from KomaruGif get a Komaru face and their own popup; the supporter popup is shorter.
+- Channels in the developer list are shown as an official resource of KomaruGram.
+- The tray icon uses the KomaruGramPremium face again, sized like the Telegram plane.
+- No more divider bands around KomaruGram Preferences in settings.
+- No doubled separator in the main menu when My Profile is moved down.
+- Hidden Profile Photos moved from Advanced to Show in Profile in Appearance.
+
 7.2.9-1.3.2 (24.09.26)
 
 - KomaruGram developers and supporters get a Komaru face next to their name, in their own colours, with moving particles.
