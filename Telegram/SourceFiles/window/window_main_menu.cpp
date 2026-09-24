@@ -418,6 +418,11 @@ MainMenu::MainMenu(
 			controller->show(Box(AboutBox, controller));
 		}));
 
+	// KomaruGram shows the name and version in its own settings section,
+	// so the menu footer stays empty.
+	_telegram->hide();
+	_version->hide();
+
 	rpl::combine(
 		_toggleAccounts->rightSkipValue(),
 		rpl::single(rpl::empty) | rpl::then(_badge->updated()),
