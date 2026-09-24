@@ -1,7 +1,8 @@
 // This is the source code of KomaruGram for Desktop.
 //
-// Badges for KomaruGram developers and supporters. Both lists live in a gist:
-// badges.txt for developers and donates.txt for supporters, one person per
+// Badges for KomaruGram developers, supporters and partners. The lists live
+// in a gist: badges.txt for developers, donates.txt for supporters and
+// partner.txt for partners from KomaruGif, one person per
 // line as "id,#particles,#face,alpha", the order the mobile client reads
 // them in. The Komaru face (and a developer's rosette) is drawn in the
 // second colour with animated particles around it in the first, and the
@@ -16,6 +17,7 @@ namespace KomaruBadges {
 enum class Kind : uchar {
 	Developer,
 	Supporter,
+	Partner,
 };
 
 struct Entry {
@@ -35,7 +37,10 @@ void Start();
 
 // A person can be in both lists and then shows both faces.
 [[nodiscard]] const Entry *Developer(uint64 peerId);
+// Supporters and partners share the supporter face; Supporter() returns
+// either, and IsPartner() tells which one it is for the popup text.
 [[nodiscard]] const Entry *Supporter(uint64 peerId);
+[[nodiscard]] bool IsPartner(uint64 peerId);
 
 // Fires when a list or the rate changes.
 [[nodiscard]] rpl::producer<> Updated();

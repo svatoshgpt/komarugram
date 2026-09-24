@@ -263,19 +263,17 @@ Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
 					TextWithEntities{peer->name()},
 					tr::rich);
 		} else if (komaruSupporter) {
-			const auto usd = u"$"_q
-				+ QString::number(KomaruBadges::kDonateUsd, 'f', 2);
-			const auto gram = KomaruBadges::DonateGramAmount();
-			const auto amount = gram.isEmpty()
-				? usd
-				: (gram + u" Gram (≈ "_q + usd + ')');
-			text = tr::ayu_KomaruSupporterPopup(
-				tr::now,
-				lt_item,
-				TextWithEntities{peer->name()},
-				lt_amount,
-				TextWithEntities{amount},
-				tr::rich);
+			text = KomaruBadges::IsPartner(getBareID(peer))
+				? tr::ayu_KomaruPartnerPopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{peer->name()},
+					tr::rich)
+				: tr::ayu_KomaruSupporterPopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{peer->name()},
+					tr::rich);
 		} else if (isCustomBadge) {
 			const auto custom = getCustomBadge(getBareID(peer));
 			text = custom.text.isEmpty()

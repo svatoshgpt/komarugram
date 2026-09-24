@@ -43,6 +43,7 @@ constexpr auto kTwinklePeriod = 1400.;
 struct State {
 	std::unordered_map<uint64, Entry> developers;
 	std::unordered_map<uint64, Entry> supporters;
+	std::unordered_map<uint64, Entry> partners;
 	double rate = 0.;
 	rpl::event_stream<> updated;
 	bool started = false;
@@ -117,6 +118,8 @@ struct State {
 void FetchList(Kind kind) {
 	const auto name = (kind == Kind::Developer)
 		? u"badges.txt"_q
+		: (kind == Kind::Partner)
+		? u"partner.txt"_q
 		: u"donates.txt"_q;
 	const auto reply = Get(QString::fromLatin1(kGistRaw) + name);
 	QObject::connect(reply, &QNetworkReply::finished, [=] {
@@ -131,6 +134,8 @@ void FetchList(Kind kind) {
 		auto parsed = ParseList(kind, reply->readAll());
 		auto &list = (kind == Kind::Developer)
 			? state.developers
+			: (kind == Kind::Partner)
+			? state.partners
 			: state.supporters;
 		list = std::move(parsed);
 		state.updated.fire({});
@@ -207,6 +212,7 @@ void FetchRate(int index = 0) {
 void Refresh() {
 	FetchList(Kind::Developer);
 	FetchList(Kind::Supporter);
+	FetchList(Kind::Partner);
 	FetchRate();
 }
 
@@ -302,9 +308,21 @@ const Entry *Developer(uint64 peerId) {
 }
 
 const Entry *Supporter(uint64 peerId) {
-	const auto &list = Instance().supporters;
-	const auto i = list.find(peerId);
-	return (i != end(list)) ? &i->second : nullptr;
+	const auto &state = Instance();
+	if (const auto i = state.supporters.find(peerId);
+		i != end(state.supporters)) {
+		return &i->second;
+	} else if (const auto j = state.partners.find(peerId);
+		j != end(state.partners)) {
+		return &j->second;
+	}
+	return nullptr;
+}
+
+bool IsPartner(uint64 peerId) {
+	const auto &state = Instance();
+	return !state.supporters.contains(peerId)
+		&& state.partners.contains(peerId);
 }
 
 rpl::producer<> Updated() {

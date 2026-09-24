@@ -9192,7 +9192,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_OfficialResourcePopup" = "**{item}** is the official resource of **exteraGram** or **KomaruGram**.";
 "ayu_KomaruDeveloperPopup" = "**{item}** is a member of the **KomaruGram** development team.";
 "ayu_KomaruOfficialResourcePopup" = "**{item}** is an official resource of **KomaruGram**.";
-"ayu_KomaruSupporterPopup" = "**{item}** supported **KomaruGram** and received a unique badge. To get one, donate {amount} or more through **@kdecat**.";
+"ayu_KomaruSupporterPopup" = "**{item}** supported **KomaruGram** and received a unique badge.";
+"ayu_KomaruPartnerPopup" = "**{item}** is a partner from **KomaruGif**.";
 "ayu_KomaruSupportDonationInfo" = "Transfer an amount of {amount} to any of the project's payment details. These can be found in the **Other** section of the app settings.";
 "ayu_ShowInProfile" = "Show in Profile";
 "ayu_ProfileRegistrationDate" = "Registration Date";
