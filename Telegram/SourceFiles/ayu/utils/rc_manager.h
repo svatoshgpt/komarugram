@@ -10,6 +10,8 @@
 
 #include <QtNetwork/QNetworkReply>
 
+#include <rpl/event_stream.h>
+
 extern std::unordered_set<ID> default_developers;
 extern std::unordered_set<ID> default_channels;
 
@@ -77,6 +79,11 @@ public:
 		return _donateAmountRub;
 	}
 
+	// Fires when a map is applied, from the cache or the network.
+	[[nodiscard]] rpl::producer<> updated() const {
+		return _updated.events();
+	}
+
 private:
 	RCManager() = default;
 	~RCManager();
@@ -90,6 +97,8 @@ private:
 	void clearSentRequest();
 	bool handleResponse(const QByteArray &response);
 	bool applyResponse(const QByteArray &response);
+	void loadCached();
+	void saveCached(const QByteArray &response);
 
 	bool initialized = false;
 
@@ -110,5 +119,7 @@ private:
 	QNetworkReply *_reply = nullptr;
 	bool _useExteraFallback = false;
 	bool _retryAttempted = false;
+
+	rpl::event_stream<> _updated;
 
 };

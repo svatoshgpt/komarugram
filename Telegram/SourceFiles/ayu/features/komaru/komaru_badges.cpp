@@ -6,6 +6,7 @@
 #include "ui/style/style_core.h"
 
 #include <QtCore/QCoreApplication>
+#include <QtCore/QDir>
 #include <QtCore/QFile>
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
@@ -15,6 +16,7 @@
 #include <QtNetwork/QNetworkReply>
 #include <QtNetwork/QNetworkRequest>
 #include <QtSvg/QSvgRenderer>
+#include <QtWidgets/QApplication>
 
 #include <rpl/event_stream.h>
 
@@ -44,6 +46,7 @@ struct State {
 	std::unordered_map<uint64, Entry> developers;
 	std::unordered_map<uint64, Entry> supporters;
 	std::unordered_map<uint64, Entry> partners;
+	std::map<Kind, QByteArray> raw;
 	double rate = 0.;
 	rpl::event_stream<> updated;
 	bool started = false;
@@ -115,12 +118,61 @@ struct State {
 	return result;
 }
 
-void FetchList(Kind kind) {
-	const auto name = (kind == Kind::Developer)
-		? u"badges.txt"_q
+[[nodiscard]] QString ListName(Kind kind) {
+	switch (kind) {
+	case Kind::Developer: return u"badges.txt"_q;
+	case Kind::Supporter: return u"donates.txt"_q;
+	case Kind::Partner: return u"partner.txt"_q;
+	}
+	Unexpected("Kind in KomaruBadges::ListName.");
+}
+
+// The last lists received, so faces show from the first frame instead of
+// popping in once the gist answers.
+[[nodiscard]] QString CachePath(Kind kind) {
+	return cWorkingDir() + u"tdata/komaru_badges/"_q + ListName(kind);
+}
+
+// Chat lists paint badges only when something else repaints them, so new
+// faces would otherwise not show until the next scroll or hover.
+void RepaintAll() {
+	for (const auto widget : QApplication::allWidgets()) {
+		widget->update();
+	}
+}
+
+// Returns whether the list changed.
+bool ApplyList(Kind kind, const QByteArray &data) {
+	auto &state = Instance();
+	auto &raw = state.raw[kind];
+	if (raw == data) {
+		return false;
+	}
+	raw = data;
+	auto &list = (kind == Kind::Developer)
+		? state.developers
 		: (kind == Kind::Partner)
-		? u"partner.txt"_q
-		: u"donates.txt"_q;
+		? state.partners
+		: state.supporters;
+	list = ParseList(kind, data);
+	return true;
+}
+
+void LoadCachedLists() {
+	auto any = false;
+	for (const auto kind : { Kind::Developer, Kind::Supporter, Kind::Partner }) {
+		auto file = QFile(CachePath(kind));
+		if (file.open(QIODevice::ReadOnly)) {
+			any = ApplyList(kind, file.readAll()) || any;
+		}
+	}
+	if (any) {
+		Instance().updated.fire({});
+	}
+}
+
+void FetchList(Kind kind) {
+	const auto name = ListName(kind);
 	const auto reply = Get(QString::fromLatin1(kGistRaw) + name);
 	QObject::connect(reply, &QNetworkReply::finished, [=] {
 		reply->deleteLater();
@@ -130,15 +182,17 @@ void FetchList(Kind kind) {
 				).arg(name, reply->errorString()));
 			return;
 		}
-		auto &state = Instance();
-		auto parsed = ParseList(kind, reply->readAll());
-		auto &list = (kind == Kind::Developer)
-			? state.developers
-			: (kind == Kind::Partner)
-			? state.partners
-			: state.supporters;
-		list = std::move(parsed);
-		state.updated.fire({});
+		const auto data = reply->readAll();
+		if (!ApplyList(kind, data)) {
+			return;
+		}
+		QDir().mkpath(cWorkingDir() + u"tdata/komaru_badges"_q);
+		auto file = QFile(CachePath(kind));
+		if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+			file.write(data);
+		}
+		Instance().updated.fire({});
+		RepaintAll();
 	});
 }
 
@@ -295,6 +349,7 @@ void Start() {
 		return;
 	}
 	state.started = true;
+	LoadCachedLists();
 	Refresh();
 	const auto timer = new QTimer(QCoreApplication::instance());
 	QObject::connect(timer, &QTimer::timeout, [] { Refresh(); });

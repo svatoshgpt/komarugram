@@ -227,10 +227,11 @@ CustomBadge getCustomBadge(ID peerId) {
 }
 
 rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<PeerData*> peer) {
-	// The KomaruGram lists arrive from the network after the profile may
+	// The badge lists arrive from the network after the profile may
 	// already be open, so follow them and the hide setting.
 	return rpl::single(rpl::empty) | rpl::then(rpl::merge(
 		KomaruBadges::Updated(),
+		RCManager::getInstance().updated(),
 		AyuSettings::getInstance().hideExteraBadgesChanges(
 		) | rpl::to_empty
 	)) | rpl::map([=] {

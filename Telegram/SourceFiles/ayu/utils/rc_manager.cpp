@@ -6,6 +6,8 @@
 // Copyright @Radolyn, 2026
 #include "ayu/utils/rc_manager.h"
 
+#include <QApplication>
+#include <QFile>
 #include <QJsonArray>
 #include <qjsondocument.h>
 #include <QTimer>
@@ -15,6 +17,20 @@ namespace {
 constexpr auto kPrimaryUrl = "https://update.ayugram.one/rc/current/desktop2";
 constexpr auto kExteraUrl = "https://api.exteragram.app/api/v1/profiles/compact";
 constexpr auto kFetchTimeout = 15 * 1000;
+
+// KomaruGram: the last map received, so the badges it lists show from the
+// first frame instead of popping in once the network answers.
+[[nodiscard]] QString CachePath() {
+	return cWorkingDir() + u"tdata/ayu_rc.json"_q;
+}
+
+// Chat lists paint badges only when something else repaints them, so a
+// new map would otherwise not show until the next scroll or hover.
+void RepaintAll() {
+	for (const auto widget : QApplication::allWidgets()) {
+		widget->update();
+	}
+}
 
 }
 
@@ -34,6 +50,7 @@ void RCManager::start() {
 	DEBUG_LOG(("RCManager: starting"));
 	_manager = std::make_unique<QNetworkAccessManager>();
 
+	loadCached();
 	makeRequest();
 
 	_timer = new QTimer(this);
@@ -96,6 +113,28 @@ void RCManager::gotResponse() {
 	if (!handleResponse(response)) {
 		LOG(("RCManager: Error bad map size: %1").arg(response.size()));
 		gotFailure(QNetworkReply::UnknownContentError);
+		return;
+	}
+	saveCached(response);
+	_updated.fire({});
+	RepaintAll();
+}
+
+void RCManager::loadCached() {
+	auto file = QFile(CachePath());
+	if (!file.open(QIODevice::ReadOnly)) {
+		return;
+	}
+	if (handleResponse(file.readAll())) {
+		LOG(("RCManager: applied the cached map"));
+		_updated.fire({});
+	}
+}
+
+void RCManager::saveCached(const QByteArray &response) {
+	auto file = QFile(CachePath());
+	if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+		file.write(response);
 	}
 }
 
