@@ -38,7 +38,9 @@ void Start();
 // A person can be in both lists and then shows both faces.
 [[nodiscard]] const Entry *Developer(uint64 peerId);
 // Supporters and partners share the supporter face; Supporter() returns
-// either, and IsPartner() tells which one it is for the popup text.
+// either. IsPartner() picks the popup text and wins when someone is in both
+// lists, so partners can stay in donates.txt for clients that predate
+// partner.txt.
 [[nodiscard]] const Entry *Supporter(uint64 peerId);
 [[nodiscard]] bool IsPartner(uint64 peerId);
 

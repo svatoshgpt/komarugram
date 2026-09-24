@@ -320,9 +320,7 @@ const Entry *Supporter(uint64 peerId) {
 }
 
 bool IsPartner(uint64 peerId) {
-	const auto &state = Instance();
-	return !state.supporters.contains(peerId)
-		&& state.partners.contains(peerId);
+	return Instance().partners.contains(peerId);
 }
 
 rpl::producer<> Updated() {
