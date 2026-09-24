@@ -8888,7 +8888,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_CrashReporting" = "Crash Reporting";
 "ayu_CrashReportingDescription" = "When this option is enabled, you'll be prompted to send a report after the app crashes. You can decide whether to send it or not.";
 "ayu_AnonymousStatistics" = "Anonymous Statistics";
-"ayu_AnonymousStatisticsDescription" = "Sends app launches, updates and crashes to Google Analytics with a random ID that is not linked to your account. No messages, contacts, phone number or usernames are sent.";
+"ayu_AnonymousStatisticsDescription" = "Sends app updates and crashes to Google Analytics with a random ID that is not linked to your account. No messages, contacts, phone number or usernames are sent.";
 "ayu_ResetSettings" = "Reset Settings";
 "ayu_ResetSettingsConfirmation" = "Are you sure you want to reset **all** KomaruGram preferences to their defaults?";
 "ayu_DisableColorfulCover" = "Disable adaptive color";

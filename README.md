@@ -22,9 +22,9 @@ and is currently based on Telegram Desktop **7.2.9**.
 After a crash KomaruGram offers to open a prefilled GitHub issue, and you decide what
 to send; the crash report and memory dump are not uploaded anywhere.
 
-KomaruGram sends anonymous statistics to Google Analytics: app launches, updates, and the
-fact of a crash with the crashed version. They carry a random ID that is not linked to your
-account; messages, contacts, phone number and usernames are never sent. Turn them off in
+KomaruGram sends anonymous statistics to Google Analytics: updates, and the fact of a
+crash with the crashed version. They carry a random ID that is not linked to your account;
+messages, contacts, phone number and usernames are never sent. Turn them off in
 Settings → KomaruGram Preferences → Other → Anonymous Statistics.
 
 ## Download

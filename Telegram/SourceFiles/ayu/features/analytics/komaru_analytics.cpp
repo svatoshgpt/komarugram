@@ -160,24 +160,17 @@ bool Available() {
 	return (kMeasurementId[0] != '\0') && (kApiSecret[0] != '\0');
 }
 
-void TrackLaunch() {
+void TrackUpdate() {
 	auto state = LoadOrCreateState();
 	const auto previous = state.lastVersion;
-	if (previous != AppVersion) {
-		// Keep the record current even with statistics off, so turning them
-		// on later does not report an update that happened long ago.
-		state.lastVersion = AppVersion;
-		WriteState(state);
-	}
-	if (!Enabled()) {
+	if (previous == AppVersion) {
 		return;
 	}
-	// first_seen marks the first launch that statistics saw; installs that
-	// predate this build report it once too.
-	Send(state.clientId, u"app_launch"_q, {
-		{ u"first_seen"_q, previous ? 0 : 1 },
-	});
-	if (previous && previous < AppVersion) {
+	// Keep the record current even with statistics off, so turning them
+	// on later does not report an update that happened long ago.
+	state.lastVersion = AppVersion;
+	WriteState(state);
+	if (previous && previous < AppVersion && Enabled()) {
 		Send(state.clientId, u"app_update"_q, {
 			{ u"from_version"_q, QString::number(previous) },
 			{ u"to_version"_q, QString::number(AppVersion) },

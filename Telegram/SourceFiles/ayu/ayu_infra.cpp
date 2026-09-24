@@ -92,7 +92,7 @@ void init() {
 	initWorker();
 	initRCManager();
 	initTranslator();
-	KomaruAnalytics::TrackLaunch();
+	KomaruAnalytics::TrackUpdate();
 }
 
 }

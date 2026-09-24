@@ -53,7 +53,7 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_HideExteraBadges", u"Скрыть значки поддержки"_q },
 		std::pair{
 			"ayu_AnonymousStatisticsDescription",
-			u"Отправляет в Google Analytics запуски, обновления и сбои "
+			u"Отправляет в Google Analytics обновления и сбои "
 			"со случайным ID, не связанным с аккаунтом. Сообщения, "
 			"контакты, номер телефона и юзернеймы не отправляются."_q },
 	};
