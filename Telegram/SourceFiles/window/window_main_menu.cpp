@@ -433,8 +433,9 @@ MainMenu::MainMenu(
 	_badge->setPremiumClickCallback([=] {
 		chooseEmojiStatus();
 	});
-	_exteraBadge->setPremiumClickCallback(
-		badgeClickHandler(controller->session().user()));
+	_exteraBadge->setPremiumClickCallback(badgeClickHandler(
+		controller->session().user(),
+		_exteraBadge.get()));
 
 	_controller->session().downloaderTaskFinished(
 	) | rpl::on_next([=] {

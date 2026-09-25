@@ -92,6 +92,10 @@ public:
 	void setContent(Content content);
 	[[nodiscard]] const style::InfoPeerBadge &st() const;
 
+	// The part of the badge under the cursor: one KomaruGram face, or the
+	// badge after them. Meant for click handlers.
+	[[nodiscard]] Content clickedContent() const;
+
 private:
 	const not_null<QWidget*> _parent;
 	const style::InfoPeerBadge &_st;

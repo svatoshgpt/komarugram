@@ -66,7 +66,10 @@ bool isCustomBadgePeer(ID peerId);
 CustomBadge getCustomBadge(ID peerId);
 
 rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<PeerData*> peer);
-Fn<void()> badgeClickHandler(not_null<PeerData *> peer);
+// With `source` set, the popup covers only the part of it that was clicked.
+Fn<void()> badgeClickHandler(
+	not_null<PeerData*> peer,
+	Info::Profile::Badge *source = nullptr);
 
 bool isMessageHidden(not_null<HistoryItem*> item);
 

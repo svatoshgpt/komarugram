@@ -239,10 +239,14 @@ rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<Pe
 	}) | rpl::distinct_until_changed();
 }
 
-Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
+Fn<void()> badgeClickHandler(
+		not_null<PeerData*> peer,
+		Info::Profile::Badge *source) {
 	return [=]
 	{
-		const auto badge = ComputeExteraBadgeContent(peer);
+		const auto badge = source
+			? source->clickedContent()
+			: ComputeExteraBadgeContent(peer);
 		const auto isCustomBadge = isCustomBadgePeer(getBareID(peer));
 		const auto isExtera = isExteraPeer(getBareID(peer));
 		const auto isSupporter = isSupporterPeer(getBareID(peer));

@@ -522,7 +522,8 @@ TopBar::TopBar(
 	if (_exteraBadge) {
 		// The handler works out what was clicked; the KomaruGram lists can
 		// arrive after this, so it is set up regardless.
-		_exteraBadge->setPremiumClickCallback(badgeClickHandler(_peer));
+		_exteraBadge->setPremiumClickCallback(
+			badgeClickHandler(_peer, _exteraBadge.get()));
 		badgeUpdates = rpl::merge(
 			std::move(badgeUpdates),
 			_exteraBadge->updated());

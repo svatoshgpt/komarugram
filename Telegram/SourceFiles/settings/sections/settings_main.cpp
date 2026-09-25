@@ -235,7 +235,8 @@ Cover::Cover(
 			_badge.widget(),
 			_badge.sizeTag());
 	});
-	_exteraBadge.setPremiumClickCallback(badgeClickHandler(_user));
+	_exteraBadge.setPremiumClickCallback(
+		badgeClickHandler(_user, &_exteraBadge));
 	rpl::merge(
 		_badge.updated(),
 		_exteraBadge.updated()

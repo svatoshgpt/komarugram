@@ -28,6 +28,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "base/timer.h"
 #include "styles/style_ayu_icons.h"
 
+#include <QtGui/QCursor>
+
 
 namespace Info::Profile {
 namespace {
@@ -365,6 +367,33 @@ void Badge::move(int left, int top, int bottom) {
 			? style.position.y()
 			: (bottom - top - _view->height()) / 2);
 	_view->moveToLeft(badgeLeft, badgeTop);
+}
+
+Badge::Content Badge::clickedContent() const {
+	auto result = _content;
+	const auto faces = KomaruFacesCount(result);
+	if (!_view || !faces) {
+		return result;
+	}
+	const auto faceWidth = st::infoExteraSupporterBadge.width();
+	const auto skip = (result.badge == BadgeType::ExteraCustom)
+		? 0
+		: st::infoVerifiedCheckPosition.x();
+	const auto x = _view->mapFromGlobal(QCursor::pos()).x();
+	if (x < skip + faces * faceWidth) {
+		// The developer face comes first when there is one.
+		const auto developer = result.komaruDeveloper
+			&& (x < skip + faceWidth);
+		result.badge = BadgeType::Komaru;
+		result.emojiStatusId = EmojiStatusId();
+		result.komaruDeveloper = developer;
+		result.komaruSupporter = !developer;
+	} else if (result.badge != BadgeType::Komaru) {
+		result.komaruPeer = 0;
+		result.komaruDeveloper = false;
+		result.komaruSupporter = false;
+	}
+	return result;
 }
 
 const style::InfoPeerBadge &Badge::st() const {
