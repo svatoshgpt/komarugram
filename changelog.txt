@@ -1,6 +1,7 @@
 7.2.9-1.3.5 (28.09.26)
 
-- With Google Sans chosen, the message field on Windows is no longer too tall and text in it and in the chat header sits in the middle again.
+- The look now follows materialgram: Google Sans as the interface font, rounder corners, pill highlight for the active folder, softer ripples, thinner scroll bars and new window and box icons.
+- Google Sans lines are no longer too tall on Windows.
 - Linux builds update themselves: unpack the linux-x64.tar.xz archive to a folder you can write to and run KomaruGram from there.
 - A system-wide install under /usr does not try to update itself.
 - Video messages are 240 px across again, as in materialgram.

@@ -13,7 +13,7 @@ its own licence; the full texts follow.
 - **Noto Sans** — SIL Open Font License 1.1 — https://github.com/notofonts/latin-greek-cyrillic
 - **JetBrains Mono** — SIL Open Font License 1.1 — https://github.com/JetBrains/JetBrainsMono
 - **Fira Code** — SIL Open Font License 1.1 — https://github.com/tonsky/FiraCode
-- **Google Sans** — SIL Open Font License 1.1 — https://fonts.google.com/specimen/Google+Sans
+- **Google Sans** — SIL Open Font License 1.1 — https://fonts.google.com/specimen/Google+Sans (the interface font, shipped in Telegram/lib_ui/fonts)
 
 
 ---
