@@ -4,6 +4,7 @@
 - Linux builds update themselves: unpack the linux-x64.tar.xz archive to a folder you can write to and run KomaruGram from there.
 - A system-wide install under /usr does not try to update itself.
 - Video messages are 240 px across again, as in materialgram.
+- Message bubbles have the same inner padding as in materialgram.
 
 7.2.9-1.3.4 (25.09.26)
 
