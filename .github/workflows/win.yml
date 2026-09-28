@@ -343,8 +343,11 @@ jobs:
 
       - name: Pull Docker.
         run: |
-          docker pull ghcr.io/telegramdesktop/tdesktop/centos_env
-          docker tag ghcr.io/telegramdesktop/tdesktop/centos_env $IMAGE_TAG
+          # Pinned: latest follows upstream tdesktop and stops linking our
+          # tree as soon as its libraries move ahead of our submodules.
+          IMAGE=ghcr.io/telegramdesktop/tdesktop/centos_env@sha256:4d2c2d1e7e1c9c3f7e010fbaa13d2017f973ac6e8dd1da26ba66b4cc20adc2c5
+          docker pull $IMAGE
+          docker tag $IMAGE $IMAGE_TAG
 
       - name: Update signing setup.
         env:
