@@ -1,5 +1,5 @@
-name: Windows
-run-name: KomaruGram for Windows — ${{ github.ref_name }}
+name: Build
+run-name: KomaruGram — ${{ github.ref_name }}
 
 on:
   push:
@@ -324,13 +324,145 @@ jobs:
           fi
           gh release upload "$TAG" -R "$REPO" --clobber "$ZIP" update/*
 
+  linux:
+    name: Linux
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_TAG: komarugram:build
+
+    steps:
+      - name: Free up some disk space.
+        uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be
+        with:
+          tool-cache: true
+
+      - name: Clone.
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Pull Docker.
+        run: |
+          docker pull ghcr.io/telegramdesktop/tdesktop/centos_env
+          docker tag ghcr.io/telegramdesktop/tdesktop/centos_env $IMAGE_TAG
+
+      - name: Update signing setup.
+        env:
+          UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+        run: |
+          # Only tagged releases are signed, as on Windows.
+          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+            echo "BUILD_PACKER=OFF" >> $GITHUB_ENV
+            exit 0
+          fi
+          if [ -z "$UPDATE_PRIVATE_KEY" ]; then
+            echo "::error::The UPDATE_PRIVATE_KEY secret is not set."
+            exit 1
+          fi
+          echo "BUILD_PACKER=ON" >> $GITHUB_ENV
+          python3 - <<'EOF'
+          import json, os
+          key = os.environ['UPDATE_PRIVATE_KEY'].replace('\r\n', '\n').strip()
+          def lit(s):
+              return json.dumps(s + chr(10))
+          path = os.path.join('Telegram', 'SourceFiles', '_other', 'packer_private.h')
+          with open(path, 'w', newline='\n') as f:
+              f.write('// Generated in CI from a secret. Never commit.\n')
+              f.write('const char *PrivateKey = ' + lit(key) + ';\n')
+              f.write('const char *PrivateBetaKey = "";\n')
+              f.write('static const char *AlphaPrivateKey = "";\n')
+          EOF
+
+      - name: KomaruGram build.
+        run: |
+          docker run --rm \
+          -u $(id -u) \
+          -v $PWD:/usr/src/tdesktop \
+          $IMAGE_TAG \
+          /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+          -D CMAKE_CONFIGURATION_TYPES=Release \
+          -D CMAKE_INSTALL_PREFIX="/usr" \
+          -D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} \
+          -D TDESKTOP_API_HASH=${{ secrets.TDESKTOP_API_HASH }} \
+          -D KOMARUGRAM_GA_MEASUREMENT_ID=${{ secrets.GA_MEASUREMENT_ID }} \
+          -D KOMARUGRAM_GA_API_SECRET=${{ secrets.GA_API_SECRET }} \
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF \
+          -D KOMARUGRAM_BUILD_PACKER=$BUILD_PACKER
+
+      - name: Pack update.
+        if: env.BUILD_PACKER == 'ON'
+        run: |
+          VERSION=$(sed -n 's/.*constexpr auto AppVersion = \([0-9]*\);.*/\1/p' \
+            Telegram/SourceFiles/core/version.h)
+          [ -n "$VERSION" ] || { echo "::error::AppVersion not found"; exit 1; }
+
+          BIN=$(dirname "$(find out -maxdepth 2 -type f -name Updater | head -1)")
+          [ -x "$BIN/Packer" ] || { echo "::error::Packer not found next to Updater in '$BIN'"; exit 1; }
+
+          # Clients get the same stripped binaries the archives carry.
+          docker run --rm \
+          -u $(id -u) \
+          -v $PWD:/usr/src/tdesktop \
+          -w "/usr/src/tdesktop/$BIN" \
+          $IMAGE_TAG \
+          bash -c "strip KomaruGram Updater && ./Packer -path KomaruGram -path Updater -version $VERSION"
+
+          mkdir -p update
+          mv "$BIN"/tlinuxupd* update/
+          ls -la update
+          [ -n "$(ls -A update)" ] || { echo "::error::Packer wrote no update file"; exit 1; }
+
+      - name: Scrub signing material.
+        if: always()
+        run: |
+          rm -f Telegram/SourceFiles/_other/packer_private.h
+          find out -maxdepth 2 -type f -name Packer -delete 2>/dev/null || true
+          find out -type d -name 'Packer.dir' -prune -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Create archives.
+        run: |
+          TAG="$GITHUB_REF_NAME"
+          mkdir -p dist
+
+          # The usr tree is for installing system-wide; such installs
+          # do not update themselves.
+          (cd out/install && tar -I 'zstd -T0 --ultra -22' -cf "../../dist/KomaruGram-$TAG.tar.zst" usr)
+
+          # The portable folder updates itself: Updater must sit next to
+          # the client in a folder the user can write to.
+          mkdir -p portable/KomaruGram
+          BIN=$(dirname "$(find out -maxdepth 2 -type f -name Updater | head -1)")
+          cp "$BIN/KomaruGram" "$BIN/Updater" portable/KomaruGram/
+          [ -n "$(ls update 2>/dev/null)" ] || strip portable/KomaruGram/KomaruGram portable/KomaruGram/Updater
+          tar -C portable -cJf "dist/KomaruGram-$TAG-linux-x64.tar.xz" KomaruGram
+          ls -la dist
+
+      - name: Upload artifact.
+        uses: actions/upload-artifact@v7
+        with:
+          name: KomaruGram Linux
+          path: dist/
+
+      - name: Publish release.
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REPO="$GITHUB_REPOSITORY"
+          TAG="$GITHUB_REF_NAME"
+          if ! gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
+            gh release create "$TAG" -R "$REPO" --title "KomaruGram $TAG" --notes "Built from $GITHUB_SHA." --verify-tag --latest=false || true
+          fi
+          gh release upload "$TAG" -R "$REPO" --clobber dist/* update/*
+
   feed:
     name: Update feed
     # Runs only when every Windows build succeeded. Publishing the feed from
     # the build jobs let the first one to finish point clients at a package
-    # the other had not uploaded yet, or never would.
-    needs: windows
-    if: startsWith(github.ref, 'refs/tags/')
+    # the other had not uploaded yet, or never would. A failed Linux build
+    # only leaves Linux out of the feed.
+    needs: [windows, linux]
+    if: always() && startsWith(github.ref, 'refs/tags/') && needs.windows.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
@@ -355,7 +487,15 @@ jobs:
             grep -qx "$f" <<< "$ASSETS" || { echo "::error::$f is not in the release"; exit 1; }
           done
 
-          printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s"}}}\n' \
-            "$V" "$V" "$V" "$V" > current6
+          LINUX=""
+          if [ "${{ needs.linux.result }}" = "success" ] && grep -qx "tlinuxupd$V" <<< "$ASSETS"; then
+            LINUX=$(printf ',"linux":{"stable":{"released":"%s","link":"/tlinuxupd%s"}}' "$V" "$V")
+          else
+            echo "::warning::Linux is left out of the update feed"
+          fi
+
+          printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s"}}%s}\n' \
+            "$V" "$V" "$V" "$V" "$LINUX" > current6
+          cat current6
           gh release upload "$TAG" -R "$REPO" --clobber current6
           gh release edit "$TAG" -R "$REPO" --latest

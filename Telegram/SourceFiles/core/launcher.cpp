@@ -138,6 +138,14 @@ void ComputeDebugMode() {
 }
 
 void ComputeExternalUpdater() {
+#ifdef Q_OS_LINUX
+	// A read-only install (like /usr) can't apply downloaded updates.
+	if (!QFileInfo(cExeDir()).isWritable()) {
+		SetUpdaterDisabledAtStartup();
+		return;
+	}
+#endif // Q_OS_LINUX
+
 	auto locations = QStandardPaths::standardLocations(
 		QStandardPaths::AppDataLocation);
 	if (locations.isEmpty()) {
