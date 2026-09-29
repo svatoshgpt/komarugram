@@ -327,10 +327,20 @@ void EmptyUserpic::paint(
 		p.setFont(font);
 		p.setBrush(Qt::NoBrush);
 		p.setPen(st::windowBgActive);
-		p.drawText(
-			QRect(x, y, size, size),
-			_string,
-			QTextOption(style::al_center));
+		// Center the glyphs themselves, the font box sits off with Google Sans.
+		const auto bounds = QFontMetricsF(font).tightBoundingRect(_string);
+		if (bounds.isEmpty()) {
+			p.drawText(
+				QRect(x, y, size, size),
+				_string,
+				QTextOption(style::al_center));
+		} else {
+			p.drawText(
+				QPointF(
+					x + (size - bounds.width()) / 2. - bounds.x(),
+					y + (size - bounds.height()) / 2. - bounds.y()),
+				_string);
+		}
 	}
 }
 
