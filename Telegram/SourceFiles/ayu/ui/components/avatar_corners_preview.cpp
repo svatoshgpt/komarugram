@@ -18,7 +18,6 @@
 #include "ui/effects/ripple_animation.h"
 #include "window/window_session_controller.h"
 
-#include <QSvgRenderer>
 #include <QPainterPath>
 
 namespace {
@@ -38,7 +37,7 @@ AvatarCornersPreview::AvatarCornersPreview(
 		Data::DecideColorIndex(
 			peerFromChannel(ChannelId(2331068091)))),
 	QString::fromUtf8(kPreviewName))
-, _logo(std::make_unique<QSvgRenderer>(u":/gui/icons/komarugram.svg"_q)) {
+, _logo(u":/gui/art/ayu/default/app.png"_q) {
 	const auto &row = st::defaultDialogRow;
 	setFixedHeight(row.height);
 	setCursor(Qt::PointingHandCursor);
@@ -66,7 +65,7 @@ void AvatarCornersPreview::paintEvent(QPaintEvent *e) {
 	}
 
 	// Mirror the avatar corners setting this preview exists to demonstrate.
-	if (_logo && _logo->isValid()) {
+	if (!_logo.isNull()) {
 		const auto target = QRectF(userpicX, userpicY, photoSize, photoSize);
 		auto shape = QPainterPath();
 		if (AyuUserpic::IsCircle()) {
@@ -80,7 +79,7 @@ void AvatarCornersPreview::paintEvent(QPaintEvent *e) {
 		auto hq = PainterHighQualityEnabler(p);
 		p.save();
 		p.setClipPath(shape);
-		_logo->render(&p, target);
+		p.drawImage(target, _logo);
 		p.restore();
 	} else if (AyuUserpic::IsCircle()) {
 		_emptyUserpic.paintCircle(p, userpicX, userpicY, width(), photoSize);

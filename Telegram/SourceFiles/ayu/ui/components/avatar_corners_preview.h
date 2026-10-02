@@ -10,6 +10,8 @@
 #include "ui/rp_widget.h"
 #include "ui/userpic_view.h"
 
+#include <QImage>
+
 namespace Ui {
 class RippleAnimation;
 } // namespace Ui
@@ -19,7 +21,6 @@ class SessionController;
 } // namespace Window
 
 class PeerData;
-class QSvgRenderer;
 
 class AvatarCornersPreview final : public Ui::RpWidget {
 public:
@@ -36,6 +37,6 @@ protected:
 private:
 	const not_null<Window::SessionController*> _controller;
 	Ui::EmptyUserpic _emptyUserpic;
-	std::unique_ptr<QSvgRenderer> _logo;
+	QImage _logo;
 	std::unique_ptr<Ui::RippleAnimation> _ripple;
 };

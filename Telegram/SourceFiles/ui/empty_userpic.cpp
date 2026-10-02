@@ -302,7 +302,7 @@ void EmptyUserpic::paint(
 		Fn<void()> paintBackground) const {
 	x = style::RightToLeft() ? (outerWidth - x - size) : x;
 
-	const auto fontsize = (size * 13) / 33;
+	const auto fontsize = (size * 16) / 33;
 	auto font = st::historyPeerUserpicFont->f;
 	font.setPixelSize(fontsize);
 
@@ -337,9 +337,8 @@ void EmptyUserpic::paint(
 		} else {
 			p.drawText(
 				QPointF(
-					x + (size - bounds.width()) / 2. - bounds.x(),
-					y + (size - bounds.height()) / 2. - bounds.y()
-						+ metrics.descent() / 2.),
+					x + size / 2. - bounds.center().x(),
+					y + size / 2. - bounds.center().y()),
 				_string);
 		}
 	}
