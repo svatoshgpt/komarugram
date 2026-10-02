@@ -1,5 +1,5 @@
 <div align="center">
-<img src="./docs/assets/logo.svg" width="140" align="center" alt="KomaruGram">
+<img src="./Telegram/Resources/art/ayu/default/app.svg" width="140" align="center" alt="KomaruGram">
 
 # KomaruGram
 
