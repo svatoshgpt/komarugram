@@ -327,8 +327,8 @@ void EmptyUserpic::paint(
 		p.setFont(font);
 		p.setBrush(Qt::NoBrush);
 		p.setPen(st::windowBgActive);
-		// Center the glyphs themselves, the font box sits off with Google Sans.
-		const auto bounds = QFontMetricsF(font).tightBoundingRect(_string);
+		const auto metrics = QFontMetricsF(font, p.device());
+		const auto bounds = metrics.tightBoundingRect(_string);
 		if (bounds.isEmpty()) {
 			p.drawText(
 				QRect(x, y, size, size),
@@ -338,7 +338,8 @@ void EmptyUserpic::paint(
 			p.drawText(
 				QPointF(
 					x + (size - bounds.width()) / 2. - bounds.x(),
-					y + (size - bounds.height()) / 2. - bounds.y()),
+					y + (size - bounds.height()) / 2. - bounds.y()
+						+ metrics.descent() / 2.),
 				_string);
 		}
 	}
