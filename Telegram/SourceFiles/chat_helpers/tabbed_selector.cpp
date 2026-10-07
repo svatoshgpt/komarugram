@@ -671,7 +671,7 @@ TabbedSelector::Tab TabbedSelector::createTab(SelectorTab type, int index) {
 				.mode = (_mode == Mode::ChatIntro
 					? StickersMode::ChatIntro
 					: StickersMode::Full),
-				.requireConfirmation = _mode != Mode::MediaEditor,
+				.requireConfirmation = (_mode == Mode::Full),
 				.paused = paused,
 				.st = &_st,
 				.features = _features,
@@ -682,6 +682,7 @@ TabbedSelector::Tab TabbedSelector::createTab(SelectorTab type, int index) {
 			using Descriptor = GifsListDescriptor;
 			return object_ptr<GifsListWidget>(this, Descriptor{
 				.show = _show,
+				.requireConfirmation = (_mode == Mode::Full),
 				.paused = paused,
 				.st = &_st,
 			});

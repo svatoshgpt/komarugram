@@ -445,6 +445,11 @@ bool UiIntegration::handleUrlClick(
 		}
 	}
 
+	if (AyuUrlHandlers::IsUnsafeExternalUrl(url)) {
+		LOG(("KomaruGram: Blocked opening unsafe url: %1").arg(url));
+		return true;
+	}
+
 	if (AyuUrlHandlers::TryHandleSpotify(url)) {
 		return true;
 	}

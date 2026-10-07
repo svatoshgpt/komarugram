@@ -1440,7 +1440,7 @@ ComposeControls::ComposeControls(
 				updateControlsGeometry(_wrap->size());
 			} else if (_botKeyboardHide && !has) {
 				_botKeyboardHide = nullptr;
-				_tabbedSelectorToggle->show();
+				updateControlsVisibility();
 				updateControlsGeometry(_wrap->size());
 			}
 		}, _wrap->lifetime());
@@ -3414,6 +3414,8 @@ void ComposeControls::fieldChanged() {
 	const auto hideExtra = hideExtraButtons()
 		|| isEditingMessage()
 		|| textExceedsMaxSize();
+	const auto ttlAllowed = AyuSettings::getInstance()
+		.showAutoDeleteButtonInMessageField();
 	const auto refreshControls = commandShown
 		|| menuRefreshed
 		|| likeShown
@@ -3422,7 +3424,7 @@ void ComposeControls::fieldChanged() {
 			&& !hideExtra))
 		|| (silentVisible != (_silent && !hideExtra))
 		|| (scheduledVisible != (_scheduled && !hideExtra))
-		|| (ttlVisible != (_ttlInfo && !hideExtra));
+		|| (ttlVisible != (_ttlInfo && !hideExtra && ttlAllowed));
 	if (refreshControls) {
 		updateControlsVisibility();
 		updateControlsGeometry(_wrap->size());
@@ -4965,15 +4967,16 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 			? (_commentsShown->width() + _st.commentsSkip)
 			: 0)
 		- (((_attachToggle && settings.showAttachButtonInMessageField()) || _sendAs) ? _st.padding.left() : _st.fieldLeft)
+		- (_attachToggle && settings.showAttachButtonInMessageField() ? _attachToggle->width() : 0)
 		- (_botMenu.button
 			? (st::historyBotMenuSkip + _botMenu.button->width())
 			: 0)
-		- ((_attachToggle && settings.showAttachButtonInMessageField()) ? _attachToggle->width() : 0)
 		- (_sendAs ? _sendAs->width() : 0)
 		- _st.padding.right()
 		- _send->width()
 		- (_editStars ? _editStars->width() : 0)
 		- (_tabbedSelectorToggle->isHidden()
+			|| !settings.showEmojiButtonInMessageField()
 			? 0
 			: _tabbedSelectorToggle->width())
 		- (_likeShown ? _like->width() : 0)
@@ -4988,7 +4991,11 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 			: 0)
 		- (_botKeyboardShow ? _botKeyboardShow->width() : 0)
 		- (_botKeyboardHide ? _botKeyboardHide->width() : 0)
-		- ((_ttlInfo && _ttlInfo->isVisible()) ? _ttlInfo->width() : 0)
+		- ((_ttlInfo
+			&& !_ttlInfo->isHidden()
+			&& settings.showAutoDeleteButtonInMessageField())
+			? _ttlInfo->width()
+			: 0)
 		- (_starsReaction
 			? (_st.starsSkip + _starsReaction->width())
 			: 0);
@@ -5061,7 +5068,8 @@ void ComposeControls::updateControlsGeometry(QSize size) {
 		right += _editStars->width();
 	}
 	_tabbedSelectorToggle->moveToRight(right, buttonsTop);
-	if (!_tabbedSelectorToggle->isHidden()) {
+	if (!_tabbedSelectorToggle->isHidden()
+		&& settings.showEmojiButtonInMessageField()) {
 		right += _tabbedSelectorToggle->width();
 	}
 	if (_like) {
@@ -5144,9 +5152,6 @@ void ComposeControls::updateControlsVisibility() {
 	if (_editStars) {
 		_editStars->show();
 	}
-	if (_ttlInfo) {
-		_ttlInfo->setVisible(!hide);
-	}
 	if (_sendAs) {
 		_sendAs->show();
 	}
@@ -5174,7 +5179,7 @@ void ComposeControls::updateControlsVisibility() {
 	if (_starsReaction) {
 		_starsReaction->show();
 	}
-	SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField());
+	SWITCH_BUTTON(_tabbedSelectorToggle, settings.showEmojiButtonInMessageField() && !_botKeyboardHide);
 	if (_ttlInfo) {
 		_ttlInfo->setVisible(
 			!hide && settings.showAutoDeleteButtonInMessageField());
