@@ -1,3 +1,10 @@
+7.2.9-1.3.8 (08.10.26)
+
+- Fixed the auto-delete button visibility check that broke compilation.
+- Improved ghost mode read handling and scheduling for messages and media.
+- Fixed preservation of expiring media and forwarding of files and rich messages.
+- Improved database stability, translation and external link handling.
+
 7.2.9-1.3.7 (02.10.26)
 
 - Empty avatar initials are larger and centered by their visible shapes.

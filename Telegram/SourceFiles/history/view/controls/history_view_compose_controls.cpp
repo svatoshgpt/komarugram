@@ -3403,7 +3403,7 @@ void ComposeControls::fieldChanged() {
 		&& !_giftToUser->isHidden();
 	const auto silentVisible = _silent && !_silent->isHidden();
 	const auto scheduledVisible = _scheduled && !_scheduled->isHidden();
-	const auto ttlVisible = _ttlInfo && _ttlInfo->isVisible();
+	const auto ttlVisible = _ttlInfo && !_ttlInfo->isHidden();
 	updateSendButtonType();
 	_hasSendText = _field->isVisible() && HasSendText(_field);
 	const auto commandShown = updateBotCommandShown();
