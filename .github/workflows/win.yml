@@ -1,11 +1,16 @@
 name: Build
-run-name: KomaruGram — ${{ github.ref_name }}
+run-name: KomaruGram — ${{ inputs.release_tag || github.ref_name }}
 
 on:
   push:
     tags:
       - '*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to rebuild from the current main source
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -196,10 +201,11 @@ jobs:
         shell: bash
         env:
           UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           # Only tagged releases are signed. Everything else builds the
           # updater into the client but never touches the private key.
-          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+          if [[ "$GITHUB_REF" != refs/tags/* && -z "$RELEASE_TAG" ]]; then
             echo "BUILD_PACKER=OFF" >> $GITHUB_ENV
             exit 0
           fi
@@ -301,17 +307,18 @@ jobs:
           path: artifact\
 
       - name: Publish release.
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           case "${{ matrix.arch }}" in
             x64_x86) SUFFIX="x86";;
             *) SUFFIX="${{ matrix.arch }}";;
           esac
           REPO="$GITHUB_REPOSITORY"
-          TAG="$GITHUB_REF_NAME"
+          TAG="${RELEASE_TAG:-$GITHUB_REF_NAME}"
 
           # Updater.exe must sit next to the client or updates cannot apply.
           ZIP="KomaruGram-$TAG-windows-$SUFFIX.zip"
@@ -343,18 +350,29 @@ jobs:
 
       - name: Pull Docker.
         run: |
-          # Pinned: latest follows upstream tdesktop and stops linking our
-          # tree as soon as its libraries move ahead of our submodules.
-          IMAGE=ghcr.io/telegramdesktop/tdesktop/centos_env@sha256:4d2c2d1e7e1c9c3f7e010fbaa13d2017f973ac6e8dd1da26ba66b4cc20adc2c5
-          docker pull $IMAGE
-          docker tag $IMAGE $IMAGE_TAG
+          python3 -m venv "$RUNNER_TEMP/dockerfile-generator"
+          "$RUNNER_TEMP/dockerfile-generator/bin/python" -m pip install Jinja2==3.1.6
+          cd Telegram/build/docker/centos_env
+          DEBUG= LTO= "$RUNNER_TEMP/dockerfile-generator/bin/python" gen_dockerfile.py > Dockerfile
+
+      - name: Set up Docker Buildx.
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image.
+        uses: docker/build-push-action@v7
+        with:
+          context: Telegram/build/docker/centos_env
+          file: Telegram/build/docker/centos_env/Dockerfile
+          load: true
+          tags: ${{ env.IMAGE_TAG }}
 
       - name: Update signing setup.
         env:
           UPDATE_PRIVATE_KEY: ${{ secrets.UPDATE_PRIVATE_KEY }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           # Only tagged releases are signed, as on Windows.
-          if [[ "$GITHUB_REF" != refs/tags/* ]]; then
+          if [[ "$GITHUB_REF" != refs/tags/* && -z "$RELEASE_TAG" ]]; then
             echo "BUILD_PACKER=OFF" >> $GITHUB_ENV
             exit 0
           fi
@@ -423,8 +441,10 @@ jobs:
           find out -type d -name 'Packer.dir' -prune -exec rm -rf {} + 2>/dev/null || true
 
       - name: Create archives.
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
-          TAG="$GITHUB_REF_NAME"
+          TAG="${RELEASE_TAG:-$GITHUB_REF_NAME}"
           mkdir -p dist
 
           # The usr tree is for installing system-wide; such installs
@@ -447,12 +467,13 @@ jobs:
           path: dist/
 
       - name: Publish release.
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           REPO="$GITHUB_REPOSITORY"
-          TAG="$GITHUB_REF_NAME"
+          TAG="${RELEASE_TAG:-$GITHUB_REF_NAME}"
           if ! gh release view "$TAG" -R "$REPO" >/dev/null 2>&1; then
             gh release create "$TAG" -R "$REPO" --title "KomaruGram $TAG" --notes "Built from $GITHUB_SHA." --verify-tag --latest=false || true
           fi
@@ -465,7 +486,7 @@ jobs:
     # the other had not uploaded yet, or never would. A failed Linux build
     # only leaves Linux out of the feed.
     needs: [windows, linux]
-    if: always() && startsWith(github.ref, 'refs/tags/') && needs.windows.result == 'success'
+    if: always() && (startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')) && needs.windows.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
@@ -478,9 +499,10 @@ jobs:
       - name: Publish update feed.
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           REPO="$GITHUB_REPOSITORY"
-          TAG="$GITHUB_REF_NAME"
+          TAG="${RELEASE_TAG:-$GITHUB_REF_NAME}"
           V=$(sed -n 's/.*constexpr auto AppVersion = \([0-9]*\);.*/\1/p' \
             Telegram/SourceFiles/core/version.h)
           [ -n "$V" ] || { echo "::error::AppVersion not found"; exit 1; }
