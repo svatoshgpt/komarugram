@@ -494,7 +494,7 @@ void BottomInfo::layoutDateText() {
 	const auto updated = (_data.flags & Data::Flag::Updated);
 	const auto editedPrimary = !updated
 		&& (_data.flags & Data::Flag::EditedPrimary)
-		&& !(_data.flags & Data::Flag::ForwardedDate);
+		&& !(_data.flags & (Data::Flag::ForwardedDate | Data::Flag::FullDate));
 
 	if (!settings.replaceBottomInfoWithIcons()) {
 		const auto deleted = (_data.flags & Data::Flag::AyuDeleted)
@@ -515,7 +515,7 @@ void BottomInfo::layoutDateText() {
 		const auto prefix = !author.isEmpty() ? u", "_q : QString();
 		const auto date = editedPrimary
 			? FormatEditedDate(_data.date, _data.editedDate)
-			: edited + ((_data.flags & Data::Flag::ForwardedDate)
+			: edited + ((_data.flags & (Data::Flag::ForwardedDate | Data::Flag::FullDate))
 			? Ui::FormatDateTimeSavedFrom(_data.date)
 			: formatMessageTime(_data.date.time()));
 		const auto afterAuthor = prefix + date;
@@ -606,7 +606,7 @@ void BottomInfo::layoutDateText() {
 
 		const auto dateStr = editedPrimary
 			? FormatEditedDate(_data.date, _data.editedDate)
-			: (_data.flags & Data::Flag::ForwardedDate)
+			: (_data.flags & (Data::Flag::ForwardedDate | Data::Flag::FullDate))
 			? Ui::FormatDateTimeSavedFrom(_data.date)
 			: formatMessageTime(_data.date.time());
 
@@ -794,6 +794,8 @@ BottomInfo::Data BottomInfoDataFromMessage(not_null<Message*> message) {
 	}
 	if (message->context() == Context::ShortcutMessages) {
 		result.flags |= Flag::Shortcut;
+	} else if (message->context() == Context::MediaEditor) {
+		result.flags |= Flag::FullDate;
 	}
 	if (!item->isPost()
 		|| !item->hasRealFromId()

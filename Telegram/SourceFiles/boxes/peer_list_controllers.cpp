@@ -1728,7 +1728,6 @@ void PaintRestrictionBadge(
 				st::premiumButtonFg->c,
 				&check);
 		} else {
-			auto hq = PainterHighQualityEnabler(p);
 			const auto &icon = st::stickersPremiumLock;
 			const auto width = icon.width();
 			const auto height = icon.height();
@@ -1744,6 +1743,7 @@ void PaintRestrictionBadge(
 			cache.badge.fill(Qt::transparent);
 			const auto inner = QRect(add, add, rect.width(), rect.height());
 			auto q = QPainter(&cache.badge);
+			auto hq = PainterHighQualityEnabler(q);
 			auto pen = check.border->p;
 			pen.setWidthF(check.width);
 			q.setPen(pen);

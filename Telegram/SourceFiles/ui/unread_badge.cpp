@@ -606,7 +606,8 @@ int PeerBadge::drawKomaru(
 		p,
 		QRect(left, rectForName.y(), iconw, icon->height()),
 		entry,
-		now);
+		now,
+		(*descriptor.premiumFg)->c);
 	if (!descriptor.paused && KomaruBadges::Animated()) {
 		if (!_komaruAnimation) {
 			_komaruAnimation = std::make_unique<KomaruAnimation>();

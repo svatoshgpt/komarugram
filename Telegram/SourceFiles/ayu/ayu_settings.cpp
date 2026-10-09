@@ -936,6 +936,7 @@ const std::vector<QString> &AyuSettings::DefaultDrawerOrder() {
 		u"contacts"_q,
 		u"calls"_q,
 		u"savedMessages"_q,
+		u"wallet"_q,
 		u"lread"_q,
 		u"sread"_q,
 		u"settings"_q,

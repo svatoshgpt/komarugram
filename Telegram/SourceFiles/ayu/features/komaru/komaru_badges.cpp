@@ -88,31 +88,38 @@ struct State {
 		if (!id) {
 			continue;
 		}
-		// "#RRGGBB"; anything else falls back.
-		const auto color = [&](int index, QColor fallback) {
+		struct ParsedColor {
+			QColor value;
+			bool theme = false;
+		};
+		const auto color = [&](int index, ParsedColor fallback) {
 			const auto text = (parts.size() > index)
 				? parts[index].trimmed()
 				: QString();
+			if (text.compare(u"#md3"_q, Qt::CaseInsensitive) == 0) {
+				return ParsedColor{ fallback.value, true };
+			}
 			auto ok = false;
 			const auto rgb = text.mid(1).toUInt(&ok, 16);
 			return (ok && text.size() == 7 && text.startsWith('#'))
-				? QColor(QRgb(0xFF000000U | rgb))
+				? ParsedColor{ QColor(QRgb(0xFF000000U | rgb)), false }
 				: fallback;
 		};
-		// A line with a single colour uses it for both.
-		auto particles = color(1, kDefaultFace);
+		auto particles = color(1, { kDefaultFace, false });
 		auto face = color(2, particles);
 		auto ok = false;
 		const auto alpha = (parts.size() > 3)
 			? parts[3].trimmed().toInt(&ok)
 			: 255;
 		const auto clamped = std::clamp(ok ? alpha : 255, 0, 255);
-		face.setAlpha(clamped);
-		particles.setAlpha(clamped);
+		face.value.setAlpha(clamped);
+		particles.value.setAlpha(clamped);
 		result.emplace(id, Entry{
 			.kind = kind,
-			.face = face,
-			.particles = particles,
+			.face = face.value,
+			.particles = particles.value,
+			.faceTheme = face.theme,
+			.particlesTheme = particles.theme,
 		});
 	}
 	return result;
@@ -395,7 +402,12 @@ bool Animated() {
 	return !PowerSaving::On(PowerSaving::kEmojiStatus);
 }
 
-void Paint(QPainter &p, QRect rect, const Entry &entry, crl::time now) {
+void Paint(
+		QPainter &p,
+		QRect rect,
+		const Entry &entry,
+		crl::time now,
+		QColor themeColor) {
 	const auto side = std::min(rect.width(), rect.height());
 	if (side <= 0) {
 		return;
@@ -404,6 +416,16 @@ void Paint(QPainter &p, QRect rect, const Entry &entry, crl::time now) {
 	const auto ratio = style::DevicePixelRatio();
 	const auto time = Animated() ? double(now) : 0.;
 	const auto developer = (entry.kind == Kind::Developer);
+	const auto resolve = [&](QColor color, bool theme) {
+		if (!theme) {
+			return color;
+		}
+		auto result = themeColor;
+		result.setAlphaF(result.alphaF() * color.alphaF());
+		return result;
+	};
+	const auto face = resolve(entry.face, entry.faceTheme);
+	const auto particles = resolve(entry.particles, entry.particlesTheme);
 	const auto square = [&](int size) {
 		return QRectF(
 			center.x() - size / 2.,
@@ -419,7 +441,7 @@ void Paint(QPainter &p, QRect rect, const Entry &entry, crl::time now) {
 		const auto &rosette = Tinted(
 			Art::DeveloperRosette,
 			size * ratio,
-			entry.face);
+			face);
 		p.save();
 		p.translate(center);
 		p.rotate(360. * std::fmod(time / kRosettePeriod, 1.));
@@ -428,12 +450,12 @@ void Paint(QPainter &p, QRect rect, const Entry &entry, crl::time now) {
 		p.restore();
 		p.drawImage(
 			square(size),
-			Tinted(Art::DeveloperFace, size * ratio, entry.face));
+			Tinted(Art::DeveloperFace, size * ratio, face));
 	} else {
 		const auto size = int(std::round(side * kFaceShare));
 		p.drawImage(
 			square(size),
-			Tinted(Art::SupporterFace, size * ratio, entry.face));
+			Tinted(Art::SupporterFace, size * ratio, face));
 	}
 
 	p.setPen(Qt::NoPen);
@@ -449,7 +471,7 @@ void Paint(QPainter &p, QRect rect, const Entry &entry, crl::time now) {
 			std::cos(angle) * orbit,
 			std::sin(angle) * orbit);
 		p.setOpacity(opacity * (0.35 + 0.65 * twinkle));
-		p.setBrush(entry.particles);
+		p.setBrush(particles);
 		p.drawPath(Sparkle(position, radius));
 	}
 	p.setOpacity(opacity);

@@ -54,7 +54,8 @@ void PaintKomaruFaces(
 		QPainter &p,
 		const Badge::Content &content,
 		int left,
-		int height) {
+		int height,
+		QColor themeColor) {
 	const auto &icon = st::infoExteraSupporterBadge;
 	const auto now = crl::now();
 	const auto top = (height - icon.height()) / 2;
@@ -64,7 +65,8 @@ void PaintKomaruFaces(
 				p,
 				QRect(left, top, icon.width(), icon.height()),
 				*entry,
-				now);
+				now,
+				themeColor);
 		}
 		left += icon.width();
 	};
@@ -210,7 +212,7 @@ void Badge::setContent(Content content) {
 		) | rpl::on_next([=, check = _view.data()]{
 			if (prefix) {
 				auto p = QPainter(check);
-				PaintKomaruFaces(p, faces, 0, check->height());
+				PaintKomaruFaces(p, faces, 0, check->height(), st().premiumFg->c);
 			}
 			if (_emojiStatus) {
 				auto args = Ui::Text::CustomEmoji::Context{
@@ -297,7 +299,9 @@ void Badge::setContent(Content content) {
 		_view->paintRequest(
 		) | rpl::on_next([=, check = _view.data()]{
 			Painter p(check);
-			PaintKomaruFaces(p, faces, skip, check->height());
+			PaintKomaruFaces(p, faces, skip, check->height(), _overrideSt
+				? _overrideSt->premiumFg->c
+				: st::profileVerifiedCheckBg->c);
 			const auto left = skip + facesWidth;
 			if (_overrideSt) {
 				icon->paint(p, left, 0, check->width(), _overrideSt->premiumFg->c);
@@ -314,7 +318,9 @@ void Badge::setContent(Content content) {
 		_view->paintRequest(
 		) | rpl::on_next([=, check = _view.data()]{
 			auto p = QPainter(check);
-			PaintKomaruFaces(p, faces, skip, check->height());
+			PaintKomaruFaces(p, faces, skip, check->height(), _overrideSt
+				? _overrideSt->premiumFg->c
+				: st::profileVerifiedCheckBg->c);
 		}, _view->lifetime());
 	} break;
 	}

@@ -6,7 +6,9 @@
 // line as "id,#particles,#face,alpha", the order the mobile client reads
 // them in. The Komaru face (and a developer's rosette) is drawn in the
 // second colour with animated particles around it in the first, and the
-// alpha applies to both. Channels are listed by their bare id, without -100.
+// alpha applies to both. A #md3 colour follows the surrounding badge palette
+// at paint time, including selection and theme changes. Channels are listed
+// by their bare id, without -100.
 #pragma once
 
 #include <crl/crl_time.h>
@@ -24,6 +26,8 @@ struct Entry {
 	Kind kind = Kind::Supporter;
 	QColor face;
 	QColor particles;
+	bool faceTheme = false;
+	bool particlesTheme = false;
 };
 
 // The donation that earns a supporter badge, in US dollars.
@@ -55,6 +59,11 @@ void Start();
 [[nodiscard]] bool Animated();
 
 // Paints the face and its particles into `rect`, which should be square.
-void Paint(QPainter &p, QRect rect, const Entry &entry, crl::time now);
+void Paint(
+	QPainter &p,
+	QRect rect,
+	const Entry &entry,
+	crl::time now,
+	QColor themeColor);
 
 } // namespace KomaruBadges

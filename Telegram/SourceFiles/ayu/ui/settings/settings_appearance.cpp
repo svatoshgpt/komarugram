@@ -28,6 +28,7 @@
 #include "styles/style_menu_icons.h"
 #include "styles/style_polls.h"
 #include "styles/style_settings.h"
+#include "styles/style_wallet.h"
 #include "ui/painter.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/padding_wrap.h"
@@ -464,6 +465,12 @@ struct DrawerItem {
 			{ &st::menuIconSavedMessages },
 			&AyuSettings::showSavedMessagesInDrawer,
 			&AyuSettings::setShowSavedMessagesInDrawer);
+	} else if (id == u"wallet"_q) {
+		return DrawerItem{
+			.settingId = u"ayu/drawerWallet"_q,
+			.title = tr::lng_wallet_menu(),
+			.icon = { &st::walletMenuIcon },
+		};
 	} else if (id == u"lread"_q) {
 		return toggle(
 			u"ayu/showLReadToggleInDrawer"_q,

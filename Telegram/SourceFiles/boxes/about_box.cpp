@@ -87,6 +87,7 @@ void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controll
 		Ui::AddSkip(layout, st::aboutSkip);
 	};
 
+	addText(tr::ayu_KomaruAboutTagline(tr::marked));
 	addText(Text());
 
 	box->addButton(tr::lng_close(), [=] { box->closeBox(); });

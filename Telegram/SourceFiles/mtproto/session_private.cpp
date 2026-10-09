@@ -81,14 +81,10 @@ using namespace details;
 }
 
 [[nodiscard]] QString ComputeAppVersion() {
-#if defined Q_OS_WIN && defined Q_PROCESSOR_X86_64
-	const auto arch = u" x64"_q;
-#elif (defined Q_OS_WIN && defined Q_PROCESSOR_X86_32) || defined Q_PROCESSOR_X86_64
-	const auto arch = QString();
-#else
-	const auto arch = ' ' + QSysInfo::buildCpuArchitecture();
-#endif
-	return QString::fromLatin1(AppVersionStr) + arch + ([] {
+	const auto arch = QSysInfo::buildCpuArchitecture()
+		.replace(u"x86_64"_q, u"x64"_q)
+		.replace(u"i386"_q, u"x86"_q);
+	return arch + ([] {
 #if defined OS_MAC_STORE
 		return u" Mac App Store"_q;
 #elif defined OS_WIN_STORE // OS_MAC_STORE

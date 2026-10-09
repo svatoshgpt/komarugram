@@ -72,7 +72,8 @@ object_ptr<Ui::RpWidget> CreateTopLogoWidget(
 				.face = color,
 				.particles = color,
 			},
-			crl::now());
+			crl::now(),
+			color);
 	}, raw->lifetime());
 
 	return result;

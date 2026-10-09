@@ -66,7 +66,6 @@ kzVbVVCRdc/pR6YVm1XnrmrU5eHNrK1/WAdY2UBxotAemqciYpvbu6SLDkA4YxbQ\n\
 rlcDDEG4f22eLC8LxCSK0f8nWVQ9dU1sAQIDAQAB\n\
 -----END RSA PUBLIC KEY-----\
 ";
-
 #if defined TDESKTOP_API_ID && defined TDESKTOP_API_HASH
 
 constexpr auto ApiId = TDESKTOP_API_ID;

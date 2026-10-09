@@ -40,7 +40,8 @@ constexpr auto postfixes = {
 // AyuGram wording for these keys, so its values are dropped on the floor.
 bool IsLocallyOwned(const QString &key) {
 	return (key == qsl("ayu_SettingsDescription"))
-		|| (key == qsl("ayu_DisableOpenLinkWarning"));
+		|| (key == qsl("ayu_DisableOpenLinkWarning"))
+		|| (key == u"ayu_KomaruAboutTagline"_q);
 }
 
 // KomaruGram: keys that exist only in KomaruGram. The AyuGram pack has no
