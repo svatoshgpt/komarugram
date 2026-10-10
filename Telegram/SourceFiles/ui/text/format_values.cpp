@@ -7,7 +7,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/text/format_values.h"
 
-#include "ayu/utils/telegram_helpers.h"
 #include "base/unixtime.h"
 #include "lang/lang_keys.h"
 #include "countries/countries_instance.h"
@@ -707,7 +706,7 @@ QString FormatResetCloudPasswordIn(float64 sec) {
 	return (sec >= 3600) ? FormatTTL(sec) : FormatDurationText(sec);
 }
 
-QString FormatDialogsDate(const QDateTime &lastTime) {
+QString FormatDialogsDate(const QDateTime &lastTime, bool showSeconds) {
 	// Show all dates that are in the last 20 hours in time format.
 	constexpr int kRecentlyInSeconds = 20 * 3600;
 
@@ -717,7 +716,14 @@ QString FormatDialogsDate(const QDateTime &lastTime) {
 
 	if ((lastDate == nowDate)
 		|| (std::abs(lastTime.secsTo(now)) < kRecentlyInSeconds)) {
-		return formatMessageTime(lastTime.time());
+		const auto locale = QLocale();
+		const auto shortFormat = locale.timeFormat(QLocale::ShortFormat);
+		const auto format = showSeconds
+			? (shortFormat.contains(u"AP"_q)
+				? u"h:mm:ss AP"_q
+				: u"HH:mm:ss"_q)
+			: shortFormat;
+		return locale.toString(lastTime.time(), format);
 	} else if (std::abs(lastDate.daysTo(nowDate)) < 7) {
 		return langDayOfWeek(lastDate);
 	} else {

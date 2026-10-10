@@ -34,7 +34,9 @@ inline const QString kCreditsCurrency = u"XTR"_q;
 [[nodiscard]] QString FormatMuteFor(float64 sec);
 [[nodiscard]] QString FormatMuteForTiny(float64 sec);
 [[nodiscard]] QString FormatResetCloudPasswordIn(float64 sec);
-[[nodiscard]] QString FormatDialogsDate(const QDateTime &lastTime);
+[[nodiscard]] QString FormatDialogsDate(
+	const QDateTime &lastTime,
+	bool showSeconds = false);
 
 struct CurrencyRule {
 	const char *international = "";
