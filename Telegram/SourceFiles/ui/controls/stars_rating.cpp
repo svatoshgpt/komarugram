@@ -25,6 +25,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/rect.h"
 #include "ui/rp_widget.h"
 #include "ui/ui_utility.h"
+#include <QtGui/QFontMetricsF>
 #include "styles/style_chat.h" // textMoreIconEmoji
 #include "styles/style_info.h"
 #include "styles/style_info_levels.h"
@@ -523,10 +524,20 @@ void StarsRating::paint(QPainter &p) {
 				? *_customTextColor
 				: st::levelTextFg->c);
 			q.setFont(st::levelStyle.font);
-			q.drawText(
-				Rect(_shape->icon.size()),
-				Qt::AlignCenter,
-				_collapsedText);
+			const auto metrics = QFontMetricsF(q.font(), q.device());
+			const auto bounds = metrics.tightBoundingRect(_collapsedText);
+			if (bounds.isEmpty()) {
+				q.drawText(
+					Rect(_shape->icon.size()),
+					Qt::AlignCenter,
+					_collapsedText);
+			} else {
+				q.drawText(
+					QPointF(
+						_shape->icon.width() / 2. - bounds.center().x(),
+						_shape->icon.height() / 2. - bounds.center().y()),
+					_collapsedText);
+			}
 		}
 
 		_cachedLevel = _currentLevel;

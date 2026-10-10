@@ -28,6 +28,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "wallet/wallet_ton_connect_link.h"
 #include "wallet/wallet_ton_connect_request.h"
 #include "wallet/wallet_user_addresses.h"
+#include "webview/webview_common.h"
+#include "window/themes/window_theme.h"
 #include "window/window_controller.h"
 #include "window/window_session_controller.h"
 
@@ -83,11 +85,12 @@ not_null<Ui::SeparatePanel*> ShowWallet(not_null<Main::Session*> session) {
 		style::PaletteChanged()
 	) | rpl::on_next([=] {
 		const auto scope = WindowPaletteScope(panel);
-		panel->overrideTitleColor(st::windowBgOver->c);
-		panel->overrideBottomBarColor(st::windowBgOver->c);
-		panel->overrideBodyColor(WindowPalette()
-			? std::make_optional(st::windowBg->c)
-			: std::nullopt);
+		const auto params = Window::Theme::WebViewParams();
+		panel->overrideTitleColor(params.titleBg.alpha() == 255
+			? params.titleBg
+			: params.bodyBg);
+		panel->overrideBottomBarColor(params.bodyBg);
+		panel->overrideBodyColor(params.bodyBg);
 	}, panel->lifetime());
 	TransactionsShownValue(
 		session

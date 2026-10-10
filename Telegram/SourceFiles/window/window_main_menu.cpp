@@ -784,9 +784,13 @@ void MainMenu::setupMenu() {
 				wallet->entity(),
 				tr::lng_wallet_menu(),
 				st::mainMenuButton);
-			wallet->toggleOn(session->appConfig().value(
-			) | rpl::map([=] {
-				return session->appConfig().walletAvailable();
+			wallet->toggleOn(rpl::combine(
+				session->appConfig().value() | rpl::map([=] {
+					return session->appConfig().walletAvailable();
+				}),
+				settings.showWalletInDrawerValue()
+			) | rpl::map([](bool available, bool shown) {
+				return available && shown;
 			}) | rpl::distinct_until_changed());
 			wallet->finishAnimating();
 			wallet->entity()->setClickedCallback([=] {
