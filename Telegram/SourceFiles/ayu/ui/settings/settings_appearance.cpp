@@ -466,11 +466,12 @@ struct DrawerItem {
 			&AyuSettings::showSavedMessagesInDrawer,
 			&AyuSettings::setShowSavedMessagesInDrawer);
 	} else if (id == u"wallet"_q) {
-		return DrawerItem{
-			.settingId = u"ayu/drawerWallet"_q,
-			.title = tr::lng_wallet_menu(),
-			.icon = { &st::walletMenuIcon },
-		};
+		return toggle(
+			u"ayu/drawerWallet"_q,
+			tr::lng_wallet_menu(),
+			{ &st::walletMenuIcon },
+			&AyuSettings::showWalletInDrawer,
+			&AyuSettings::setShowWalletInDrawer);
 	} else if (id == u"lread"_q) {
 		return toggle(
 			u"ayu/showLReadToggleInDrawer"_q,

@@ -19,11 +19,6 @@ namespace {
 
 using Window::Theme::EmbeddedType;
 
-struct WindowPaletteData {
-	int version = -1;
-	std::unique_ptr<style::palette> palette;
-};
-
 [[nodiscard]] std::array<double, 3> ToOklab(const QColor &color) {
 	const auto linear = [](float channel) {
 		const auto value = double(channel);
@@ -141,17 +136,7 @@ QColor CardMatchedAccent(EmbeddedType type) {
 }
 
 const style::palette *WindowPalette() {
-	static auto data = WindowPaletteData();
-	if (data.version != style::PaletteVersion()) {
-		data.version = style::PaletteVersion();
-		const auto type = Window::Theme::CurrentEmbeddedType();
-		data.palette = type
-			? Window::Theme::PrepareEmbeddedPalette(
-				*type,
-				CardMatchedAccent(*type))
-			: nullptr;
-	}
-	return data.palette.get();
+	return nullptr;
 }
 
 void UseWindowPalette(not_null<Ui::RpWidget*> window) {
