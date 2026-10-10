@@ -59,6 +59,7 @@ struct DateTextCache {
 	TimeId messageTimeId = 0;
 	int todaySerial = 0;
 	int width = 0;
+	bool showMessageSeconds = false;
 };
 
 struct DateText {

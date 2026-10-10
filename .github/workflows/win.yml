@@ -142,24 +142,10 @@ jobs:
             ARTIFACT_NAME="${ARTIFACT_NAME} ${{ matrix.arch }}"
           fi
 
-          GENERATOR=""
-          if [ -n "${{ matrix.generator }}" ]; then
-            GENERATOR="-G \"${{ matrix.generator }}\""
-            echo "Generator from matrix: $GENERATOR"
-            ARTIFACT_NAME="${ARTIFACT_NAME} ${{ matrix.generator }}"
-          fi
-          echo "TDESKTOP_BUILD_GENERATOR=$GENERATOR" >> $GITHUB_ENV
-
-          [ -n "$GENERATOR" ] && ARCH=""
+          echo "TDESKTOP_BUILD_GENERATOR=" >> $GITHUB_ENV
           echo "TDESKTOP_BUILD_ARCH=$ARCH" >> $GITHUB_ENV
 
-          DEFINE=""
-          if [ -n "${{ matrix.defines }}" ]; then
-            DEFINE="-D ${{ matrix.defines }}=ON"
-            echo "Define from matrix: $DEFINE"
-            ARTIFACT_NAME="${ARTIFACT_NAME} ${{ matrix.defines }}"
-          fi
-          echo "TDESKTOP_BUILD_DEFINE=$DEFINE" >> $GITHUB_ENV
+          echo "TDESKTOP_BUILD_DEFINE=" >> $GITHUB_ENV
 
           echo "ARTIFACT_NAME=$ARTIFACT_NAME" >> $GITHUB_ENV
 
@@ -400,6 +386,7 @@ jobs:
           docker run --rm \
           -u $(id -u) \
           -v $PWD:/usr/src/tdesktop \
+          -w /usr/src/tdesktop \
           $IMAGE_TAG \
           /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
           -D CMAKE_CONFIGURATION_TYPES=Release \

@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "dialogs/dialogs_entry.h"
 
+#include "ayu/ayu_settings.h"
 #include "dialogs/dialogs_key.h"
 #include "dialogs/dialogs_indexed_list.h"
 #include "base/options.h"
@@ -350,13 +351,16 @@ DateText ResolveDateText(
 		LastNow = now;
 		LastTodaySerial = int(QDate::currentDate().toJulianDay());
 	}
+	const auto showMessageSeconds = AyuSettings::getInstance().showMessageSeconds();
 	if (cache.messageTimeId != date
-		|| cache.todaySerial != LastTodaySerial) {
+		|| cache.todaySerial != LastTodaySerial
+		|| cache.showMessageSeconds != showMessageSeconds) {
 		const auto qdt = base::unixtime::parse(date);
 		cache.text = Ui::FormatDialogsDate(qdt);
 		cache.width = st::dialogsDateFont->width(cache.text);
 		cache.messageTimeId = date;
 		cache.todaySerial = LastTodaySerial;
+		cache.showMessageSeconds = showMessageSeconds;
 	}
 	return { cache.text, cache.width };
 }
