@@ -1,3 +1,11 @@
+7.3.1-1.4.1 (17.10.26)
+
+- Updated the Telegram Desktop base to 7.3.1 while preserving client customizations.
+- Fixed wallet encryption with Windows Hello sometimes failing.
+- Copy-restricted media no longer reaches Downloads.
+- Fixed bad date colors in some custom themes.
+- Removed attaching a link in the photo editor.
+
 7.3.0-1.4.0 (10.10.26)
 
 - Added a toggle to hide Money in the side menu.

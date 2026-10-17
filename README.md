@@ -12,7 +12,7 @@ Telegram Desktop fork — **[materialgram](https://github.com/kukuruzka165/mater
 ## What is this
 
 KomaruGram merges two well-known [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) forks
-and is currently based on Telegram Desktop **7.3.0**.
+and is currently based on Telegram Desktop **7.3.1**.
 
 - **Feature base — AyuGram:** ghost mode, deleted and edited message history, streamer mode,
   local Telegram Premium, translator, font customization, ID copying, extended appearance.
@@ -76,7 +76,7 @@ release. The workflows need these repository secrets:
 
 The release version comes from `Telegram/SourceFiles/core/version.h`. Its internal
 number must increase with every release: 7.2.9-k1.3.8 is `7002101` and
-7.3.0-k1.3.9 is `7003012`. Installed clients use this number to detect updates.
+7.3.1-k1.4.1 is `7003014`. Installed clients use this number to detect updates.
 
 ## Support the project
 
