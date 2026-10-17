@@ -66,7 +66,11 @@ void AboutBox(not_null<Ui::GenericBox*> box, Window::SessionController* controll
 			tr::lng_about_version(
 				tr::now,
 				lt_version,
-				currentVersionText()),
+				u"1.1"_q + (Platform::IsWindows64Bit()
+					? u" x64"_q
+					: Platform::IsWindowsARM64()
+					? u" arm64"_q
+					: QString())),
 			st::aboutVersionLink),
 		QMargins(
 			st::boxRowPadding.left(),
