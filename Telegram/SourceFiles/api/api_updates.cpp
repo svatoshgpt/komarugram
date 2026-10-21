@@ -526,7 +526,7 @@ void Updates::differenceDone(const MTPupdates_Difference &result) {
 		stateDone(d.vstate());
 	} break;
 	case mtpc_updates_differenceTooLong: {
-		LOG(("API Error: updates.differenceTooLong is not supported by materialgram!"));
+		LOG(("API Error: updates.differenceTooLong is not supported by KomaruGram!"));
 	} break;
 	};
 }
@@ -2213,7 +2213,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 						|| user->phone().isEmpty())
 						? QString()
 						: Ui::FormatPhone(user->phone())),
-					user->username());
+					user->editableUsername());
 
 				session().changes().peerUpdated(
 					user,

@@ -287,16 +287,8 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.toggledWhenAll = true,
 	});
 
-	// The rows materialgram adds to user profiles. They used to sit in
-	// Advanced, so their old ids still lead here from search.
 	ayu.addCollapsibleToggle({
 		.id = u"ayu/profileInfo"_q,
-		.altIds = {
-			u"advanced/materialgram"_q,
-			u"advanced/materialgram_registration"_q,
-			u"advanced/materialgram_datacenter"_q,
-			u"advanced/materialgram_gamee"_q,
-		},
 		.title = tr::ayu_ShowInProfile(),
 		.checkboxes = {
 			NestedEntry{

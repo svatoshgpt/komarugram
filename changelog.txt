@@ -1,3 +1,8 @@
+7.3.2-1.4.2 (21.10.26)
+
+- Updated the Telegram Desktop base to 7.3.2 while preserving client customizations.
+- Removed leftover mentions of other clients from the app and its build files.
+
 7.3.1-1.4.1 (17.10.26)
 
 - Updated the Telegram Desktop base to 7.3.1 while preserving client customizations.
@@ -34,16 +39,16 @@
 7.2.9-1.3.6 (02.10.26)
 
 - Empty profile initials are now centered by the visible shapes of their letters.
-- Updated the Materialgram interface components.
+- Updated the interface components.
 
 7.2.9-1.3.5 (28.09.26)
 
-- The look now follows materialgram: Google Sans as the interface font, rounder corners, pill highlight for the active folder, softer ripples, thinner scroll bars and new window and box icons.
+- New look: Google Sans as the interface font, rounder corners, pill highlight for the active folder, softer ripples, thinner scroll bars and new window and box icons.
 - Google Sans lines are no longer too tall on Windows.
 - Linux builds update themselves: unpack the linux-x64.tar.xz archive to a folder you can write to and run KomaruGram from there.
 - A system-wide install under /usr does not try to update itself.
-- Video messages are 240 px across again, as in materialgram.
-- Message bubbles have the same inner padding as in materialgram.
+- Video messages are 240 px across again.
+- Message bubbles have a roomier inner padding.
 
 7.2.9-1.3.4 (25.09.26)
 
@@ -99,7 +104,7 @@
 
 7.2.9-1 (21.09.26)
 
-- KomaruGram: materialgram design on an AyuGram feature base.
+- KomaruGram: Material design on an AyuGram feature base.
 - Rebased onto Telegram Desktop 7.2.9.
 - Nine popular font families bundled with the client.
 - Round Komaru app icon.
