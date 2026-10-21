@@ -3,7 +3,7 @@
 
 # KomaruGram
 
-Форк Telegram Desktop — дизайн **[materialgram](https://github.com/kukuruzka165/materialgram)** поверх функций **[AyuGram](https://github.com/AyuGram/AyuGramDesktop)**.
+Форк Telegram Desktop — дизайн Material поверх функций **[AyuGram](https://github.com/AyuGram/AyuGramDesktop)**.
 
 [ [English](README.md) | Русский ]
 
@@ -11,13 +11,13 @@
 
 ## Что это
 
-KomaruGram объединяет два известных форка [Telegram Desktop](https://github.com/telegramdesktop/tdesktop).
-Сейчас он основан на Telegram Desktop **7.3.1**.
+KomaruGram — форк [Telegram Desktop](https://github.com/telegramdesktop/tdesktop).
+Сейчас он основан на Telegram Desktop **7.3.2**.
 
 - **Функции — AyuGram:** режим призрака, история удалённых и изменённых сообщений, режим
   стримера, локальный Telegram Premium, переводчик, настройка шрифтов, копирование ID,
   расширенные настройки внешнего вида.
-- **Дизайн — materialgram:** цвета и иконки Material, меньше КАПСА, более отзывчивый
+- **Дизайн — Material:** цвета и иконки Material, меньше КАПСА, более отзывчивый
   интерфейс, быстрая загрузка файлов, выше качество медиа, больше недавних стикеров,
   больше аккаунтов.
 
@@ -77,7 +77,7 @@ KomaruGram собирается так же, как Telegram Desktop. Инстр
 
 Версия релиза берётся из `Telegram/SourceFiles/core/version.h`. Её внутренний номер
 должен расти с каждым релизом: 7.2.9-k1.3.8 — это `7002101`, а
-7.3.1-k1.4.1 — `7003014`. По этому номеру установленные клиенты находят обновления.
+7.3.2-k1.4.2 — `7003015`. По этому номеру установленные клиенты находят обновления.
 
 ## Поддержать проект
 
@@ -89,7 +89,6 @@ Gram (TON): `UQAirl_g-9BqSSTGqcX0LHGEyhN_ewZ0ucNakXGrw-h9tMY4`
 
 - [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) — Telegram Messenger
 - [AyuGram](https://github.com/AyuGram/AyuGramDesktop) — Radolyn Labs
-- [materialgram](https://github.com/kukuruzka165/materialgram) — kukuruzka165
 - Шрифты распространяются под своими лицензиями (SIL OFL 1.1, Apache 2.0) — см.
   [Telegram/Resources/fonts/LICENSE.md](Telegram/Resources/fonts/LICENSE.md).
 

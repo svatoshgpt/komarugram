@@ -14,3 +14,5 @@ Telegram/Resources/zxcvbn/*.txt text eol=lf
 # Ensure bundled fonts are treated as binary files
 *.ttf binary
 *.otf binary
+# Raw float tables, such as the 3D diamond model data
+*.bin binary

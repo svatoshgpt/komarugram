@@ -3,7 +3,7 @@
 
 # KomaruGram
 
-Telegram Desktop fork — **[materialgram](https://github.com/kukuruzka165/materialgram)** design on an **[AyuGram](https://github.com/AyuGram/AyuGramDesktop)** feature base.
+Telegram Desktop fork with a Material design on an **[AyuGram](https://github.com/AyuGram/AyuGramDesktop)** feature base.
 
 [ English | [Русский](README-RU.md) ]
 
@@ -11,12 +11,12 @@ Telegram Desktop fork — **[materialgram](https://github.com/kukuruzka165/mater
 
 ## What is this
 
-KomaruGram merges two well-known [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) forks
-and is currently based on Telegram Desktop **7.3.1**.
+KomaruGram is a [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) fork
+and is currently based on Telegram Desktop **7.3.2**.
 
 - **Feature base — AyuGram:** ghost mode, deleted and edited message history, streamer mode,
   local Telegram Premium, translator, font customization, ID copying, extended appearance.
-- **Design layer — materialgram:** Material colors and icons, reduced uppercase, snappier
+- **Design layer — Material:** Material colors and icons, reduced uppercase, snappier
   timeouts, faster uploads, higher media quality, more recent stickers, larger account limits.
 
 After a crash KomaruGram offers to open a prefilled GitHub issue, and you decide what
@@ -76,7 +76,7 @@ release. The workflows need these repository secrets:
 
 The release version comes from `Telegram/SourceFiles/core/version.h`. Its internal
 number must increase with every release: 7.2.9-k1.3.8 is `7002101` and
-7.3.1-k1.4.1 is `7003014`. Installed clients use this number to detect updates.
+7.3.2-k1.4.2 is `7003015`. Installed clients use this number to detect updates.
 
 ## Support the project
 
@@ -88,7 +88,6 @@ The same address is in the app under Settings → KomaruGram Preferences → Oth
 
 - [Telegram Desktop](https://github.com/telegramdesktop/tdesktop) by Telegram Messenger
 - [AyuGram](https://github.com/AyuGram/AyuGramDesktop) by Radolyn Labs
-- [materialgram](https://github.com/kukuruzka165/materialgram) by kukuruzka165
 - Bundled fonts keep their own licences (SIL OFL 1.1, Apache 2.0) — see
   [Telegram/Resources/fonts/LICENSE.md](Telegram/Resources/fonts/LICENSE.md).
 
