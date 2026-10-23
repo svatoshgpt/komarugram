@@ -433,6 +433,8 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           TAG="${RELEASE_TAG:-$GITHUB_REF_NAME}"
+          # Branch names like codex/foo would otherwise point into a folder.
+          TAG="${TAG//\//-}"
           mkdir -p dist
 
           # The usr tree is for installing system-wide; such installs

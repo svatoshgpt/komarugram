@@ -9,6 +9,11 @@
 // alpha applies to both. A #md3 colour follows the surrounding badge palette
 // at paint time, including selection and theme changes. Channels are listed
 // by their bare id, without -100.
+//
+// statuses.txt puts an emoji status in the custom badge slot, one person
+// per line as "id,status[,popup text]". The status is a custom emoji id, or
+// an emoji pack link with a 1-based position, like
+// https://t.me/addemoji/EmojiKomaru/1 or just EmojiKomaru/1.
 #pragma once
 
 #include <crl/crl_time.h>
@@ -47,6 +52,10 @@ void Start();
 // partner.txt.
 [[nodiscard]] const Entry *Supporter(uint64 peerId);
 [[nodiscard]] bool IsPartner(uint64 peerId);
+
+// The emoji status from statuses.txt, 0 if none or its pack is not loaded.
+[[nodiscard]] uint64 Status(uint64 peerId);
+[[nodiscard]] QString StatusText(uint64 peerId);
 
 // Fires when a list or the rate changes.
 [[nodiscard]] rpl::producer<> Updated();
