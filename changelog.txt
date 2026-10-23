@@ -1,13 +1,10 @@
-7.3.3-1.4.3 (23.10.26)
+7.3.3-1.4.2 (23.10.26)
 
 - Updated the Telegram Desktop base to 7.3.3 while preserving client customizations.
+- Emoji statuses for KomaruGram people, set from an emoji pack link or an emoji id.
 - Fixed a transparent media viewer and green video tint with ANGLE on Windows.
 - Fixed text rendering ignoring system settings on Windows.
 - Fixed Chinese characters not showing on older Windows.
-
-7.3.2-1.4.2 (21.10.26)
-
-- Updated the Telegram Desktop base to 7.3.2 while preserving client customizations.
 - Removed leftover mentions of other clients from the app and its build files.
 
 7.3.1-1.4.1 (17.10.26)
