@@ -2706,6 +2706,10 @@ if (WIN32)
     endif()
 
     if (DESKTOP_APP_WIN7_BASELINE)
+        # Qt6Network needs dnsapi for QDnsLookup, WindowsApp.lib used to bring it.
+        target_link_libraries(Telegram PRIVATE Dnsapi)
+        target_link_options(Telegram PRIVATE /DELAYLOAD:dnsapi.dll)
+
         # ANGLE loads d3dcompiler_47.dll from modules folder next to exe.
         if (build_win64)
             set(d3d_modules_subdir x64)
