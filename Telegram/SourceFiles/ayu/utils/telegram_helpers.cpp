@@ -187,10 +187,17 @@ bool isSupporterPeer(ID peerId) {
 }
 
 bool isCustomBadgePeer(ID peerId) {
-	return RCManager::getInstance().supporterCustomBadges().contains(peerId);
+	return KomaruBadges::Status(peerId)
+		|| RCManager::getInstance().supporterCustomBadges().contains(peerId);
 }
 
 CustomBadge getCustomBadge(ID peerId) {
+	if (const auto status = KomaruBadges::Status(peerId)) {
+		return {
+			.emojiStatusId = EmojiStatusId{ .documentId = status },
+			.text = KomaruBadges::StatusText(peerId),
+		};
+	}
 	const auto &badges = RCManager::getInstance().supporterCustomBadges();
 	if (const auto it = badges.find(peerId); it != badges.end()) {
 		return it->second;
@@ -282,19 +289,25 @@ Fn<void()> badgeClickHandler(
 					tr::rich);
 		} else if (isCustomBadge) {
 			const auto custom = getCustomBadge(getBareID(peer));
-			text = custom.text.isEmpty()
-					   ? (isExtera
-							  ? tr::ayu_DeveloperPopup(
-								  tr::now,
-								  lt_item,
-								  TextWithEntities{peer->name()},
-								  tr::rich)
-							  : tr::ayu_SupporterPopup(
-								  tr::now,
-								  lt_item,
-								  TextWithEntities{peer->name()},
-								  tr::rich))
-					   : tr::rich(custom.text);
+			text = !custom.text.isEmpty()
+				? tr::rich(custom.text)
+				: KomaruBadges::Status(getBareID(peer))
+				? tr::ayu_KomaruSupporterPopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{peer->name()},
+					tr::rich)
+				: isExtera
+				? tr::ayu_DeveloperPopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{peer->name()},
+					tr::rich)
+				: tr::ayu_SupporterPopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{peer->name()},
+					tr::rich);
 		} else if (isExtera) {
 			text = peer->isUser()
 					   ? tr::ayu_DeveloperPopup(

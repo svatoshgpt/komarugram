@@ -1,6 +1,11 @@
 // This is the source code of KomaruGram for Desktop.
 #include "ayu/features/komaru/komaru_badges.h"
 
+#include "apiwrap.h"
+#include "core/application.h"
+#include "data/data_types.h"
+#include "main/main_domain.h"
+#include "main/main_session.h"
 #include "ui/painter.h"
 #include "ui/power_saving.h"
 #include "ui/style/style_core.h"
@@ -11,6 +16,7 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QRegularExpression>
 #include <QtCore/QTimer>
 #include <QtNetwork/QNetworkAccessManager>
 #include <QtNetwork/QNetworkReply>
@@ -42,11 +48,26 @@ constexpr auto kParticles = 4;
 constexpr auto kOrbitPeriod = 6000.;
 constexpr auto kTwinklePeriod = 1400.;
 
+// An emoji status from statuses.txt: either a custom emoji id, or a
+// 1-based position in an emoji pack that is looked up once per pack.
+struct StatusRef {
+	QString set;
+	int index = 0;
+	DocumentId id = 0;
+	QString text;
+};
+
 struct State {
 	std::unordered_map<uint64, Entry> developers;
 	std::unordered_map<uint64, Entry> supporters;
 	std::unordered_map<uint64, Entry> partners;
 	std::map<Kind, QByteArray> raw;
+	std::unordered_map<uint64, StatusRef> statuses;
+	QByteArray statusesRaw;
+	base::flat_map<QString, std::vector<DocumentId>> sets;
+	base::flat_set<QString> requestedSets;
+	Main::Session *session = nullptr;
+	rpl::lifetime sessionLifetime;
 	double rate = 0.;
 	rpl::event_stream<> updated;
 	bool started = false;
@@ -125,6 +146,46 @@ struct State {
 	return result;
 }
 
+[[nodiscard]] StatusRef ParseStatusRef(const QString &text) {
+	auto ok = false;
+	if (const auto id = text.toULongLong(&ok); ok && id) {
+		return { .id = id };
+	}
+	static const auto expression = QRegularExpression(
+		u"^(?:(?:https?://)?(?:t|telegram)\\.me/addemoji/)?"
+		"([A-Za-z0-9_]+)/(\\d+)/?$"_q);
+	const auto match = expression.match(text);
+	const auto index = match.hasMatch() ? match.captured(2).toInt() : 0;
+	return (index > 0)
+		? StatusRef{ .set = match.captured(1), .index = index }
+		: StatusRef();
+}
+
+[[nodiscard]] std::unordered_map<uint64, StatusRef> ParseStatuses(
+		const QByteArray &data) {
+	auto result = std::unordered_map<uint64, StatusRef>();
+	for (const auto &raw : QString::fromUtf8(data).split('\n')) {
+		const auto line = raw.trimmed();
+		if (line.isEmpty() || line.startsWith('#')) {
+			continue;
+		}
+		const auto parts = line.split(',');
+		const auto id = parts[0].trimmed().toULongLong();
+		if (!id || parts.size() < 2) {
+			continue;
+		}
+		auto status = ParseStatusRef(parts[1].trimmed());
+		if (!status.id && !status.index) {
+			continue;
+		}
+		if (parts.size() > 2) {
+			status.text = parts.mid(2).join(',').trimmed();
+		}
+		result.emplace(id, std::move(status));
+	}
+	return result;
+}
+
 [[nodiscard]] QString ListName(Kind kind) {
 	switch (kind) {
 	case Kind::Developer: return u"badges.txt"_q;
@@ -165,6 +226,87 @@ bool ApplyList(Kind kind, const QByteArray &data) {
 	return true;
 }
 
+[[nodiscard]] QString StatusesPath() {
+	return cWorkingDir() + u"tdata/komaru_badges/statuses.txt"_q;
+}
+
+void RequestSet(not_null<Main::Session*> session, const QString &name) {
+	auto &state = Instance();
+	if (state.sets.contains(name) || state.requestedSets.contains(name)) {
+		return;
+	}
+	state.requestedSets.emplace(name);
+	session->api().request(MTPmessages_GetStickerSet(
+		MTP_inputStickerSetShortName(MTP_string(name)),
+		MTP_int(0)
+	)).done([=](const MTPmessages_StickerSet &result) {
+		auto ids = std::vector<DocumentId>();
+		result.match([&](const MTPDmessages_stickerSet &data) {
+			for (const auto &document : data.vdocuments().v) {
+				ids.push_back((document.type() == mtpc_document)
+					? document.c_document().vid().v
+					: DocumentId());
+			}
+		}, [](const MTPDmessages_stickerSetNotModified &) {
+		});
+		auto &state = Instance();
+		state.sets[name] = std::move(ids);
+		state.updated.fire({});
+		RepaintAll();
+	}).fail([=](const MTP::Error &error) {
+		LOG(("Komaru Badges Error: emoji pack %1 not loaded, %2"
+			).arg(name, error.type()));
+	}).send();
+}
+
+void ResolveStatusSets() {
+	auto &state = Instance();
+	if (!state.session) {
+		return;
+	}
+	for (const auto &[peerId, status] : state.statuses) {
+		if (!status.set.isEmpty()) {
+			RequestSet(state.session, status.set);
+		}
+	}
+}
+
+// Returns whether the list changed.
+bool ApplyStatuses(const QByteArray &data) {
+	auto &state = Instance();
+	if (state.statusesRaw == data) {
+		return false;
+	}
+	state.statusesRaw = data;
+	state.statuses = ParseStatuses(data);
+	state.requestedSets.clear();
+	ResolveStatusSets();
+	return true;
+}
+
+void FetchStatuses() {
+	const auto reply = Get(QString::fromLatin1(kGistRaw) + u"statuses.txt"_q);
+	QObject::connect(reply, &QNetworkReply::finished, [=] {
+		reply->deleteLater();
+		if (reply->error() != QNetworkReply::NoError) {
+			LOG(("Komaru Badges Error: statuses.txt not loaded, %1"
+				).arg(reply->errorString()));
+			return;
+		}
+		const auto data = reply->readAll();
+		if (!ApplyStatuses(data)) {
+			return;
+		}
+		QDir().mkpath(cWorkingDir() + u"tdata/komaru_badges"_q);
+		auto file = QFile(StatusesPath());
+		if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+			file.write(data);
+		}
+		Instance().updated.fire({});
+		RepaintAll();
+	});
+}
+
 void LoadCachedLists() {
 	auto any = false;
 	for (const auto kind : { Kind::Developer, Kind::Supporter, Kind::Partner }) {
@@ -172,6 +314,9 @@ void LoadCachedLists() {
 		if (file.open(QIODevice::ReadOnly)) {
 			any = ApplyList(kind, file.readAll()) || any;
 		}
+	}
+	if (auto file = QFile(StatusesPath()); file.open(QIODevice::ReadOnly)) {
+		any = ApplyStatuses(file.readAll()) || any;
 	}
 	if (any) {
 		Instance().updated.fire({});
@@ -274,6 +419,7 @@ void Refresh() {
 	FetchList(Kind::Developer);
 	FetchList(Kind::Supporter);
 	FetchList(Kind::Partner);
+	FetchStatuses();
 	FetchRate();
 }
 
@@ -357,6 +503,11 @@ void Start() {
 	}
 	state.started = true;
 	LoadCachedLists();
+	Core::App().domain().activeSessionValue(
+	) | rpl::on_next([](Main::Session *session) {
+		Instance().session = session;
+		ResolveStatusSets();
+	}, state.sessionLifetime);
 	Refresh();
 	const auto timer = new QTimer(QCoreApplication::instance());
 	QObject::connect(timer, &QTimer::timeout, [] { Refresh(); });
@@ -379,6 +530,27 @@ const Entry *Supporter(uint64 peerId) {
 		return &j->second;
 	}
 	return nullptr;
+}
+
+uint64 Status(uint64 peerId) {
+	const auto &state = Instance();
+	const auto i = state.statuses.find(peerId);
+	if (i == end(state.statuses)) {
+		return 0;
+	} else if (i->second.id) {
+		return i->second.id;
+	}
+	const auto j = state.sets.find(i->second.set);
+	if (j == end(state.sets) || i->second.index > int(j->second.size())) {
+		return 0;
+	}
+	return j->second[i->second.index - 1];
+}
+
+QString StatusText(uint64 peerId) {
+	const auto &state = Instance();
+	const auto i = state.statuses.find(peerId);
+	return (i != end(state.statuses)) ? i->second.text : QString();
 }
 
 bool IsPartner(uint64 peerId) {
