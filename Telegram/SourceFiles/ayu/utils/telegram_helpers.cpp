@@ -187,17 +187,10 @@ bool isSupporterPeer(ID peerId) {
 }
 
 bool isCustomBadgePeer(ID peerId) {
-	return KomaruBadges::Status(peerId)
-		|| RCManager::getInstance().supporterCustomBadges().contains(peerId);
+	return RCManager::getInstance().supporterCustomBadges().contains(peerId);
 }
 
 CustomBadge getCustomBadge(ID peerId) {
-	if (const auto status = KomaruBadges::Status(peerId)) {
-		return {
-			.emojiStatusId = EmojiStatusId{ .documentId = status },
-			.text = KomaruBadges::StatusText(peerId),
-		};
-	}
 	const auto &badges = RCManager::getInstance().supporterCustomBadges();
 	if (const auto it = badges.find(peerId); it != badges.end()) {
 		return it->second;
@@ -225,7 +218,10 @@ CustomBadge getCustomBadge(ID peerId) {
 	// KomaruGram faces go in front of the arrow, or stand alone.
 	result.komaruDeveloper = (KomaruBadges::Developer(id) != nullptr);
 	result.komaruSupporter = (KomaruBadges::Supporter(id) != nullptr);
-	if (result.komaruDeveloper || result.komaruSupporter) {
+	result.komaruStatus = KomaruBadges::Status(id);
+	if (result.komaruDeveloper
+		|| result.komaruSupporter
+		|| result.komaruStatus) {
 		result.komaruPeer = id;
 		if (result.badge == BadgeType::None) {
 			result.badge = BadgeType::Komaru;
@@ -287,16 +283,20 @@ Fn<void()> badgeClickHandler(
 					lt_item,
 					TextWithEntities{peer->name()},
 					tr::rich);
+		} else if (badge.komaruStatus
+			&& badge.badge == Info::Profile::BadgeType::Komaru) {
+			const auto custom = KomaruBadges::StatusText(getBareID(peer));
+			text = !custom.isEmpty()
+				? tr::rich(custom)
+				: tr::ayu_KomaruSupporterPopup(
+					tr::now,
+					lt_item,
+					TextWithEntities{peer->name()},
+					tr::rich);
 		} else if (isCustomBadge) {
 			const auto custom = getCustomBadge(getBareID(peer));
 			text = !custom.text.isEmpty()
 				? tr::rich(custom.text)
-				: KomaruBadges::Status(getBareID(peer))
-				? tr::ayu_KomaruSupporterPopup(
-					tr::now,
-					lt_item,
-					TextWithEntities{peer->name()},
-					tr::rich)
 				: isExtera
 				? tr::ayu_DeveloperPopup(
 					tr::now,

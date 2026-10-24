@@ -321,17 +321,22 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 	const auto komaruSupporter = hideExteraBadges
 		? nullptr
 		: KomaruBadges::Supporter(getBareID(peer));
-	const auto komaruSize = descriptor.exteraSupporter->width();
-	const auto komaruWidth = (komaruDeveloper ? komaruSize : 0)
-		+ (komaruSupporter ? komaruSize : 0);
-	const auto paintKomaru = (komaruWidth > 0);
-	const auto paintTail = paintExtera || paintKomaru;
-	const auto tailWidth = exteraWidth + komaruWidth;
+	const auto komaruStatus = hideExteraBadges
+		? uint64()
+		: KomaruBadges::Status(getBareID(peer));
 	const auto customEmojiSkip = (st::emojiSize
 		- Ui::Text::AdjustCustomEmojiSize(st::emojiSize)) / 2;
-	const auto exteraCustomWidth = paintExteraCustom
-		? descriptor.premium->width() - 4 * customEmojiSkip
-		: 0;
+	const auto customEmojiWidth = descriptor.premium->width()
+		- 4 * customEmojiSkip;
+	const auto exteraCustomWidth = paintExteraCustom ? customEmojiWidth : 0;
+	const auto komaruSize = descriptor.exteraSupporter->width();
+	const auto komaruStatusWidth = komaruStatus ? customEmojiWidth : 0;
+	const auto komaruWidth = (komaruDeveloper ? komaruSize : 0)
+		+ (komaruSupporter ? komaruSize : 0)
+		+ komaruStatusWidth;
+	const auto paintKomaru = (komaruWidth > 0);
+	const auto paintTail = paintExtera || paintExteraCustom || paintKomaru;
+	const auto tailWidth = exteraWidth + exteraCustomWidth + komaruWidth;
 	const auto verifyWidth = paintVerify ? descriptor.verified->width() : 0;
 	const auto verifyAfterEmojiWidth = (paintVerify && !paintExtera)
 		? verifyWidth
@@ -343,21 +348,15 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 		if (verifyAfterEmojiWidth) {
 			rectForName.setWidth(rectForName.width() - verifyAfterEmojiWidth);
 		}
-		if (paintExteraCustom) {
-			rectForName.setWidth(rectForName.width() - exteraCustomWidth);
-		}
 		if (paintTail) {
 			rectForName.setWidth(rectForName.width() - tailWidth);
 		}
 		result += drawPremiumEmojiStatus(p, descriptor);
-		if (!paintVerify && !paintExteraCustom && !paintTail) {
+		if (!paintVerify && !paintTail) {
 			return result;
 		}
 		if (verifyAfterEmojiWidth) {
 			rectForName.setWidth(rectForName.width() + verifyAfterEmojiWidth);
-		}
-		if (paintExteraCustom) {
-			rectForName.setWidth(rectForName.width() + exteraCustomWidth);
 		}
 		if (paintTail) {
 			rectForName.setWidth(rectForName.width() + tailWidth);
@@ -365,17 +364,7 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 		descriptor.nameWidth += result;
 	}
 
-	if (paintExteraCustom) {
-		auto &rectForName = descriptor.rectForName;
-		const auto reserve = komaruWidth + (paintVerify ? verifyWidth : 0);
-		rectForName.setWidth(rectForName.width() - reserve);
-		result += drawExteraCustom(p, descriptor);
-		if (!paintVerify && !paintKomaru) {
-			return result;
-		}
-		rectForName.setWidth(rectForName.width() + reserve);
-		descriptor.nameWidth += result;
-	} else if (_emojiStatus) {
+	if (!paintExteraCustom && _emojiStatus) {
 		_emojiStatus->painted = false;
 	}
 
@@ -391,7 +380,9 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 		};
 		// The arrow takes the place of the verified check, as before.
 		const auto afterKomaru = exteraWidth
+			+ exteraCustomWidth
 			+ ((paintVerify && !paintExtera) ? verifyWidth : 0);
+		const auto afterFaces = komaruStatusWidth + afterKomaru;
 		if (paintStar) {
 			drawKeeping(komaruWidth + afterKomaru, [&] {
 				return drawPremiumStar(p, descriptor);
@@ -399,16 +390,32 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 		}
 		if (komaruDeveloper) {
 			const auto supporter = komaruSupporter ? komaruSize : 0;
-			drawKeeping(supporter + afterKomaru, [&] {
+			drawKeeping(supporter + afterFaces, [&] {
 				return drawKomaru(p, descriptor, *komaruDeveloper);
 			});
 		}
 		if (komaruSupporter) {
-			drawKeeping(afterKomaru, [&] {
+			drawKeeping(afterFaces, [&] {
 				return drawKomaru(p, descriptor, *komaruSupporter);
 			});
 		}
-		if (paintExteraDev) {
+		if (komaruStatus) {
+			drawKeeping(afterKomaru, [&] {
+				return drawCustomStatus(
+					p,
+					descriptor,
+					EmojiStatusId{ .documentId = komaruStatus },
+					_komaruStatus);
+			});
+		}
+		if (paintExteraCustom) {
+			drawKeeping(paintVerify ? verifyWidth : 0, [&] {
+				return drawExteraCustom(p, descriptor);
+			});
+			if (paintVerify) {
+				result += drawVerifyCheck(p, descriptor);
+			}
+		} else if (paintExteraDev) {
 			result += drawExteraOfficial(p, descriptor);
 		} else if (paintExteraSupporter) {
 			result += drawExteraSupporter(p, descriptor);
@@ -517,44 +524,55 @@ int PeerBadge::drawPremiumEmojiStatus(
 		.position = _emojiStatus->lastPosition,
 		.paused = descriptor.paused || On(PowerSaving::kEmojiStatus),
 	});
-	return iconw - 4 * _emojiStatus->skip;
+	return descriptor.premium->width() - 4 * _emojiStatus->skip;
 }
 
 int PeerBadge::drawExteraCustom(
 		Painter &p,
 		const Descriptor &descriptor) {
+	return drawCustomStatus(
+		p,
+		descriptor,
+		getCustomBadge(getBareID(descriptor.peer)).emojiStatusId,
+		_exteraCustomStatus);
+}
+
+int PeerBadge::drawCustomStatus(
+		Painter &p,
+		const Descriptor &descriptor,
+		EmojiStatusId id,
+		std::unique_ptr<EmojiStatus> &slot) {
 	const auto peer = descriptor.peer;
-	const auto id = getCustomBadge(getBareID(peer)).emojiStatusId;
 	const auto rectForName = descriptor.rectForName;
 	const auto iconw = descriptor.premium->width();
 	const auto iconx = rectForName.x()
 		+ qMin(descriptor.nameWidth, rectForName.width() - iconw);
 	const auto icony = rectForName.y();
-	if (!_exteraCustomStatus) {
-		_exteraCustomStatus = std::make_unique<EmojiStatus>();
+	if (!slot) {
+		slot = std::make_unique<EmojiStatus>();
 		const auto size = st::emojiSize;
 		const auto emoji = Ui::Text::AdjustCustomEmojiSize(size);
-		_exteraCustomStatus->skip = (size - emoji) / 2;
+		slot->skip = (size - emoji) / 2;
 	}
-	if (_exteraCustomStatus->id != id) {
+	if (slot->id != id) {
 		using namespace Ui::Text;
 		auto &manager = peer->session().data().customEmojiManager();
-		_exteraCustomStatus->id = id;
-		_exteraCustomStatus->emoji = std::make_unique<LimitedLoopsEmoji>(
+		slot->id = id;
+		slot->emoji = std::make_unique<LimitedLoopsEmoji>(
 			manager.create(
 				Data::EmojiStatusCustomId(id),
 				descriptor.customEmojiRepaint),
 			kPlayStatusLimit);
 	}
-	_exteraCustomStatus->emoji->paint(p, {
+	slot->emoji->paint(p, {
 		.textColor = (*descriptor.premiumFg)->c,
 		.now = descriptor.now,
 		.position = QPoint(
-			iconx - 2 * _exteraCustomStatus->skip,
-			icony + _exteraCustomStatus->skip),
+			iconx - 2 * slot->skip,
+			icony + slot->skip),
 		.paused = descriptor.paused || On(PowerSaving::kEmojiStatus),
 	});
-	return iconw - 4 * _exteraCustomStatus->skip;
+	return iconw - 4 * slot->skip;
 }
 
 int PeerBadge::drawPremiumStar(Painter &p, const Descriptor &descriptor) {

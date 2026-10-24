@@ -128,6 +128,8 @@ void Badge::setContent(Content content) {
 	_content = content;
 	_emojiStatus = nullptr;
 	_komaruTimer = nullptr;
+	_komaruStatus = nullptr;
+	_komaruStatusWidth = 0;
 	_view.destroy();
 	if (_content.badge == BadgeType::None) {
 		_updated.fire({});
@@ -157,9 +159,42 @@ void Badge::setContent(Content content) {
 	}());
 	_view->show();
 	const auto faces = _content;
-	const auto facesWidth = KomaruFacesCount(_content)
+	const auto facesOnlyWidth = KomaruFacesCount(_content)
 		* st::infoExteraSupporterBadge.width();
-	if (facesWidth > 0) {
+	if (_content.komaruStatus) {
+		_komaruStatusWidth = Data::FrameSizeFromTag(sizeTag())
+			/ style::DevicePixelRatio();
+		_komaruStatus = _session->data().customEmojiManager().create(
+			Data::EmojiStatusCustomId(
+				EmojiStatusId{ .documentId = _content.komaruStatus }),
+			[raw = _view.data()] { raw->update(); },
+			sizeTag());
+		if (_customStatusLoopsLimit > 0) {
+			_komaruStatus = MakeWrappedEmoji<Ui::Text::LimitedLoopsEmoji>(
+				std::move(_komaruStatus),
+				_customStatusLoopsLimit);
+		}
+	}
+	const auto facesWidth = facesOnlyWidth + _komaruStatusWidth;
+	const auto paintPrefix = [=](
+			QPainter &p,
+			int left,
+			int height,
+			QColor themeColor) {
+		PaintKomaruFaces(p, faces, left, height, themeColor);
+		if (_komaruStatus) {
+			_komaruStatus->paint(p, {
+				.textColor = themeColor,
+				.now = crl::now(),
+				.position = QPoint(
+					left + facesOnlyWidth,
+					(height - _komaruStatusWidth) / 2),
+				.paused = ((_animationPaused && _animationPaused())
+					|| On(PowerSaving::kEmojiStatus)),
+			});
+		}
+	};
+	if (facesOnlyWidth > 0) {
 		_komaruTimer = std::make_unique<base::Timer>([=] {
 			const auto paused = _animationPaused && _animationPaused();
 			if (_view && !paused && KomaruBadges::Animated()) {
@@ -206,13 +241,17 @@ void Badge::setContent(Content content) {
 			? facesWidth
 			: 0;
 		const auto width = prefix + emoji + (icon ? icon->width() : 0);
-		const auto height = std::max(emoji, icon ? icon->height() : 0);
+		const auto height = std::max({
+			emoji,
+			icon ? icon->height() : 0,
+			prefix ? _komaruStatusWidth : 0,
+		});
 		_view->resize(width, height);
 		_view->paintRequest(
 		) | rpl::on_next([=, check = _view.data()]{
 			if (prefix) {
 				auto p = QPainter(check);
-				PaintKomaruFaces(p, faces, 0, check->height(), st().premiumFg->c);
+				paintPrefix(p, 0, check->height(), st().premiumFg->c);
 			}
 			if (_emojiStatus) {
 				auto args = Ui::Text::CustomEmoji::Context{
@@ -295,18 +334,19 @@ void Badge::setContent(Content content) {
 		const auto skip = st::infoVerifiedCheckPosition.x();
 		_view->resize(
 			skip + facesWidth + icon->width(),
-			icon->height());
+			std::max(icon->height(), _komaruStatusWidth));
 		_view->paintRequest(
 		) | rpl::on_next([=, check = _view.data()]{
 			Painter p(check);
-			PaintKomaruFaces(p, faces, skip, check->height(), _overrideSt
+			paintPrefix(p, skip, check->height(), _overrideSt
 				? _overrideSt->premiumFg->c
 				: st::profileVerifiedCheckBg->c);
 			const auto left = skip + facesWidth;
+			const auto top = (check->height() - icon->height()) / 2;
 			if (_overrideSt) {
-				icon->paint(p, left, 0, check->width(), _overrideSt->premiumFg->c);
+				icon->paint(p, left, top, check->width(), _overrideSt->premiumFg->c);
 			} else {
-				icon->paint(p, left, 0, check->width());
+				icon->paint(p, left, top, check->width());
 			}
 		}, _view->lifetime());
 	} break;
@@ -314,11 +354,13 @@ void Badge::setContent(Content content) {
 		const auto skip = st::infoVerifiedCheckPosition.x();
 		_view->resize(
 			skip + facesWidth,
-			st::infoExteraSupporterBadge.height());
+			std::max(
+				st::infoExteraSupporterBadge.height(),
+				_komaruStatusWidth));
 		_view->paintRequest(
 		) | rpl::on_next([=, check = _view.data()]{
 			auto p = QPainter(check);
-			PaintKomaruFaces(p, faces, skip, check->height(), _overrideSt
+			paintPrefix(p, skip, check->height(), _overrideSt
 				? _overrideSt->premiumFg->c
 				: st::profileVerifiedCheckBg->c);
 		}, _view->lifetime());
@@ -378,7 +420,8 @@ void Badge::move(int left, int top, int bottom) {
 Badge::Content Badge::clickedContent() const {
 	auto result = _content;
 	const auto faces = KomaruFacesCount(result);
-	if (!_view || !faces) {
+	const auto status = result.komaruStatus ? _komaruStatusWidth : 0;
+	if (!_view || (!faces && !status)) {
 		return result;
 	}
 	const auto faceWidth = st::infoExteraSupporterBadge.width();
@@ -394,10 +437,17 @@ Badge::Content Badge::clickedContent() const {
 		result.emojiStatusId = EmojiStatusId();
 		result.komaruDeveloper = developer;
 		result.komaruSupporter = !developer;
+		result.komaruStatus = 0;
+	} else if (x < skip + faces * faceWidth + status) {
+		result.badge = BadgeType::Komaru;
+		result.emojiStatusId = EmojiStatusId();
+		result.komaruDeveloper = false;
+		result.komaruSupporter = false;
 	} else if (result.badge != BadgeType::Komaru) {
 		result.komaruPeer = 0;
 		result.komaruDeveloper = false;
 		result.komaruSupporter = false;
+		result.komaruStatus = 0;
 	}
 	return result;
 }
