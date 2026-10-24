@@ -91,9 +91,6 @@ void ApplyKomaruTranslations() {
 			u"**{item}** поддержал **KomaruGram** и получил уникальный "
 			"значок."_q },
 		std::pair{
-			"ayu_KomaruPartnerPopup",
-			u"**{item}** — партнёр из **KomaruGif**."_q },
-		std::pair{
 			"ayu_KomaruSupportDonationInfo",
 			u"Переведите сумму в размере {amount} на любые реквизиты проекта. "
 			"Их можно найти в разделе **Другое** настроек приложения."_q },

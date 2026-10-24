@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #pragma once
 
+#include "data/data_types.h"
 #include "ui/text/text_custom_emoji.h"
 #include "ui/rp_widget.h"
 
@@ -104,6 +105,11 @@ private:
 	int drawPremiumStar(Painter &p, const Descriptor &descriptor);
 
 	int drawExteraCustom(Painter &p, const Descriptor &descriptor);
+	int drawCustomStatus(
+		Painter &p,
+		const Descriptor &descriptor,
+		EmojiStatusId id,
+		std::unique_ptr<EmojiStatus> &slot);
 	int drawExteraOfficial(Painter &p, const Descriptor &descriptor);
 	int drawExteraSupporter(Painter &p, const Descriptor &descriptor);
 	int drawKomaru(
@@ -116,6 +122,7 @@ private:
 	std::unique_ptr<EmojiStatus> _emojiStatus;
 	std::unique_ptr<KomaruAnimation> _komaruAnimation;
 	std::unique_ptr<EmojiStatus> _exteraCustomStatus;
+	std::unique_ptr<EmojiStatus> _komaruStatus;
 	mutable std::unique_ptr<BotVerifiedData> _botVerifiedData;
 
 };

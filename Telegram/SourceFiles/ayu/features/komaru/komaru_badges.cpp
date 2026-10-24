@@ -60,7 +60,6 @@ struct StatusRef {
 struct State {
 	std::unordered_map<uint64, Entry> developers;
 	std::unordered_map<uint64, Entry> supporters;
-	std::unordered_map<uint64, Entry> partners;
 	std::map<Kind, QByteArray> raw;
 	std::unordered_map<uint64, StatusRef> statuses;
 	QByteArray statusesRaw;
@@ -190,7 +189,6 @@ struct State {
 	switch (kind) {
 	case Kind::Developer: return u"badges.txt"_q;
 	case Kind::Supporter: return u"donates.txt"_q;
-	case Kind::Partner: return u"partner.txt"_q;
 	}
 	Unexpected("Kind in KomaruBadges::ListName.");
 }
@@ -219,8 +217,6 @@ bool ApplyList(Kind kind, const QByteArray &data) {
 	raw = data;
 	auto &list = (kind == Kind::Developer)
 		? state.developers
-		: (kind == Kind::Partner)
-		? state.partners
 		: state.supporters;
 	list = ParseList(kind, data);
 	return true;
@@ -309,7 +305,7 @@ void FetchStatuses() {
 
 void LoadCachedLists() {
 	auto any = false;
-	for (const auto kind : { Kind::Developer, Kind::Supporter, Kind::Partner }) {
+	for (const auto kind : { Kind::Developer, Kind::Supporter }) {
 		auto file = QFile(CachePath(kind));
 		if (file.open(QIODevice::ReadOnly)) {
 			any = ApplyList(kind, file.readAll()) || any;
@@ -418,7 +414,6 @@ void FetchRate(int index = 0) {
 void Refresh() {
 	FetchList(Kind::Developer);
 	FetchList(Kind::Supporter);
-	FetchList(Kind::Partner);
 	FetchStatuses();
 	FetchRate();
 }
@@ -521,15 +516,9 @@ const Entry *Developer(uint64 peerId) {
 }
 
 const Entry *Supporter(uint64 peerId) {
-	const auto &state = Instance();
-	if (const auto i = state.supporters.find(peerId);
-		i != end(state.supporters)) {
-		return &i->second;
-	} else if (const auto j = state.partners.find(peerId);
-		j != end(state.partners)) {
-		return &j->second;
-	}
-	return nullptr;
+	const auto &list = Instance().supporters;
+	const auto i = list.find(peerId);
+	return (i != end(list)) ? &i->second : nullptr;
 }
 
 uint64 Status(uint64 peerId) {
@@ -551,10 +540,6 @@ QString StatusText(uint64 peerId) {
 	const auto &state = Instance();
 	const auto i = state.statuses.find(peerId);
 	return (i != end(state.statuses)) ? i->second.text : QString();
-}
-
-bool IsPartner(uint64 peerId) {
-	return Instance().partners.contains(peerId);
 }
 
 rpl::producer<> Updated() {
