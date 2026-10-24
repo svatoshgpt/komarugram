@@ -272,17 +272,11 @@ Fn<void()> badgeClickHandler(
 					TextWithEntities{peer->name()},
 					tr::rich);
 		} else if (komaruSupporter) {
-			text = KomaruBadges::IsPartner(getBareID(peer))
-				? tr::ayu_KomaruPartnerPopup(
-					tr::now,
-					lt_item,
-					TextWithEntities{peer->name()},
-					tr::rich)
-				: tr::ayu_KomaruSupporterPopup(
-					tr::now,
-					lt_item,
-					TextWithEntities{peer->name()},
-					tr::rich);
+			text = tr::ayu_KomaruSupporterPopup(
+				tr::now,
+				lt_item,
+				TextWithEntities{peer->name()},
+				tr::rich);
 		} else if (badge.komaruStatus
 			&& badge.badge == Info::Profile::BadgeType::Komaru) {
 			const auto custom = KomaruBadges::StatusText(getBareID(peer));
