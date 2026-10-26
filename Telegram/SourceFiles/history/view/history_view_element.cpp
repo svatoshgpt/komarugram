@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_element.h"
 
+#include "ayu/ui/components/color_swatch.h"
+
 #include "apiwrap.h"
 #include "api/api_transcribes.h"
 #include "history/view/history_view_service_message.h"
@@ -2427,7 +2429,11 @@ void Element::setTextWithLinks(
 		const auto item = data();
 		const auto &options = Ui::ItemTextOptions(item);
 		clearSpecialOnlyEmoji();
-		_text.setMarkedText(st::messageTextStyle, text, options, context);
+		_text.setMarkedText(
+			st::messageTextStyle,
+			AyuUi::AddColorSwatches(text),
+			options,
+			AyuUi::WithColorSwatches(context));
 		if (!item->_text.empty() && _text.isEmpty()){
 			// If server has allowed some text that we've trim-ed entirely,
 			// just replace it with something so that UI won't look buggy.

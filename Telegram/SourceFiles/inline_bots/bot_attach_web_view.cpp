@@ -3018,94 +3018,133 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 	const auto bots = &peer->session().attachWebView();
 	const auto raw = result.get();
 	auto minimal = 0;
-	if (Data::CanSend(peer, ChatRestriction::SendPhotos, false)) {
-		++minimal;
-		raw->addAction(tr::lng_attach_photo_or_video(tr::now), [=] {
-			attach(true);
-		}, &st::menuIconPhoto);
-	}
-	const auto fileTypes = ChatRestriction::SendVideos
-		| ChatRestriction::SendGifs
-		| ChatRestriction::SendStickers
-		| ChatRestriction::SendMusic
-		| ChatRestriction::SendFiles;
-	if (Data::CanSendAnyOf(peer, fileTypes, false)) {
-		++minimal;
-		raw->addAction(tr::lng_attach_document(tr::now), [=] {
-			attach(false);
-		}, &st::menuIconFile);
-	}
-	const auto moneyIndex = int(raw->actions().size());
-	if (peer->canCreatePolls(false)) {
-		++minimal;
-		raw->addAction(tr::lng_polls_menu_item(tr::now), [=] {
-			const auto action = actionFactory();
-			const auto source = action.options.scheduled
-				? Api::SendType::Scheduled
-				: Api::SendType::Normal;
-			const auto chosen = kDefaultPollCreateFlags;
-			Window::PeerMenuCreatePoll(
-				controller,
-				peer,
-				action.replyTo,
-				action.options.suggest,
-				chosen,
-				PollData::Flags(),
-				source,
-				sendMenuDetails());
-		}, &st::menuIconCreatePoll);
-	}
-	if (peer->canCreateTodoLists(false)) {
-		++minimal;
-		raw->addAction(tr::lng_todo_menu_item(tr::now), [=] {
-			const auto action = actionFactory();
-			const auto source = action.options.scheduled
-				? Api::SendType::Scheduled
-				: Api::SendType::Normal;
-			Window::PeerMenuCreateTodoList(
-				controller,
-				peer,
-				action.replyTo,
-				action.options.suggest,
-				source,
-				sendMenuDetails());
-		}, &st::menuIconCreateTodoList);
-	}
-	if (Iv::Editor::CanAuthorRichMessages(&controller->session())
-		&& Data::CanSendAnyOf(peer, ChatRestriction::SendOther, false)) {
-		raw->addAction(tr::lng_article_menu_item(tr::now), [=] {
-			const auto action = actionFactory();
-			const auto details = sendMenuDetails();
-			Iv::Editor::ShowComposeBox(
-				controller,
-				peer,
-				action,
-				details,
-				composeFieldText ? composeFieldText() : TextWithTags(),
-				composeFieldMigrated);
-		}, &st::menuIconArticle);
-	}
+	auto moneyIndex = -1;
 	const auto session = &controller->session();
 	const auto locationType = ChatRestriction::SendOther;
 	const auto config = ResolveMapsConfig(session);
-	if (Data::CanSendAnyOf(peer, locationType, false)
-		&& Ui::LocationPicker::Available(config)) {
-		raw->addAction(tr::lng_maps_point(tr::now), [=] {
-			Ui::PreventDelayedActivation();
-			ChooseAndSendLocation(controller, config, actionFactory());
-		}, &st::menuIconAddress);
-	}
-	if (Data::CanSend(peer, ChatRestriction::SendMusic, false)) {
-		++minimal;
-		raw->addAction(tr::lng_all_music(tr::now), [=] {
-			const auto box = controller->show(
-				Box(MusicAttachBox, controller, peer, actionFactory));
-			if (const auto strong = box.get()) {
-				QObject::connect(parent, &QObject::destroyed, strong, [=] {
-					strong->closeBox();
-				});
-			}
-		}, &st::menuIconSoundOn);
+	const auto addPhoto = [&] {
+		if (Data::CanSend(peer, ChatRestriction::SendPhotos, false)) {
+			++minimal;
+			raw->addAction(tr::lng_attach_photo_or_video(tr::now), [=] {
+				attach(true);
+			}, &st::menuIconPhoto);
+		}
+	};
+	const auto addDocument = [&] {
+		const auto fileTypes = ChatRestriction::SendVideos
+			| ChatRestriction::SendGifs
+			| ChatRestriction::SendStickers
+			| ChatRestriction::SendMusic
+			| ChatRestriction::SendFiles;
+		if (Data::CanSendAnyOf(peer, fileTypes, false)) {
+			++minimal;
+			raw->addAction(tr::lng_attach_document(tr::now), [=] {
+				attach(false);
+			}, &st::menuIconFile);
+		}
+	};
+	const auto addPoll = [&] {
+		if (peer->canCreatePolls(false)) {
+			++minimal;
+			raw->addAction(tr::lng_polls_menu_item(tr::now), [=] {
+				const auto action = actionFactory();
+				const auto source = action.options.scheduled
+					? Api::SendType::Scheduled
+					: Api::SendType::Normal;
+				const auto chosen = kDefaultPollCreateFlags;
+				Window::PeerMenuCreatePoll(
+					controller,
+					peer,
+					action.replyTo,
+					action.options.suggest,
+					chosen,
+					PollData::Flags(),
+					source,
+					sendMenuDetails());
+			}, &st::menuIconCreatePoll);
+		}
+	};
+	const auto addTodo = [&] {
+		if (peer->canCreateTodoLists(false)) {
+			++minimal;
+			raw->addAction(tr::lng_todo_menu_item(tr::now), [=] {
+				const auto action = actionFactory();
+				const auto source = action.options.scheduled
+					? Api::SendType::Scheduled
+					: Api::SendType::Normal;
+				Window::PeerMenuCreateTodoList(
+					controller,
+					peer,
+					action.replyTo,
+					action.options.suggest,
+					source,
+					sendMenuDetails());
+			}, &st::menuIconCreateTodoList);
+		}
+	};
+	const auto addArticle = [&] {
+		if (Iv::Editor::CanAuthorRichMessages(&controller->session())
+			&& Data::CanSendAnyOf(peer, ChatRestriction::SendOther, false)) {
+			raw->addAction(tr::lng_article_menu_item(tr::now), [=] {
+				const auto action = actionFactory();
+				const auto details = sendMenuDetails();
+				Iv::Editor::ShowComposeBox(
+					controller,
+					peer,
+					action,
+					details,
+					composeFieldText ? composeFieldText() : TextWithTags(),
+					composeFieldMigrated);
+			}, &st::menuIconArticle);
+		}
+	};
+	const auto addLocation = [&] {
+		if (Data::CanSendAnyOf(peer, locationType, false)
+			&& Ui::LocationPicker::Available(config)) {
+			raw->addAction(tr::lng_maps_point(tr::now), [=] {
+				Ui::PreventDelayedActivation();
+				ChooseAndSendLocation(controller, config, actionFactory());
+			}, &st::menuIconAddress);
+		}
+	};
+	const auto addMusic = [&] {
+		if (Data::CanSend(peer, ChatRestriction::SendMusic, false)) {
+			++minimal;
+			raw->addAction(tr::lng_all_music(tr::now), [=] {
+				const auto box = controller->show(
+					Box(MusicAttachBox, controller, peer, actionFactory));
+				if (const auto strong = box.get()) {
+					QObject::connect(parent, &QObject::destroyed, strong, [=] {
+						strong->closeBox();
+					});
+				}
+			}, &st::menuIconSoundOn);
+		}
+	};
+	// KomaruGram: the items follow the order and visibility set in
+	// Settings > KomaruGram > Appearance > Attachment Menu. Money is added
+	// later, when the wallet can offer it, at the place it holds here.
+	const auto &ayu = AyuSettings::getInstance();
+	for (const auto &id : ayu.attachOrder()) {
+		if (!ayu.attachItemShown(id)) {
+			continue;
+		} else if (id == u"photo"_q) {
+			addPhoto();
+		} else if (id == u"document"_q) {
+			addDocument();
+		} else if (id == u"money"_q) {
+			moneyIndex = int(raw->actions().size());
+		} else if (id == u"poll"_q) {
+			addPoll();
+		} else if (id == u"todo"_q) {
+			addTodo();
+		} else if (id == u"article"_q) {
+			addArticle();
+		} else if (id == u"location"_q) {
+			addLocation();
+		} else if (id == u"music"_q) {
+			addMusic();
+		}
 	}
 	const auto addBots = Data::CanSend(peer, ChatRestriction::SendInline, false)
 		&& !peer->starsPerMessageChecked();
@@ -3150,7 +3189,7 @@ std::unique_ptr<Ui::DropdownMenu> MakeAttachBotsMenu(
 	} else if (actions <= minimal && !onclick) {
 		return nullptr;
 	}
-	if (const auto user = peer->asUser()) {
+	if (const auto user = (moneyIndex >= 0) ? peer->asUser() : nullptr) {
 		const auto wallet = &session->wallet();
 		const auto userId = peerToUser(user->id);
 		const auto weakSession = base::make_weak(session);

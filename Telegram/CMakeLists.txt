@@ -121,8 +121,6 @@ PRIVATE
 set(ayugram_files
         ayu/ayu_worker.cpp
         ayu/ayu_worker.h
-        ayu/features/analytics/komaru_analytics.cpp
-        ayu/features/analytics/komaru_analytics.h
         ayu/features/komaru/komaru_badges.cpp
         ayu/features/komaru/komaru_badges.h
         ayu/ayu_url_handlers.cpp
@@ -212,6 +210,8 @@ set(ayugram_files
         ayu/ui/boxes/plugin_info_box.h
         ayu/ui/components/image_view.cpp
         ayu/ui/components/image_view.h
+        ayu/ui/components/color_swatch.cpp
+        ayu/ui/components/color_swatch.h
         ayu/ui/components/icon_picker.cpp
         ayu/ui/components/icon_picker.h
         ayu/ui/components/avatar_corners_preview.cpp
@@ -2913,8 +2913,6 @@ target_compile_definitions(Telegram
 PRIVATE
     TDESKTOP_API_ID=${TDESKTOP_API_ID}
     TDESKTOP_API_HASH=${TDESKTOP_API_HASH}
-    KOMARUGRAM_GA_MEASUREMENT_ID="${KOMARUGRAM_GA_MEASUREMENT_ID}"
-    KOMARUGRAM_GA_API_SECRET="${KOMARUGRAM_GA_API_SECRET}"
     G_LOG_DOMAIN="Telegram"
     U_STATIC_IMPLEMENTATION=1 # AyuGram: do not use __declspec(dllimport) when including icu headers
 )

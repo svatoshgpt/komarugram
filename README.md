@@ -22,10 +22,7 @@ and is currently based on Telegram Desktop **7.3.3**.
 After a crash KomaruGram offers to open a prefilled GitHub issue, and you decide what
 to send; the crash report and memory dump are not uploaded anywhere.
 
-KomaruGram sends anonymous statistics to Google Analytics: updates, and the fact of a
-crash with the crashed version. They carry a random ID that is not linked to your account;
-messages, contacts, phone number and usernames are never sent. Turn them off in
-Settings → KomaruGram Preferences → Other → Anonymous Statistics.
+KomaruGram sends no telemetry.
 
 ## Download
 
@@ -67,9 +64,6 @@ Pushing a tag builds Windows x64, Windows x86 and Linux x64 and publishes them a
 release. The workflows need these repository secrets:
 
 - `TDESKTOP_API_ID`, `TDESKTOP_API_HASH` — Telegram API credentials.
-- `GA_MEASUREMENT_ID`, `GA_API_SECRET` — Google Analytics 4 measurement ID and
-  Measurement Protocol API secret for anonymous statistics. Leave them unset to build
-  without statistics.
 - `UPDATE_PRIVATE_KEY` — RSA-2048 private key that signs Windows update packages.
   The matching public key is in `Telegram/SourceFiles/config.h`. Keep the private key
   safe: without it, installed clients cannot receive updates.

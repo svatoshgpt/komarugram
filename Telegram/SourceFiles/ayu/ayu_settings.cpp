@@ -939,6 +939,7 @@ const std::vector<QString> &AyuSettings::DefaultDrawerOrder() {
 	static const auto result = std::vector<QString>{
 		u"myProfile"_q,
 		u"bots"_q,
+		u"separator"_q,
 		u"newGroup"_q,
 		u"newChannel"_q,
 		u"contacts"_q,
@@ -955,31 +956,144 @@ const std::vector<QString> &AyuSettings::DefaultDrawerOrder() {
 	return result;
 }
 
+namespace {
+
+// Puts every default item the saved order lacks right after the item that
+// precedes it in the defaults, so a new item shows up where it belongs
+// instead of at the very end.
+void InsertMissing(
+		std::vector<QString> &result,
+		const std::vector<QString> &defaults) {
+	for (auto i = begin(defaults); i != end(defaults); ++i) {
+		if (*i == u"separator"_q || ranges::contains(result, *i)) {
+			continue;
+		}
+		auto at = begin(result);
+		for (auto previous = i; previous != begin(defaults);) {
+			--previous;
+			if (*previous == u"separator"_q) {
+				continue;
+			}
+			const auto found = ranges::find(result, *previous);
+			if (found != end(result)) {
+				at = found + 1;
+				break;
+			}
+		}
+		result.insert(at, *i);
+	}
+}
+
+[[nodiscard]] QString JoinOrder(const std::vector<QString> &order) {
+	auto joined = QStringList{ u"v2"_q };
+	for (const auto &id : order) {
+		joined.push_back(id);
+	}
+	return joined.join(',');
+}
+
+} // namespace
+
 std::vector<QString> AyuSettings::drawerOrder() const {
 	const auto &defaults = DefaultDrawerOrder();
+	auto saved = _drawerOrder.current().split(',', Qt::SkipEmptyParts);
+	if (saved.isEmpty()) {
+		return defaults;
+	}
+	const auto versioned = (saved.front() == u"v2"_q);
+	if (versioned) {
+		saved.removeFirst();
+	}
 	auto result = std::vector<QString>();
-	for (const auto &id : _drawerOrder.current().split(',')) {
-		if (ranges::contains(defaults, id) && !ranges::contains(result, id)) {
+	for (const auto &id : saved) {
+		if (id == u"separator"_q) {
+			if (versioned) {
+				result.push_back(id);
+			}
+		} else if (ranges::contains(defaults, id)
+			&& !ranges::contains(result, id)) {
 			result.push_back(id);
 		}
 	}
-	// Items the saved order does not know about yet go to the end.
-	for (const auto &id : defaults) {
-		if (!ranges::contains(result, id)) {
-			result.push_back(id);
+	if (!versioned) {
+		// Orders saved before separators became items had one after the
+		// profile and the bots while those led the menu.
+		auto i = begin(result);
+		while (i != end(result)
+			&& (*i == u"myProfile"_q || *i == u"bots"_q)) {
+			++i;
+		}
+		if (i != begin(result)) {
+			result.insert(i, u"separator"_q);
 		}
 	}
+	InsertMissing(result, defaults);
 	return result;
 }
 
 void AyuSettings::setDrawerOrder(const std::vector<QString> &order) {
+	const auto value = JoinOrder(order);
+	if (_drawerOrder.current() == value) return;
+	_drawerOrder = value;
+	save();
+}
+
+const std::vector<QString> &AyuSettings::DefaultAttachOrder() {
+	static const auto result = std::vector<QString>{
+		u"photo"_q,
+		u"document"_q,
+		u"money"_q,
+		u"poll"_q,
+		u"todo"_q,
+		u"article"_q,
+		u"location"_q,
+		u"music"_q,
+	};
+	return result;
+}
+
+std::vector<QString> AyuSettings::attachOrder() const {
+	const auto &defaults = DefaultAttachOrder();
+	auto result = std::vector<QString>();
+	for (const auto &id : _attachOrder.current().split(',', Qt::SkipEmptyParts)) {
+		if (ranges::contains(defaults, id) && !ranges::contains(result, id)) {
+			result.push_back(id);
+		}
+	}
+	InsertMissing(result, defaults);
+	return result;
+}
+
+bool AyuSettings::attachItemShown(const QString &id) const {
+	return !_attachHidden.current().split(',', Qt::SkipEmptyParts).contains(id);
+}
+
+rpl::producer<> AyuSettings::attachChanges() const {
+	return rpl::merge(
+		_attachOrder.changes() | rpl::to_empty,
+		_attachHidden.changes() | rpl::to_empty);
+}
+
+void AyuSettings::setAttachOrder(const std::vector<QString> &order) {
 	auto joined = QStringList();
 	for (const auto &id : order) {
 		joined.push_back(id);
 	}
 	const auto value = joined.join(',');
-	if (_drawerOrder.current() == value) return;
-	_drawerOrder = value;
+	if (_attachOrder.current() == value) return;
+	_attachOrder = value;
+	save();
+}
+
+void AyuSettings::setAttachItemShown(const QString &id, bool shown) {
+	auto hidden = _attachHidden.current().split(',', Qt::SkipEmptyParts);
+	hidden.removeAll(id);
+	if (!shown) {
+		hidden.push_back(id);
+	}
+	const auto value = hidden.join(',');
+	if (_attachHidden.current() == value) return;
+	_attachHidden = value;
 	save();
 }
 
@@ -1110,12 +1224,6 @@ void AyuSettings::setCrashReporting(bool val) {
 	save();
 }
 
-void AyuSettings::setSendAnonymousStatistics(bool val) {
-	if (_sendAnonymousStatistics.current() == val) return;
-	_sendAnonymousStatistics = val;
-	save();
-}
-
 void AyuSettings::setAvatarCorners(int val) {
 	if (_avatarCorners.current() == val) return;
 	_avatarCorners = val;
@@ -1215,6 +1323,8 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"showStreamerToggleInTray", s._showStreamerToggleInTray.current()},
 		{"monoFont", s._monoFont.current()},
 		{"drawerOrder", s._drawerOrder.current()},
+		{"attachOrder", s._attachOrder.current()},
+		{"attachHidden", s._attachHidden.current()},
 		{"hideNotificationCounters", s._hideNotificationCounters.current()},
 		{"hideNotificationBadge", s._hideNotificationBadge.current()},
 		{"hideAllChatsFolder", s._hideAllChatsFolder.current()},
@@ -1233,7 +1343,6 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"adaptiveCoverColor", s._adaptiveCoverColor.current()},
 		{"improveLinkPreviews", s._improveLinkPreviews.current()},
 		{"crashReporting", s._crashReporting.current()},
-		{"sendAnonymousStatistics", s._sendAnonymousStatistics.current()},
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
 		{"streamerMode", s._streamerMode.current()},
@@ -1323,6 +1432,8 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._showStreamerToggleInTray = j.value("showStreamerToggleInTray", defaults._showStreamerToggleInTray.current());
 	s._monoFont = j.value("monoFont", defaults._monoFont.current());
 	s._drawerOrder = j.value("drawerOrder", defaults._drawerOrder.current());
+	s._attachOrder = j.value("attachOrder", defaults._attachOrder.current());
+	s._attachHidden = j.value("attachHidden", defaults._attachHidden.current());
 	s._hideNotificationCounters = j.value("hideNotificationCounters", defaults._hideNotificationCounters.current());
 	s._hideNotificationBadge = j.value("hideNotificationBadge", defaults._hideNotificationBadge.current());
 	s._hideAllChatsFolder = j.value("hideAllChatsFolder", defaults._hideAllChatsFolder.current());
@@ -1341,7 +1452,6 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._adaptiveCoverColor = j.value("adaptiveCoverColor", defaults._adaptiveCoverColor.current());
 	s._improveLinkPreviews = j.value("improveLinkPreviews", defaults._improveLinkPreviews.current());
 	s._crashReporting = j.value("crashReporting", defaults._crashReporting.current());
-	s._sendAnonymousStatistics = j.value("sendAnonymousStatistics", defaults._sendAnonymousStatistics.current());
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());

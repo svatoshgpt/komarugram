@@ -124,3 +124,8 @@ ayuServiceTimeBadgeVerticalPadding: 2px;
 ayuServiceTimeBadgeGap: 8px;
 ayuServiceTimeBadgeTrailingInset: 3px;
 ayuServiceTimeBadgeLastLineWidthAdd: 9px;
+
+colorSwatchSize: 14px;
+colorSwatchSkip: 3px;
+colorSwatchRadius: 3px;
+colorSwatchBorder: 1px;
