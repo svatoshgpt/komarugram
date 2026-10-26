@@ -1,0 +1,24 @@
+<RCC>
+  <qresource prefix="/komaru_plugins">
+    <file alias="compat/android_utils.py">../komaru_plugins/compat/android_utils.py</file>
+    <file alias="compat/base_plugin.py">../komaru_plugins/compat/base_plugin.py</file>
+    <file alias="compat/client_utils.py">../komaru_plugins/compat/client_utils.py</file>
+    <file alias="compat/elyx/__init__.py">../komaru_plugins/compat/elyx/__init__.py</file>
+    <file alias="compat/file_utils.py">../komaru_plugins/compat/file_utils.py</file>
+    <file alias="compat/hook_utils.py">../komaru_plugins/compat/hook_utils.py</file>
+    <file alias="compat/komaru.py">../komaru_plugins/compat/komaru.py</file>
+    <file alias="compat/ui/__init__.py">../komaru_plugins/compat/ui/__init__.py</file>
+    <file alias="compat/ui/alert.py">../komaru_plugins/compat/ui/alert.py</file>
+    <file alias="compat/ui/bulletin.py">../komaru_plugins/compat/ui/bulletin.py</file>
+    <file alias="compat/ui/settings.py">../komaru_plugins/compat/ui/settings.py</file>
+    <file alias="host.py">../komaru_plugins/host.py</file>
+    <file alias="komaru_runtime/__init__.py">../komaru_plugins/komaru_runtime/__init__.py</file>
+    <file alias="komaru_runtime/accounts.py">../komaru_plugins/komaru_runtime/accounts.py</file>
+    <file alias="komaru_runtime/context.py">../komaru_plugins/komaru_runtime/context.py</file>
+    <file alias="komaru_runtime/goplugin.py">../komaru_plugins/komaru_runtime/goplugin.py</file>
+    <file alias="komaru_runtime/manager.py">../komaru_plugins/komaru_runtime/manager.py</file>
+    <file alias="komaru_runtime/meta.py">../komaru_plugins/komaru_runtime/meta.py</file>
+    <file alias="komaru_runtime/protocol.py">../komaru_plugins/komaru_runtime/protocol.py</file>
+    <file alias="komaru_runtime/stubs.py">../komaru_plugins/komaru_runtime/stubs.py</file>
+  </qresource>
+</RCC>

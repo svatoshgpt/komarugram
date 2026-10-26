@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "apiwrap.h"
 
+#include "ayu/features/plugins/komaru_plugins.h"
+
 #include "api/api_authorizations.h"
 #include "api/api_attached_stickers.h"
 #include "api/api_blocked_peers.h"
@@ -4833,6 +4835,23 @@ void ApiWrap::sendRichMessage(
 void ApiWrap::sendMessage(
 		MessageToSend &&message,
 		std::optional<MsgId> localMessageId) {
+	if (KomaruPlugins::HasSendHooks()) {
+		const auto peer = message.action.history->peer->id;
+		const auto marked = peerIsUser(peer)
+			? int64(peerToUser(peer).bare)
+			: peerIsChat(peer)
+			? -int64(peerToChat(peer).bare)
+			: -(int64(1000000000000) + int64(peerToChannel(peer).bare));
+		const auto outgoing = KomaruPlugins::TransformOutgoing(
+			&session(),
+			marked,
+			message.textWithTags.text);
+		if (outgoing.cancel) {
+			return;
+		} else if (outgoing.text != message.textWithTags.text) {
+			message.textWithTags = { outgoing.text, {} };
+		}
+	}
 	applyGhostScheduling(message.action, message.textWithTags.text);
 	const auto clearReplyTo = prependPseudoReply(message);
 

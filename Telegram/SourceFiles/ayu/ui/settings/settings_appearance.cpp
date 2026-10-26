@@ -417,6 +417,13 @@ struct DrawerItem {
 			{ &st::menuIconProfile },
 			&AyuSettings::showMyProfileInDrawer,
 			&AyuSettings::setShowMyProfileInDrawer);
+	} else if (id == u"plugins"_q) {
+		return toggle(
+			u"ayu/showPluginsInDrawer"_q,
+			tr::ayu_PluginsTitle(),
+			{ &st::menuIconCustomize },
+			&AyuSettings::showPluginsInDrawer,
+			&AyuSettings::setShowPluginsInDrawer);
 	} else if (id == u"bots"_q) {
 		return toggle(
 			u"ayu/showBotsInDrawer"_q,

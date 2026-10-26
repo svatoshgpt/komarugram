@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_main_menu.h"
 
+#include "ayu/ui/settings/settings_plugins.h"
+
 #include "apiwrap.h"
 #include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
@@ -717,6 +719,15 @@ void MainMenu::setupMenu() {
 			)->setClickedCallback([=] {
 				controller->showSection(
 					Info::Stories::MakeMyProfile(controller->session().user()));
+			});
+
+		} else if (id == u"plugins"_q) {
+			if (settings.showPluginsInDrawer())
+			addAction(
+				tr::ayu_PluginsTitle(),
+				{ &st::menuIconCustomize }
+			)->setClickedCallback([=] {
+				controller->showSettings(Settings::KomaruPluginsId());
 			});
 
 		} else if (id == u"bots"_q) {

@@ -885,6 +885,14 @@ void AyuSettings::setShowSavedMessagesInDrawer(bool val) {
 	save();
 }
 
+void AyuSettings::setShowPluginsInDrawer(bool val) {
+	if (_showPluginsInDrawer.current() == val) {
+		return;
+	}
+	_showPluginsInDrawer = val;
+	save();
+}
+
 void AyuSettings::setShowWalletInDrawer(bool val) {
 	if (_showWalletInDrawer.current() == val) {
 		return;
@@ -938,6 +946,7 @@ void AyuSettings::setShowStreamerToggleInTray(bool val) {
 const std::vector<QString> &AyuSettings::DefaultDrawerOrder() {
 	static const auto result = std::vector<QString>{
 		u"myProfile"_q,
+		u"plugins"_q,
 		u"bots"_q,
 		u"separator"_q,
 		u"newGroup"_q,
@@ -1314,6 +1323,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"showCallsInDrawer", s._showCallsInDrawer.current()},
 		{"showSavedMessagesInDrawer", s._showSavedMessagesInDrawer.current()},
 		{"showWalletInDrawer", s._showWalletInDrawer.current()},
+		{"showPluginsInDrawer", s._showPluginsInDrawer.current()},
 		{"showLReadToggleInDrawer", s._showLReadToggleInDrawer.current()},
 		{"showSReadToggleInDrawer", s._showSReadToggleInDrawer.current()},
 		{"showNightModeToggleInDrawer", s._showNightModeToggleInDrawer.current()},
@@ -1423,6 +1433,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._showCallsInDrawer = j.value("showCallsInDrawer", defaults._showCallsInDrawer.current());
 	s._showSavedMessagesInDrawer = j.value("showSavedMessagesInDrawer", defaults._showSavedMessagesInDrawer.current());
 	s._showWalletInDrawer = j.value("showWalletInDrawer", defaults._showWalletInDrawer.current());
+	s._showPluginsInDrawer = j.value("showPluginsInDrawer", defaults._showPluginsInDrawer.current());
 	s._showLReadToggleInDrawer = j.value("showLReadToggleInDrawer", defaults._showLReadToggleInDrawer.current());
 	s._showSReadToggleInDrawer = j.value("showSReadToggleInDrawer", defaults._showSReadToggleInDrawer.current());
 	s._showNightModeToggleInDrawer = j.value("showNightModeToggleInDrawer", defaults._showNightModeToggleInDrawer.current());

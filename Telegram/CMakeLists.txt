@@ -210,6 +210,10 @@ set(ayugram_files
         ayu/ui/boxes/plugin_info_box.h
         ayu/ui/components/image_view.cpp
         ayu/ui/components/image_view.h
+        ayu/features/plugins/komaru_plugins.cpp
+        ayu/features/plugins/komaru_plugins.h
+        ayu/ui/settings/settings_plugins.cpp
+        ayu/ui/settings/settings_plugins.h
         ayu/ui/components/color_swatch.cpp
         ayu/ui/components/color_swatch.h
         ayu/ui/components/icon_picker.cpp
@@ -2654,6 +2658,7 @@ endif()
 nice_target_sources(Telegram ${res_loc}
 PRIVATE
     qrc/ayu/ayu.qrc
+    qrc/komaru_plugins.qrc
 
     qrc/emoji_1.qrc
     qrc/emoji_2.qrc
