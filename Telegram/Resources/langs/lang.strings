@@ -9429,8 +9429,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SupportBoxReceiveBadgeInfo" = "After payment verification, you will receive a unique badge that will be displayed on your profile and visible to other users.";
 "ayu_CrashReporting" = "Crash Reporting";
 "ayu_CrashReportingDescription" = "When this option is enabled, you'll be prompted to send a report after the app crashes. You can decide whether to send it or not.";
-"ayu_AnonymousStatistics" = "Anonymous Statistics";
-"ayu_AnonymousStatisticsDescription" = "Sends app updates and crashes to Google Analytics with a random ID that is not linked to your account. No messages, contacts, phone number or usernames are sent.";
 "ayu_ResetSettings" = "Reset Settings";
 "ayu_ResetSettingsConfirmation" = "Are you sure you want to reset **all** KomaruGram preferences to their defaults?";
 "ayu_DisableColorfulCover" = "Disable adaptive color";
@@ -9484,6 +9482,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_MessageFieldElementVoice" = "Voice";
 "ayu_DrawerElementsHeader" = "Drawer Elements";
 "ayu_TrayElementsHeader" = "Tray Elements";
+"ayu_DrawerSeparator" = "Separator";
+"ayu_DrawerAddSeparator" = "Add separator";
+"ayu_AttachMenuHeader" = "Attachment Menu";
 "ayu_MessageBubbleRadius" = "Message Bubble Radius";
 "ayu_SettingsWideMultiplier" = "Wide Messages Multiplier";
 "ayu_SettingsWideMultiplierDescription" = "You can change message width for better display on wide monitors.";
@@ -9730,8 +9731,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_InvalidConnectionLayerNote" = "You should re-login due to an error during the update.";
 "ayu_LocalPremiumNotice" = "You're using **local** Telegram Premium.\nIt **won't** give you any benefits.\n**Enjoy the star near your nickname!**";
 "ayu_DeveloperPopup" = "**{item}** is a member of the **exteraGram** development team.";
-"ayu_SupporterPopup" = "**{item}** supported the development of **exteraGram** or **KomaruGram** and received an unique badge.";
-"ayu_OfficialResourcePopup" = "**{item}** is the official resource of **exteraGram** or **KomaruGram**.";
+"ayu_SupporterPopup" = "**{item}** supported the development of **exteraGram** or **AyuGram** and received a unique badge.";
+"ayu_OfficialResourcePopup" = "**{item}** is the official resource of **exteraGram** or **AyuGram**.";
 "ayu_KomaruDeveloperPopup" = "**{item}** is a member of the **KomaruGram** development team.";
 "ayu_KomaruOfficialResourcePopup" = "**{item}** is an official resource of **KomaruGram**.";
 "ayu_KomaruSupporterPopup" = "**{item}** supported **KomaruGram** and received a unique badge.";

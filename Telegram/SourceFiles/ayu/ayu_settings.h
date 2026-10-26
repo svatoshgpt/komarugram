@@ -335,10 +335,16 @@ public:
 	[[nodiscard]] bool showStreamerToggleInTray() const { return _showStreamerToggleInTray.current(); }
 	[[nodiscard]] const QString &monoFont() const { return _monoFont.current(); }
 
-	// Main menu items in the order the user arranged them. Always holds
-	// every known item once; ids come from DefaultDrawerOrder().
+	// Main menu items in the order the user arranged them. Holds every
+	// known item from DefaultDrawerOrder() once, plus any number of
+	// "separator" entries the user kept.
 	[[nodiscard]] std::vector<QString> drawerOrder() const;
 	[[nodiscard]] static const std::vector<QString> &DefaultDrawerOrder();
+	// Attach menu items in the order the user arranged them.
+	[[nodiscard]] std::vector<QString> attachOrder() const;
+	[[nodiscard]] static const std::vector<QString> &DefaultAttachOrder();
+	[[nodiscard]] bool attachItemShown(const QString &id) const;
+	[[nodiscard]] rpl::producer<> attachChanges() const;
 	[[nodiscard]] bool hideNotificationCounters() const { return _hideNotificationCounters.current(); }
 	[[nodiscard]] bool hideNotificationBadge() const { return _hideNotificationBadge.current(); }
 	[[nodiscard]] bool hideAllChatsFolder() const { return _hideAllChatsFolder.current(); }
@@ -357,7 +363,6 @@ public:
 	[[nodiscard]] bool adaptiveCoverColor() const { return _adaptiveCoverColor.current(); }
 	[[nodiscard]] bool improveLinkPreviews() const { return _improveLinkPreviews.current(); }
 	[[nodiscard]] bool crashReporting() const { return _crashReporting.current(); }
-	[[nodiscard]] bool sendAnonymousStatistics() const { return _sendAnonymousStatistics.current(); }
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
@@ -430,6 +435,8 @@ public:
 	void setShowStreamerToggleInTray(bool val);
 	void setMonoFont(const QString &val);
 	void setDrawerOrder(const std::vector<QString> &order);
+	void setAttachOrder(const std::vector<QString> &order);
+	void setAttachItemShown(const QString &id, bool shown);
 	void setHideNotificationCounters(bool val);
 	void setHideNotificationBadge(bool val);
 	void setHideAllChatsFolder(bool val);
@@ -448,7 +455,6 @@ public:
 	void setAdaptiveCoverColor(bool val);
 	void setImproveLinkPreviews(bool val);
 	void setCrashReporting(bool val);
-	void setSendAnonymousStatistics(bool val);
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
 	void setStreamerMode(bool val);
@@ -625,8 +631,6 @@ public:
 	[[nodiscard]] rpl::producer<bool> improveLinkPreviewsChanges() const { return _improveLinkPreviews.changes(); }
 	[[nodiscard]] rpl::producer<bool> crashReportingValue() const { return _crashReporting.value(); }
 	[[nodiscard]] rpl::producer<bool> crashReportingChanges() const { return _crashReporting.changes(); }
-	[[nodiscard]] rpl::producer<bool> sendAnonymousStatisticsValue() const { return _sendAnonymousStatistics.value(); }
-	[[nodiscard]] rpl::producer<bool> sendAnonymousStatisticsChanges() const { return _sendAnonymousStatistics.changes(); }
 	[[nodiscard]] rpl::producer<int> avatarCornersValue() const { return _avatarCorners.value(); }
 	[[nodiscard]] rpl::producer<int> avatarCornersChanges() const { return _avatarCorners.changes(); }
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusValue() const { return _singleCornerRadius.value(); }
@@ -711,6 +715,8 @@ private:
 	rpl::variable<bool> _hideExteraBadges = false;
 	rpl::variable<QString> _monoFont;
 	rpl::variable<QString> _drawerOrder; // Comma-separated item ids.
+	rpl::variable<QString> _attachOrder; // Comma-separated item ids.
+	rpl::variable<QString> _attachHidden; // Comma-separated item ids.
 	rpl::variable<bool> _hideNotificationCounters = false;
 	rpl::variable<bool> _hideNotificationBadge = false;
 	rpl::variable<bool> _hideAllChatsFolder = false;
@@ -729,7 +735,6 @@ private:
 	rpl::variable<bool> _adaptiveCoverColor = true;
 	rpl::variable<bool> _improveLinkPreviews = false;
 	rpl::variable<bool> _crashReporting = true;
-	rpl::variable<bool> _sendAnonymousStatistics = true;
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
 	rpl::variable<bool> _streamerMode = false;

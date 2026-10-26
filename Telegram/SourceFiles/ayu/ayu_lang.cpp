@@ -41,7 +41,10 @@ constexpr auto postfixes = {
 bool IsLocallyOwned(const QString &key) {
 	return (key == qsl("ayu_SettingsDescription"))
 		|| (key == qsl("ayu_DisableOpenLinkWarning"))
-		|| (key == u"ayu_KomaruAboutTagline"_q);
+		|| (key == u"ayu_KomaruAboutTagline"_q)
+		|| (key == u"ayu_DeveloperPopup"_q)
+		|| (key == u"ayu_SupporterPopup"_q)
+		|| (key == u"ayu_OfficialResourcePopup"_q);
 }
 
 // KomaruGram: keys that exist only in KomaruGram. The AyuGram pack has no
@@ -51,7 +54,6 @@ void ApplyKomaruTranslations() {
 		return;
 	}
 	const auto values = {
-		std::pair{ "ayu_AnonymousStatistics", u"Анонимная статистика"_q },
 		std::pair{ "ayu_HideExteraBadges", u"Скрыть значки поддержки"_q },
 		std::pair{
 			"ayu_DisableOpenLinkWarning",
@@ -64,6 +66,9 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_VoiceConfirmation", u"Голосовые сообщения"_q },
 		std::pair{ "ayu_RoundConfirmation", u"Видеосообщения"_q },
 		std::pair{ "ayu_ShowInProfile", u"Показывать в профиле"_q },
+		std::pair{ "ayu_DrawerSeparator", u"Разделитель"_q },
+		std::pair{ "ayu_DrawerAddSeparator", u"Добавить разделитель"_q },
+		std::pair{ "ayu_AttachMenuHeader", u"Меню вложений"_q },
 		std::pair{ "ayu_SupportBoxHeader", u"Поддержать разработку"_q },
 		std::pair{
 			"ayu_SupportBoxInfo",
@@ -80,6 +85,16 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_ProfileRegistrationDate", u"Дата регистрации"_q },
 		std::pair{ "ayu_ProfileDatacenter", u"Сервер (DC)"_q },
 		std::pair{ "ayu_ProfileHiddenPhotos", u"Скрытые фото профиля"_q },
+		std::pair{
+			"ayu_DeveloperPopup",
+			u"**{item}** — участник команды разработки **exteraGram**."_q },
+		std::pair{
+			"ayu_SupporterPopup",
+			u"**{item}** поддержал разработку **exteraGram** или **AyuGram** "
+			"и получил уникальный значок."_q },
+		std::pair{
+			"ayu_OfficialResourcePopup",
+			u"**{item}** — официальный ресурс **exteraGram** или **AyuGram**."_q },
 		std::pair{
 			"ayu_KomaruDeveloperPopup",
 			u"**{item}** — участник команды разработки **KomaruGram**."_q },
@@ -98,11 +113,6 @@ void ApplyKomaruTranslations() {
 			"ayu_KomaruSupportBadgeInfo",
 			u"После проверки оплаты вы получите уникальный значок, который будет "
 			"отображаться в вашем профиле и будет виден другим пользователям."_q },
-		std::pair{
-			"ayu_AnonymousStatisticsDescription",
-			u"Отправляет в Google Analytics обновления и сбои "
-			"со случайным ID, не связанным с аккаунтом. Сообщения, "
-			"контакты, номер телефона и юзернеймы не отправляются."_q },
 	};
 	for (const auto &[key, value] : values) {
 		Lang::GetInstance().resetValue(key);

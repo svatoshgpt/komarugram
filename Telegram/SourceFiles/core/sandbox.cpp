@@ -34,8 +34,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/effects/animations.h"
 #include "ui/style/style_core_palette.h"
 
-#include "ayu/features/analytics/komaru_analytics.h"
-
 #ifdef Q_OS_MAC
 #include "platform/mac/global_menu_mac.h"
 #endif // Q_OS_MAC
@@ -499,7 +497,6 @@ void Sandbox::singleInstanceChecked() {
 			return;
 		}
 		_lastCrashDump = crashdump;
-		KomaruAnalytics::TrackCrash(crashdump);
 		auto window = new LastCrashedWindow(
 			_lastCrashDump,
 			[=] { launchApplication(); });

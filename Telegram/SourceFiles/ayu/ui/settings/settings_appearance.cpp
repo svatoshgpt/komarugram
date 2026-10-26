@@ -22,6 +22,7 @@
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_icons.h"
+#include "styles/style_ayu_settings.h"
 #include "styles/style_ayu_styles.h"
 #include "styles/style_dialogs.h"
 #include "styles/style_layers.h"
@@ -32,6 +33,7 @@
 #include "ui/painter.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/padding_wrap.h"
+#include "ui/wrap/slide_wrap.h"
 #include "ui/wrap/vertical_layout.h"
 #include "ui/wrap/vertical_layout_reorder.h"
 #include "ui/widgets/buttons.h"
@@ -541,6 +543,78 @@ struct DrawerItem {
 	return handle;
 }
 
+[[nodiscard]] not_null<Ui::AbstractButton*> AddRemoveButton(
+		not_null<Ui::RpWidget*> row,
+		Fn<void()> callback) {
+	const auto size = st::drawerSeparatorRemoveSize;
+	const auto button = Ui::CreateChild<Ui::AbstractButton>(row.get());
+	button->resize(size, size);
+	button->setCursor(style::cur_pointer);
+	button->paintRequest(
+	) | rpl::on_next([=] {
+		auto p = QPainter(button);
+		auto hq = PainterHighQualityEnabler(p);
+		auto pen = st::windowActiveTextFg->p;
+		pen.setWidthF(st::drawerSeparatorRemoveStroke);
+		p.setPen(pen);
+		p.setBrush(Qt::NoBrush);
+		const auto inset = double(st::drawerSeparatorRemoveInset);
+		const auto circle = QRectF(button->rect()).marginsRemoved(
+			{ inset, inset, inset, inset });
+		p.drawEllipse(circle);
+		const auto shift = circle.width() * (1. - M_SQRT1_2) / 2.;
+		p.drawLine(
+			circle.topLeft() + QPointF(shift, shift),
+			circle.bottomRight() - QPointF(shift, shift));
+	}, button->lifetime());
+	row->sizeValue(
+	) | rpl::on_next([=](QSize rowSize) {
+		button->moveToRight(
+			st::drawerSeparatorRemoveRight,
+			(rowSize.height() - button->height()) / 2,
+			rowSize.width());
+	}, button->lifetime());
+	button->setClickedCallback(std::move(callback));
+	return button;
+}
+
+[[nodiscard]] object_ptr<Ui::SlideWrap<Ui::SettingsButton>> MakeSeparatorRow(
+		not_null<QWidget*> parent) {
+	return object_ptr<Ui::SlideWrap<Ui::SettingsButton>>(
+		parent,
+		object_ptr<Ui::SettingsButton>(
+			parent,
+			tr::ayu_DrawerSeparator(),
+			DrawerRowStyle()));
+}
+
+// Puts the items a list editor does not show (bots when there are none,
+// the streamer toggle on Linux) back after the item that preceded them.
+[[nodiscard]] std::vector<QString> RestoreUnlisted(
+		std::vector<QString> listed,
+		const std::vector<QString> &old) {
+	for (auto i = 0; i != int(old.size()); ++i) {
+		const auto &id = old[i];
+		if (id == u"separator"_q || ranges::contains(listed, id)) {
+			continue;
+		}
+		auto at = 0;
+		for (auto j = i; j > 0;) {
+			--j;
+			if (old[j] == u"separator"_q) {
+				continue;
+			}
+			const auto found = ranges::find(listed, old[j]);
+			if (found != end(listed)) {
+				at = int(found - begin(listed)) + 1;
+				break;
+			}
+		}
+		listed.insert(begin(listed) + at, id);
+	}
+	return listed;
+}
+
 void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 	builder.addSubsectionTitle(tr::ayu_DrawerElementsHeader());
 
@@ -552,7 +626,6 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 	constexpr auto hasStreamer = false;
 #endif // Q_OS_WIN || Q_OS_MAC
 
-	// Rows follow the saved order and are dragged by their handles.
 	auto shown = std::vector<QString>();
 	for (const auto &id : AyuSettings::getInstance().drawerOrder()) {
 		if ((id == u"bots"_q && !hasBots)
@@ -562,10 +635,59 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 		shown.push_back(id);
 	}
 
-	// The rows get a layout of their own, so the reorder moves only them.
-	auto handles = std::vector<not_null<Ui::RpWidget*>>();
+	// The rows follow the saved order and are dragged by their handles.
+	// A removed separator keeps its collapsed row and an empty id, so the
+	// indices the reorder reports still match these vectors.
+	struct Rows {
+		std::vector<QString> ids;
+		std::vector<not_null<Ui::RpWidget*>> widgets;
+		std::vector<not_null<Ui::RpWidget*>> handles;
+		Ui::VerticalLayout *list = nullptr;
+		Ui::VerticalLayoutReorder *reorder = nullptr;
+	};
+	const auto rows = std::make_shared<Rows>();
+	const auto saveOrder = [=] {
+		auto listed = std::vector<QString>();
+		for (const auto &id : rows->ids) {
+			if (!id.isEmpty()) {
+				listed.push_back(id);
+			}
+		}
+		AyuSettings::getInstance().setDrawerOrder(RestoreUnlisted(
+			std::move(listed),
+			AyuSettings::getInstance().drawerOrder()));
+	};
+	const auto setupSeparator = [=](
+			not_null<Ui::SlideWrap<Ui::SettingsButton>*> wrap) {
+		const auto handle = AddDragHandle(wrap->entity());
+		AddRemoveButton(wrap->entity(), [=] {
+			const auto i = ranges::find(rows->widgets, wrap.get());
+			if (i == end(rows->widgets)) {
+				return;
+			}
+			rows->ids[i - begin(rows->widgets)] = QString();
+			wrap->hide(anim::type::normal);
+			saveOrder();
+		});
+		rows->widgets.push_back(wrap);
+		rows->handles.push_back(handle);
+	};
+
 	const auto list = builder.scope([&] {
 		for (const auto &id : shown) {
+			if (id == u"separator"_q) {
+				const auto row = builder.addControl({
+					.factory = [=](not_null<Ui::VerticalLayout*> parent) {
+						auto result = MakeSeparatorRow(parent);
+						setupSeparator(result.data());
+						return object_ptr<Ui::RpWidget>(std::move(result));
+					},
+				});
+				if (row) {
+					rows->ids.push_back(id);
+				}
+				continue;
+			}
 			auto item = LookupDrawerItem(id);
 			const auto getter = item.getter;
 			const auto setter = item.setter;
@@ -589,10 +711,120 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 					setter(enabled);
 				}, button->lifetime());
 			}
+			rows->ids.push_back(id);
+			rows->widgets.push_back(button);
+			rows->handles.push_back(AddDragHandle(button));
+		}
+	});
+	if (!list
+		|| rows->ids.size() != shown.size()
+		|| rows->widgets.size() != shown.size()) {
+		builder.addSkip();
+		return;
+	}
+	rows->list = list;
+	list->lifetime().add([rows] {
+		rows->list = nullptr;
+		rows->reorder = nullptr;
+	});
+
+	const auto reorder = list->lifetime().make_state<
+		Ui::VerticalLayoutReorder>(list);
+	rows->reorder = reorder;
+	reorder->setMouseEventProxy([=](int index) -> not_null<Ui::RpWidget*> {
+		return rows->handles[index];
+	});
+	reorder->updates(
+	) | rpl::on_next([=](Ui::VerticalLayoutReorder::Single data) {
+		using ReorderState = Ui::VerticalLayoutReorder::State;
+		if (data.state != ReorderState::Applied) {
+			return;
+		}
+		const auto move = [&](auto &vector) {
+			auto moved = std::move(vector[data.oldPosition]);
+			vector.erase(begin(vector) + data.oldPosition);
+			vector.insert(begin(vector) + data.newPosition, std::move(moved));
+		};
+		move(rows->ids);
+		move(rows->widgets);
+		move(rows->handles);
+		saveOrder();
+	}, list->lifetime());
+	reorder->start();
+
+	builder.addButton({
+		.id = u"ayu/drawerAddSeparator"_q,
+		.title = tr::ayu_DrawerAddSeparator(),
+		.icon = { &st::menuIconAdd },
+		.onClick = [=] {
+			if (!rows->list || !rows->reorder) {
+				return;
+			}
+			const auto wrap = rows->list->add(MakeSeparatorRow(rows->list));
+			setupSeparator(wrap);
+			rows->ids.push_back(u"separator"_q);
+			saveOrder();
+			rows->reorder->cancel();
+			rows->reorder->start();
+		},
+	});
+
+	builder.addSkip();
+}
+
+struct AttachItem {
+	rpl::producer<QString> title;
+	IconDescriptor icon;
+};
+
+[[nodiscard]] AttachItem LookupAttachItem(const QString &id) {
+	if (id == u"photo"_q) {
+		return { tr::lng_attach_photo_or_video(), { &st::menuIconPhoto } };
+	} else if (id == u"document"_q) {
+		return { tr::lng_attach_document(), { &st::menuIconFile } };
+	} else if (id == u"money"_q) {
+		return { tr::lng_wallet_menu(), { &st::walletMenuIcon } };
+	} else if (id == u"poll"_q) {
+		return { tr::lng_polls_menu_item(), { &st::menuIconCreatePoll } };
+	} else if (id == u"todo"_q) {
+		return { tr::lng_todo_menu_item(), { &st::menuIconCreateTodoList } };
+	} else if (id == u"article"_q) {
+		return { tr::lng_article_menu_item(), { &st::menuIconArticle } };
+	} else if (id == u"location"_q) {
+		return { tr::lng_maps_point(), { &st::menuIconAddress } };
+	}
+	return { tr::lng_all_music(), { &st::menuIconSoundOn } };
+}
+
+void BuildAttachElements(SectionBuilder &builder, AyuSectionBuilder &) {
+	builder.addSubsectionTitle(tr::ayu_AttachMenuHeader());
+
+	auto ids = AyuSettings::getInstance().attachOrder();
+	auto handles = std::vector<not_null<Ui::RpWidget*>>();
+	const auto list = builder.scope([&] {
+		for (const auto &id : ids) {
+			auto item = LookupAttachItem(id);
+			const auto button = builder.addButton({
+				.id = u"ayu/attach_"_q + id,
+				.title = std::move(item.title),
+				.st = &DrawerRowStyle(),
+				.icon = std::move(item.icon),
+				.toggled = rpl::single(
+					AyuSettings::getInstance().attachItemShown(id)),
+			});
+			if (!button) {
+				continue;
+			}
+			button->toggledValue(
+			) | rpl::filter([=](bool enabled) {
+				return (enabled != AyuSettings::getInstance().attachItemShown(id));
+			}) | rpl::on_next([=](bool enabled) {
+				AyuSettings::getInstance().setAttachItemShown(id, enabled);
+			}, button->lifetime());
 			handles.push_back(AddDragHandle(button));
 		}
 	});
-	if (!list || handles.size() != shown.size()) {
+	if (!list || handles.size() != ids.size()) {
 		builder.addSkip();
 		return;
 	}
@@ -602,7 +834,7 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 		std::vector<not_null<Ui::RpWidget*>> handles;
 	};
 	const auto rows = list->lifetime().make_state<Rows>(Rows{
-		.ids = std::move(shown),
+		.ids = std::move(ids),
 		.handles = std::move(handles),
 	});
 	const auto reorder = list->lifetime().make_state<
@@ -623,18 +855,7 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 		};
 		move(rows->ids);
 		move(rows->handles);
-
-		// Items not listed here (bots when there are none, the streamer
-		// toggle on Linux) keep their places; the listed ones fill the
-		// remaining places in their new order.
-		auto order = AyuSettings::getInstance().drawerOrder();
-		auto next = begin(rows->ids);
-		for (auto &id : order) {
-			if (ranges::contains(rows->ids, id)) {
-				id = *next++;
-			}
-		}
-		AyuSettings::getInstance().setDrawerOrder(order);
+		AyuSettings::getInstance().setAttachOrder(rows->ids);
 	}, list->lifetime());
 	reorder->start();
 
@@ -655,6 +876,7 @@ const auto kMeta = BuildHelper({
 	BuildAppearance(builder, ayu);
 	BuildChatFolders(builder, ayu);
 	BuildTrayElements(builder, ayu);
+	BuildAttachElements(builder, ayu);
 	BuildDrawerElements(builder, ayu);
 	builder.addSkip();
 });
