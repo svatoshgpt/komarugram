@@ -4,6 +4,7 @@
 #include "ayu/features/plugins/komaru_plugins.h"
 #include "core/file_utilities.h"
 #include "lang_auto.h"
+#include "mainwindow.h"
 #include "settings/settings_common.h"
 #include "styles/style_boxes.h"
 #include "styles/style_widgets.h"
