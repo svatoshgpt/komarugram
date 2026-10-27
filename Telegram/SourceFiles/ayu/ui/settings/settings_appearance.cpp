@@ -421,7 +421,7 @@ struct DrawerItem {
 		return toggle(
 			u"ayu/showPluginsInDrawer"_q,
 			tr::ayu_PluginsTitle(),
-			{ &st::menuIconCustomize },
+			{ &st::ayuPluginsIcon },
 			&AyuSettings::showPluginsInDrawer,
 			&AyuSettings::setShowPluginsInDrawer);
 	} else if (id == u"bots"_q) {
@@ -547,6 +547,8 @@ struct DrawerItem {
 			st::settingsButton.iconLeft / 2,
 			(size.height() - handle->height()) / 2);
 	}, handle->lifetime());
+	// Rows added after the list is shown would keep their children hidden.
+	handle->show();
 	return handle;
 }
 
@@ -582,6 +584,7 @@ struct DrawerItem {
 			rowSize.width());
 	}, button->lifetime());
 	button->setClickedCallback(std::move(callback));
+	button->show();
 	return button;
 }
 
@@ -769,6 +772,7 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 			}
 			const auto wrap = rows->list->add(MakeSeparatorRow(rows->list));
 			setupSeparator(wrap);
+			wrap->show();
 			rows->ids.push_back(u"separator"_q);
 			saveOrder();
 			rows->reorder->cancel();

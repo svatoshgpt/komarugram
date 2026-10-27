@@ -725,7 +725,7 @@ void MainMenu::setupMenu() {
 			if (settings.showPluginsInDrawer())
 			addAction(
 				tr::ayu_PluginsTitle(),
-				{ &st::menuIconCustomize }
+				{ &st::ayuPluginsIcon }
 			)->setClickedCallback([=] {
 				controller->showSettings(Settings::KomaruPluginsId());
 			});

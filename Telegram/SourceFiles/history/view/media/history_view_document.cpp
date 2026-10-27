@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/media/history_view_document.h"
 
+#include "ayu/ui/boxes/plugin_info_box.h"
+
 #include "base/random.h"
 #include "lang/lang_keys.h"
 #include "lottie/lottie_icon.h"
@@ -893,9 +895,7 @@ void Document::draw(
 						: stm->historyFilePlay)
 					: _data->isImage()
 					? stm->historyFileImage
-					: _data->filename().endsWith(
-						u".plugin"_q,
-						Qt::CaseInsensitive)
+					: Ui::IsPluginFileName(_data->filename())
 					? stm->historyFilePlugin
 					: stm->historyFileDocument;
 			} else {

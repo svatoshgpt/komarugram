@@ -9503,6 +9503,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_PluginSettingsHeader" = "Settings";
 "ayu_PluginDelete" = "Delete plugin";
 "ayu_PluginDeleteSure" = "Delete this plugin and its settings?";
+"ayu_PluginInstallButton" = "Install";
+"ayu_PluginUpdateButton" = "Update";
+"ayu_PluginsNeedRuntime" = "Install the plugin runtime first, then open the file again.";
 "ayu_MessageBubbleRadius" = "Message Bubble Radius";
 "ayu_SettingsWideMultiplier" = "Wide Messages Multiplier";
 "ayu_SettingsWideMultiplierDescription" = "You can change message width for better display on wide monitors.";

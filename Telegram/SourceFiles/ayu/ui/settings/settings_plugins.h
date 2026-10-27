@@ -25,4 +25,13 @@ private:
 
 [[nodiscard]] Type KomaruPluginsId();
 
+// Installs a plugin file, from the plugins screen or a file in a chat, and
+// opens its box. Without the runtime it opens the plugins screen instead.
+void InstallPluginFile(
+	not_null<Window::SessionController*> controller,
+	const QString &path,
+	Fn<void()> installed = nullptr);
+
+[[nodiscard]] bool PluginInstalled(const QString &id);
+
 } // namespace Settings

@@ -351,22 +351,9 @@ void InstallFromFile(not_null<Window::SessionController*> controller) {
 		tr::ayu_PluginsInstall(tr::now),
 		u"KomaruGram plugins (*.plugin *.elyx *.eaf *.zip *.py);;All files (*.*)"_q,
 		crl::guard(controller, [=](FileDialog::OpenResult &&result) {
-			if (result.paths.isEmpty()) {
-				return;
+			if (!result.paths.isEmpty()) {
+				InstallPluginFile(controller, result.paths.front());
 			}
-			auto command = Command(u"install"_q, QString());
-			command.insert(u"path"_q, result.paths.front());
-			Request(command, crl::guard(controller, [=](
-					QJsonValue value,
-					QString error) {
-				if (!error.isEmpty()) {
-					controller->showToast(error);
-					return;
-				}
-				const auto id = value.toObject().value(u"id"_q).toString();
-				Refresh();
-				ShowPluginBox(controller, id, QString());
-			}));
 		}));
 }
 
@@ -482,6 +469,37 @@ void KomaruPluginsSection::setupContent(
 
 Type KomaruPluginsId() {
 	return KomaruPluginsSection::Id();
+}
+
+void InstallPluginFile(
+		not_null<Window::SessionController*> controller,
+		const QString &path,
+		Fn<void()> installed) {
+	if (CurrentRuntimeState() != RuntimeState::Ready) {
+		controller->showToast(tr::ayu_PluginsNeedRuntime(tr::now));
+		controller->showSettings(KomaruPluginsId());
+		return;
+	}
+	auto command = Command(u"install"_q, QString());
+	command.insert(u"path"_q, path);
+	Request(command, crl::guard(controller, [=](
+			QJsonValue value,
+			QString error) {
+		if (!error.isEmpty()) {
+			controller->showToast(error);
+			return;
+		}
+		if (installed) {
+			installed();
+		}
+		const auto id = value.toObject().value(u"id"_q).toString();
+		Refresh();
+		ShowPluginBox(controller, id, QString());
+	}));
+}
+
+bool PluginInstalled(const QString &id) {
+	return FindPlugin(id) != nullptr;
 }
 
 } // namespace Settings

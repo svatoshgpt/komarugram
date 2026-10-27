@@ -261,16 +261,16 @@ void ResolveDocument(
 			return false;
 		}
 		if (controller
-			&& document->filename().endsWith(
-				u".plugin"_q,
-				Qt::CaseInsensitive)
+			&& Ui::IsPluginFileName(document->filename())
 			&& !document->filepath(true).isEmpty()) {
 			const auto path = document->location(true).name();
 			auto file = QFile(path);
 			if (file.open(QIODevice::ReadOnly)) {
 				const auto data = file.readAll();
 				file.close();
-				auto metadata = Ui::ParsePluginMetadata(data);
+				auto metadata = Ui::ParsePluginFile(
+					document->filename(),
+					data);
 				if (!metadata.id.isEmpty()
 					&& !metadata.name.isEmpty()) {
 					Ui::ShowPluginInfoBox(

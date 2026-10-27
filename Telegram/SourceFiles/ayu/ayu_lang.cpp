@@ -87,6 +87,9 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_PluginSettingsHeader", u"Настройки"_q },
 		std::pair{ "ayu_PluginDelete", u"Удалить плагин"_q },
 		std::pair{ "ayu_PluginDeleteSure", u"Удалить этот плагин и его настройки?"_q },
+		std::pair{ "ayu_PluginInstallButton", u"Установить"_q },
+		std::pair{ "ayu_PluginUpdateButton", u"Обновить"_q },
+		std::pair{ "ayu_PluginsNeedRuntime", u"Сначала установите среду для плагинов, затем откройте файл снова."_q },
 		std::pair{ "ayu_SupportBoxHeader", u"Поддержать разработку"_q },
 		std::pair{
 			"ayu_SupportBoxInfo",

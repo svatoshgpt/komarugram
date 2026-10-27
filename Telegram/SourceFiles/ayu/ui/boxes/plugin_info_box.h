@@ -29,6 +29,13 @@ struct PluginMetadata {
 
 [[nodiscard]] PluginMetadata ParsePluginMetadata(const QByteArray &data);
 
+// Elyx archives (.elyx, .eaf) keep their metadata in a YAML metainfo file.
+[[nodiscard]] PluginMetadata ParseElyxMetadata(const QByteArray &bytes);
+[[nodiscard]] bool IsPluginFileName(const QString &name);
+[[nodiscard]] PluginMetadata ParsePluginFile(
+	const QString &name,
+	const QByteArray &bytes);
+
 void ShowPluginInfoBox(
 	not_null<Window::SessionController*> controller,
 	const QString& pluginPath,

@@ -13,6 +13,7 @@ using "ui/widgets/widgets.style";
 using "dialogs/dialogs.style";
 
 ayuGhostIcon: icon {{ "ayu/ghost", menuIconColor }};
+ayuPluginsIcon: icon {{ "menu/plugins", menuIconColor }};
 ayuGhostModeGlobalIcon: icon {{ "ayu/ghost_mode_global", historyPeerUserpicFg }};
 ayuEditsHistoryIcon: icon {{ "ayu/edits_history", menuIconColor }};
 ayuLReadMenuIcon: icon {{ "ayu/lread", menuIconColor }};
