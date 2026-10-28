@@ -128,6 +128,7 @@ void ApplyKomaruTranslations() {
 			"ayu_KomaruSupporterPopup",
 			u"**{item}** поддержал **KomaruGram** и получил уникальный "
 			"значок."_q },
+		std::pair{ "ayu_KomaruStatusPopup", u"У **{item}** статус KomaruGram."_q },
 		std::pair{
 			"ayu_KomaruSupportDonationInfo",
 			u"Переведите сумму в размере {amount} на любые реквизиты проекта. "

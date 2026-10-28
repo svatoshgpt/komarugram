@@ -282,7 +282,7 @@ Fn<void()> badgeClickHandler(
 			const auto custom = KomaruBadges::StatusText(getBareID(peer));
 			text = !custom.isEmpty()
 				? tr::rich(custom)
-				: tr::ayu_KomaruSupporterPopup(
+				: tr::ayu_KomaruStatusPopup(
 					tr::now,
 					lt_item,
 					TextWithEntities{peer->name()},
