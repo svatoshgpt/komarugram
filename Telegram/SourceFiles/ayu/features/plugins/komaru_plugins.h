@@ -1,10 +1,10 @@
 // This is the source code of KomaruGram for Desktop.
 //
 // Plugins run in a separate Python process, the plugin host, so a broken
-// plugin can never take the client down. On Windows the client downloads the
-// official embeddable Python 3.11 from python.org on first use, checks it
-// against a pinned SHA-256 and installs Telethon and Kurigram into it with
-// pip; elsewhere it uses the system python3. The host gets each logged in
+// plugin can never take the client down. The Windows build ships the
+// official embeddable Python 3.11 with Telethon and Kurigram in
+// plugins_runtime next to the executable; elsewhere the client installs them
+// for the system python3 with pip. The host gets each logged in
 // account's DC and auth key over its stdin, so Telethon, Kurigram and Go
 // plugins act as that account without a separate login. The key is never
 // written to disk by the client.

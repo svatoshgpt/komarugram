@@ -31,7 +31,9 @@ struct PluginMetadata {
 
 // Elyx archives (.elyx, .eaf) keep their metadata in a YAML metainfo file.
 [[nodiscard]] PluginMetadata ParseElyxMetadata(const QByteArray &bytes);
+// .py files count only when they import Telethon, Kurigram or the SDK.
 [[nodiscard]] bool IsPluginFileName(const QString &name);
+[[nodiscard]] bool IsUserbotSource(const QByteArray &bytes);
 [[nodiscard]] PluginMetadata ParsePluginFile(
 	const QString &name,
 	const QByteArray &bytes);

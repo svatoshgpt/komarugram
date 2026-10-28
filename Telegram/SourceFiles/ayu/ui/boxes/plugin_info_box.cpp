@@ -38,6 +38,7 @@
 #include "ui/widgets/scroll_area.h"
 #include "window/window_session_controller.h"
 
+#include <QFileInfo>
 #include <QPainterPath>
 #include <QRegularExpression>
 
@@ -613,13 +614,44 @@ PluginMetadata ParseElyxMetadata(const QByteArray &bytes) {
 bool IsPluginFileName(const QString &name) {
 	return name.endsWith(u".plugin"_q, Qt::CaseInsensitive)
 		|| name.endsWith(u".elyx"_q, Qt::CaseInsensitive)
-		|| name.endsWith(u".eaf"_q, Qt::CaseInsensitive);
+		|| name.endsWith(u".eaf"_q, Qt::CaseInsensitive)
+		|| name.endsWith(u".py"_q, Qt::CaseInsensitive);
+}
+
+bool IsUserbotSource(const QByteArray &bytes) {
+	static const auto imports = QRegularExpression(
+		uR"(^\s*(?:import|from)\s+(?:telethon|pyrogram|kurigram|komaru|base_plugin)\b)"_q,
+		QRegularExpression::MultilineOption);
+	return imports.match(QString::fromUtf8(bytes)).hasMatch();
 }
 
 PluginMetadata ParsePluginFile(const QString &name, const QByteArray &bytes) {
-	return name.endsWith(u".plugin"_q, Qt::CaseInsensitive)
-		? ParsePluginMetadata(bytes)
-		: ParseElyxMetadata(bytes);
+	if (name.endsWith(u".elyx"_q, Qt::CaseInsensitive)
+		|| name.endsWith(u".eaf"_q, Qt::CaseInsensitive)) {
+		return ParseElyxMetadata(bytes);
+	} else if (!name.endsWith(u".py"_q, Qt::CaseInsensitive)) {
+		return ParsePluginMetadata(bytes);
+	} else if (!IsUserbotSource(bytes)) {
+		return {};
+	}
+	// A userbot script may have no metadata; the host names it after the
+	// file the same way.
+	auto metadata = ParsePluginMetadata(bytes);
+	if (metadata.id.isEmpty()) {
+		const auto stem = QFileInfo(name).completeBaseName();
+		auto id = stem;
+		id.replace(QRegularExpression(u"[^A-Za-z0-9_-]"_q), u"_"_q);
+		id = id.left(32);
+		if (id.isEmpty() || !id[0].isLetter() || id[0].unicode() > 127) {
+			id = (u"py_"_q + id).left(32);
+		}
+		metadata.id = id;
+		metadata.name = stem.left(100);
+		metadata.version = u"1.0"_q;
+		metadata.description = ExtractField(bytes, u"description"_q).left(8000);
+		metadata.author = ExtractField(bytes, u"author"_q).left(200);
+	}
+	return metadata;
 }
 
 void ShowPluginInfoBox(

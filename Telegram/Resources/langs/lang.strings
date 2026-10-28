@@ -9487,7 +9487,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_AttachMenuHeader" = "Attachment Menu";
 "ayu_PluginsTitle" = "Plugins";
 "ayu_PluginsRuntimeHeader" = "Plugin runtime";
-"ayu_PluginsRuntimeAbout" = "Plugins run in a separate Python process. KomaruGram will download Python 3.11 from python.org and Telethon and Kurigram from PyPI, about 40 MB.";
+"ayu_PluginsRuntimeAbout" = "Plugins run in a separate Python process. Python 3.11 with Telethon and Kurigram comes with KomaruGram in the plugins_runtime folder.";
 "ayu_PluginsRuntimeAboutSystem" = "Plugins run with the system python3. KomaruGram will install Telethon and Kurigram for it with pip.";
 "ayu_PluginsRuntimeInstall" = "Install plugin runtime";
 "ayu_PluginsRuntimeRetry" = "Try again";

@@ -71,7 +71,7 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_AttachMenuHeader", u"Меню вложений"_q },
 		std::pair{ "ayu_PluginsTitle", u"Плагины"_q },
 		std::pair{ "ayu_PluginsRuntimeHeader", u"Среда для плагинов"_q },
-		std::pair{ "ayu_PluginsRuntimeAbout", u"Плагины работают в отдельном процессе Python. KomaruGram скачает Python 3.11 с python.org, а Telethon и Kurigram — с PyPI, около 40 МБ."_q },
+		std::pair{ "ayu_PluginsRuntimeAbout", u"Плагины работают в отдельном процессе Python. Python 3.11 с Telethon и Kurigram идёт вместе с KomaruGram в папке plugins_runtime."_q },
 		std::pair{ "ayu_PluginsRuntimeAboutSystem", u"Плагины работают на системном python3. KomaruGram поставит для него Telethon и Kurigram через pip."_q },
 		std::pair{ "ayu_PluginsRuntimeInstall", u"Установить среду для плагинов"_q },
 		std::pair{ "ayu_PluginsRuntimeRetry", u"Повторить"_q },

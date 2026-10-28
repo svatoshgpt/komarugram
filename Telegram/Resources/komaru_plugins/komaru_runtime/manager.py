@@ -225,8 +225,11 @@ class Manager:
             meta = metamod.from_archive(path)
             fmt = "Go" if meta["runtime"] == "go" else "Elyx"
         else:
+            fallback = None
+            if path.lower().endswith(".py"):
+                fallback = metamod.fallback_id(path)
             with open(path, "r", encoding="utf-8-sig") as f:
-                meta = metamod.from_source(f.read())
+                meta = metamod.from_source(f.read(), fallback)
             fmt = "exteraGram" if path.lower().endswith(".plugin") else "Python"
         plugin_id = meta["id"]
         old = self.records.get(plugin_id)

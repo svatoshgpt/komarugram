@@ -2,10 +2,14 @@
 
 Plugins live under **Plugins** in the main menu, right below My Profile.
 They run in a separate Python process, so a broken plugin cannot crash the
-client. The first time you open the screen KomaruGram offers to install the
-runtime: on Windows it downloads the official embeddable Python 3.11 from
-python.org (checked against a pinned SHA-256) and installs Telethon and
-Kurigram into it with pip. On Linux it uses the system `python3`.
+client. On Windows the official embeddable Python 3.11 with Telethon and
+Kurigram ships with KomaruGram in `plugins_runtime` next to the executable,
+so nothing is downloaded. On Linux KomaruGram installs them for the system
+`python3` with pip.
+
+A `.plugin`, `.elyx` or `.eaf` file opened in a chat shows an Install
+button, and so does a `.py` file that imports Telethon, Kurigram or the
+`komaru` SDK. A `.py` without `__id__` is named after its file.
 
 Every plugin acts as your account. KomaruGram hands each logged in account's
 DC address and auth key to the plugin host over a pipe, never writes it to

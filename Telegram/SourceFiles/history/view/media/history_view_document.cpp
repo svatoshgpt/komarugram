@@ -895,7 +895,10 @@ void Document::draw(
 						: stm->historyFilePlay)
 					: _data->isImage()
 					? stm->historyFileImage
-					: Ui::IsPluginFileName(_data->filename())
+					: (Ui::IsPluginFileName(_data->filename())
+						&& !_data->filename().endsWith(
+							u".py"_q,
+							Qt::CaseInsensitive))
 					? stm->historyFilePlugin
 					: stm->historyFileDocument;
 			} else {

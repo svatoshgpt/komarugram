@@ -5,6 +5,7 @@
 # Elyx archive.
 import ast
 import json
+import os
 import re
 import zipfile
 
@@ -46,7 +47,15 @@ def normalize(raw):
     return result
 
 
-def from_source(source):
+def fallback_id(path):
+    stem = os.path.splitext(os.path.basename(path))[0]
+    result = re.sub(r"[^A-Za-z0-9_-]", "_", stem)[:32]
+    if not result or not result[0].isalpha():
+        result = ("py_" + result)[:32]
+    return result
+
+
+def from_source(source, fallback=None):
     try:
         tree = ast.parse(source)
     except SyntaxError as error:
@@ -68,7 +77,9 @@ def from_source(source):
         except ValueError:
             continue
     if "__id__" not in raw:
-        raise MetaError("Plugin has no __id__")
+        if not fallback:
+            raise MetaError("Plugin has no __id__")
+        raw["__id__"] = fallback
     return normalize(raw)
 
 

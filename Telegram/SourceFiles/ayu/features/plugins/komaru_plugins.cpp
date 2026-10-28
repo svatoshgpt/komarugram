@@ -1,7 +1,6 @@
 // This is the source code of KomaruGram for Desktop.
 #include "ayu/features/plugins/komaru_plugins.h"
 
-#include "base/zlib_help.h"
 #include "config.h"
 #include "core/application.h"
 #include "lang/lang_keys.h"
@@ -13,7 +12,6 @@
 #include "mtproto/mtproto_dc_options.h"
 #include "ui/toast/toast.h"
 
-#include <QtCore/QCryptographicHash>
 #include <QtCore/QDir>
 #include <QtCore/QDirIterator>
 #include <QtCore/QElapsedTimer>
@@ -26,48 +24,20 @@
 #include <QtCore/QSysInfo>
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
-#include <QtNetwork/QNetworkAccessManager>
-#include <QtNetwork/QNetworkReply>
-#include <QtNetwork/QNetworkRequest>
 
 namespace KomaruPlugins {
 namespace {
 
-struct Download {
-	const char *url = nullptr;
-	const char *sha256 = nullptr;
-};
-
-#ifdef Q_OS_WIN
-#if defined Q_PROCESSOR_X86_64 || defined Q_PROCESSOR_ARM_64
-constexpr auto kPython = Download{
-	"https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-amd64.zip",
-	"009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b",
-};
-#else // Q_PROCESSOR_X86_64 || Q_PROCESSOR_ARM_64
-constexpr auto kPython = Download{
-	"https://www.python.org/ftp/python/3.11.9/python-3.11.9-embed-win32.zip",
-	"daf24de7fb3b173e94e56a201d3f38dfedebbdc7ed1925f7aeb8ed588e2b4189",
-};
-#endif // Q_PROCESSOR_X86_64 || Q_PROCESSOR_ARM_64
-constexpr auto kPythonPth = "python311._pth";
-#endif // Q_OS_WIN
-
-constexpr auto kPip = Download{
-	"https://files.pythonhosted.org/packages/3f/06/"
-	"3e4420302363fbb71be3c7f35ce042f54bfca330e3e66b3a2e3c4cca579f/"
-	"pip-26.2.2-py3-none-any.whl",
-	"fd7f4dfa8190e014013b9f08f3e973f4e4c26ffd179a204895533a7254813a70",
-};
+#ifndef Q_OS_WIN
 constexpr auto kPackages = {
 	"telethon==1.45.0",
 	"kurigram==2.2.26",
 	"pyyaml==6.0.3",
 	"tgcrypto==1.2.5",
 };
+#endif // !Q_OS_WIN
 constexpr auto kRuntimeVersion = 1;
 constexpr auto kSendHookTimeout = 1500;
-constexpr auto kMaxZipEntry = 64 * 1024 * 1024;
 constexpr auto kCreateNoWindow = 0x08000000;
 
 struct State {
@@ -81,7 +51,6 @@ struct State {
 	std::vector<PluginInfo> plugins;
 	rpl::event_stream<> pluginsChanged;
 	rpl::event_stream<QString> settingsChanged;
-	QNetworkAccessManager *network = nullptr;
 	rpl::lifetime lifetime;
 	bool ready = false;
 	bool started = false;
@@ -96,8 +65,15 @@ struct State {
 	return cWorkingDir() + u"tdata/plugins/"_q;
 }
 
+// The Windows build ships Python with Telethon and Kurigram installed in
+// plugins_runtime next to the executable; elsewhere the packages go to
+// tdata with the system python3.
 [[nodiscard]] QString RuntimeDir() {
+#ifdef Q_OS_WIN
+	return cExeDir() + u"plugins_runtime/"_q;
+#else // Q_OS_WIN
 	return Root() + u"runtime/"_q;
+#endif // Q_OS_WIN
 }
 
 [[nodiscard]] QString DataDir() {
@@ -106,10 +82,6 @@ struct State {
 
 [[nodiscard]] QString HostDir() {
 	return Root() + u"host/"_q;
-}
-
-[[nodiscard]] QString PipWheel() {
-	return RuntimeDir() + u"pip.whl"_q;
 }
 
 [[nodiscard]] QString SitePackages() {
@@ -167,80 +139,11 @@ void Fail(const QString &text) {
 	state.runtime = RuntimeState::Failed;
 }
 
-[[nodiscard]] QNetworkAccessManager &Network() {
-	auto &state = Instance();
-	if (!state.network) {
-		state.network = new QNetworkAccessManager(QCoreApplication::instance());
-	}
-	return *state.network;
-}
-
-void Fetch(
-		const Download &download,
-		const QString &label,
-		Fn<void(QByteArray)> done) {
-	auto request = QNetworkRequest(QUrl(QString::fromLatin1(download.url)));
-	request.setHeader(QNetworkRequest::UserAgentHeader, u"KomaruGram"_q);
-	const auto reply = Network().get(request);
-	QObject::connect(reply, &QNetworkReply::downloadProgress, [=](
-			qint64 received,
-			qint64 total) {
-		if (total > 0) {
-			Instance().status = u"%1 %2%"_q.arg(label).arg(received * 100 / total);
-		}
-	});
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
-		reply->deleteLater();
-		if (reply->error() != QNetworkReply::NoError) {
-			Fail(u"Download failed: %1"_q.arg(reply->errorString()));
-			return;
-		}
-		const auto bytes = reply->readAll();
-		const auto hash = QCryptographicHash::hash(
-			bytes,
-			QCryptographicHash::Sha256).toHex();
-		if (hash != QByteArray(download.sha256)) {
-			Fail(u"Checksum mismatch for %1"_q.arg(
-				QString::fromLatin1(download.url)));
-			return;
-		}
-		done(bytes);
-	});
-}
-
 [[nodiscard]] bool WriteFile(const QString &path, const QByteArray &bytes) {
 	QDir().mkpath(QFileInfo(path).absolutePath());
 	auto file = QFile(path);
 	return file.open(QIODevice::WriteOnly | QIODevice::Truncate)
 		&& (file.write(bytes) == bytes.size());
-}
-
-[[nodiscard]] bool ExtractZip(const QByteArray &bytes, const QString &folder) {
-	auto zip = zlib::FileToRead(bytes);
-	if (zip.goToFirstFile() != UNZ_OK) {
-		return false;
-	}
-	const auto root = QDir::cleanPath(folder);
-	do {
-		const auto name = zip.getCurrentFileName();
-		const auto path = QDir::cleanPath(root + '/' + name);
-		if (!path.startsWith(root + '/')) {
-			return false;
-		}
-		if (!name.endsWith('/')) {
-			const auto content = zip.readCurrentFileContent(kMaxZipEntry);
-			if (zip.error() != UNZ_OK || !WriteFile(path, content)) {
-				return false;
-			}
-		}
-		const auto jump = zip.goToNextFile();
-		if (jump == UNZ_END_OF_LIST_OF_FILE) {
-			break;
-		} else if (jump != UNZ_OK) {
-			return false;
-		}
-	} while (true);
-	return true;
 }
 
 void HideConsole(not_null<QProcess*> process) {
@@ -252,17 +155,15 @@ void HideConsole(not_null<QProcess*> process) {
 #endif // Q_OS_WIN
 }
 
+#ifndef Q_OS_WIN
 void RunPip() {
 	auto &state = Instance();
 	state.status = u"Installing Telethon and Kurigram…"_q;
 	QDir().mkpath(SitePackages());
 	auto arguments = QStringList();
-#ifdef Q_OS_WIN
-	arguments.push_back(PipWheel() + u"/pip"_q);
-#else // Q_OS_WIN
-	arguments << u"-m"_q << u"pip"_q;
-#endif // Q_OS_WIN
 	arguments
+		<< u"-m"_q
+		<< u"pip"_q
 		<< u"install"_q
 		<< u"--disable-pip-version-check"_q
 		<< u"--no-warn-script-location"_q
@@ -301,6 +202,7 @@ void RunPip() {
 	});
 	process->start(PythonExecutable(), arguments);
 }
+#endif // !Q_OS_WIN
 
 void CopyHostScripts() {
 	const auto prefix = u":/komaru_plugins"_q;
@@ -564,9 +466,18 @@ void Start() {
 		return;
 	}
 	state.started = true;
+#ifdef Q_OS_WIN
+	// Builds before 1.4.4 downloaded Python into tdata.
+	QDir(Root() + u"runtime"_q).removeRecursively();
+#endif // Q_OS_WIN
 	state.runtime = RuntimeInstalled()
 		? RuntimeState::Ready
 		: RuntimeState::Missing;
+#ifdef Q_OS_WIN
+	if (state.runtime.current() == RuntimeState::Missing) {
+		InstallRuntime();
+	}
+#endif // Q_OS_WIN
 	rpl::merge(
 		Core::App().domain().accountsChanges(),
 		Core::App().domain().activeSessionValue() | rpl::to_empty
@@ -607,31 +518,20 @@ void InstallRuntime() {
 	if (state.runtime.current() == RuntimeState::Installing) {
 		return;
 	}
+#ifdef Q_OS_WIN
+	// Nothing to download: look for the bundled runtime again.
+	if (RuntimeInstalled()) {
+		state.status = QString();
+		state.runtime = RuntimeState::Ready;
+		EnsureHost();
+	} else {
+		Fail(u"The plugin runtime was not found in %1. Reinstall "
+			"KomaruGram from the full release archive."_q.arg(
+				QDir::toNativeSeparators(RuntimeDir())));
+	}
+#else // Q_OS_WIN
 	state.runtime = RuntimeState::Installing;
 	QDir().mkpath(RuntimeDir());
-#ifdef Q_OS_WIN
-	Fetch(kPython, u"Downloading Python…"_q, [](QByteArray bytes) {
-		const auto folder = RuntimeDir() + u"python"_q;
-		QDir(folder).removeRecursively();
-		if (!ExtractZip(bytes, folder)) {
-			Fail(u"Could not unpack Python"_q);
-			return;
-		}
-		const auto pth = QByteArray(
-			"python311.zip\r\n.\r\nLib\\site-packages\r\nimport site\r\n");
-		if (!WriteFile(folder + '/' + QString::fromLatin1(kPythonPth), pth)) {
-			Fail(u"Could not set up Python"_q);
-			return;
-		}
-		Fetch(kPip, u"Downloading pip…"_q, [](QByteArray bytes) {
-			if (!WriteFile(PipWheel(), bytes)) {
-				Fail(u"Could not save pip"_q);
-				return;
-			}
-			RunPip();
-		});
-	});
-#else // Q_OS_WIN
 	if (PythonExecutable().isEmpty()) {
 		Fail(u"python3 was not found"_q);
 		return;
