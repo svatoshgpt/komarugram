@@ -429,7 +429,9 @@ Badge::Content Badge::clickedContent() const {
 		? 0
 		: st::infoVerifiedCheckPosition.x();
 	const auto x = _view->mapFromGlobal(QCursor::pos()).x();
-	if (x < skip + faces * faceWidth) {
+	// The left skip belongs to whatever comes first, so without faces a
+	// click there is a click on the status.
+	if (faces && x < skip + faces * faceWidth) {
 		// The developer face comes first when there is one.
 		const auto developer = result.komaruDeveloper
 			&& (x < skip + faceWidth);
