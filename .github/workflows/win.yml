@@ -37,6 +37,8 @@ jobs:
 
     steps:
       - name: Free up runner disk space.
+        # Best effort: it needs PSGallery, which some runner images lack.
+        continue-on-error: true
         uses: hugoalh/disk-space-optimizer-ghaction@v0.8.1
         with:
           operate_async: "True"

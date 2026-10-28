@@ -772,7 +772,7 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 			}
 			const auto wrap = rows->list->add(MakeSeparatorRow(rows->list));
 			setupSeparator(wrap);
-			wrap->show();
+			wrap->show(anim::type::instant);
 			rows->ids.push_back(u"separator"_q);
 			saveOrder();
 			rows->reorder->cancel();
