@@ -712,7 +712,25 @@ void InitMessageFieldGeometry(not_null<Ui::InputField*> field) {
 
 	// st::messageSendingAnimationTextFromOffset.
 	field->setDocumentMargin(4.);
-	field->setAdditionalMargin(style::ConvertScale(4) - 4);
+	const auto add = style::ConvertScale(4) - 4;
+
+	// KomaruGram: the base font is Google Sans, and its rounded metrics
+	// put a single line higher or lower depending on the interface scale.
+	// Move the first line so its x-height centre sits on the field centre,
+	// keeping the height the same.
+	const auto &font = field->st().style.font;
+	const auto metrics = QFontMetricsF(font->f);
+	const auto center = style::ConvertScale(4)
+		+ font->ascent
+		- metrics.xHeight() / 2.;
+	const auto wanted = (st::historySendSize.height()
+		- 2 * st::historySendPadding) / 2.;
+	const auto limit = style::ConvertScale(4);
+	const auto shift = std::clamp(
+		int(base::SafeRound(wanted - center)),
+		-limit,
+		limit);
+	field->setAdditionalMargins({ add, add + shift, add, add - shift });
 }
 
 std::shared_ptr<Ui::ChatStyle> InitMessageField(

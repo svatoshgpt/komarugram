@@ -1308,8 +1308,7 @@ historyTextStyle: TextStyle(defaultTextStyle) {
 }
 historyComposeField: InputField(defaultInputField) {
 	style: historyTextStyle;
-	// Google Sans sits higher than the Open Sans these were made for.
-	textMargins: margins(0px, 2px, 0px, 0px);
+	textMargins: margins(0px, 0px, 0px, 0px);
 	textAlign: align(left);
 	textFg: historyComposeAreaFg;
 	textBg: historyComposeAreaBg;
