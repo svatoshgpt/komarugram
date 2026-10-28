@@ -28,15 +28,15 @@
 namespace KomaruPlugins {
 namespace {
 
-#ifndef Q_OS_WIN
 constexpr auto kPackages = {
 	"telethon==1.45.0",
 	"kurigram==2.2.26",
 	"pyyaml==6.0.3",
-	"tgcrypto==1.2.5",
 };
-#endif // !Q_OS_WIN
-constexpr auto kRuntimeVersion = 1;
+// Only speeds up Kurigram, and has no wheels for new Pythons.
+constexpr auto kOptionalPackage = "tgcrypto==1.2.5";
+constexpr auto kRuntimeVersion = 2;
+constexpr auto kProbeTimeout = 10000;
 constexpr auto kSendHookTimeout = 1500;
 constexpr auto kCreateNoWindow = 0x08000000;
 
@@ -65,15 +65,10 @@ struct State {
 	return cWorkingDir() + u"tdata/plugins/"_q;
 }
 
-// The Windows build ships Python with Telethon and Kurigram installed in
-// plugins_runtime next to the executable; elsewhere the packages go to
-// tdata with the system python3.
+// Plugins use the Python installed on the computer; Telethon and Kurigram
+// are installed for it with pip into tdata, not into that Python.
 [[nodiscard]] QString RuntimeDir() {
-#ifdef Q_OS_WIN
-	return cExeDir() + u"plugins_runtime/"_q;
-#else // Q_OS_WIN
 	return Root() + u"runtime/"_q;
-#endif // Q_OS_WIN
 }
 
 [[nodiscard]] QString DataDir() {
@@ -85,36 +80,32 @@ struct State {
 }
 
 [[nodiscard]] QString SitePackages() {
-#ifdef Q_OS_WIN
-	return RuntimeDir() + u"python/Lib/site-packages"_q;
-#else // Q_OS_WIN
 	return RuntimeDir() + u"site-packages"_q;
-#endif // Q_OS_WIN
-}
-
-[[nodiscard]] QString PythonExecutable() {
-#ifdef Q_OS_WIN
-	return RuntimeDir() + u"python/python.exe"_q;
-#else // Q_OS_WIN
-	return QStandardPaths::findExecutable(u"python3"_q);
-#endif // Q_OS_WIN
 }
 
 [[nodiscard]] QString MarkerPath() {
 	return RuntimeDir() + u"komaru-runtime.json"_q;
 }
 
-[[nodiscard]] bool RuntimeInstalled() {
-	const auto python = PythonExecutable();
-	if (python.isEmpty() || !QFile::exists(python)) {
-		return false;
-	}
+[[nodiscard]] QJsonObject ReadMarker() {
 	auto file = QFile(MarkerPath());
 	if (!file.open(QIODevice::ReadOnly)) {
-		return false;
+		return {};
 	}
-	const auto marker = QJsonDocument::fromJson(file.readAll()).object();
-	return marker.value(u"version"_q).toInt() == kRuntimeVersion;
+	return QJsonDocument::fromJson(file.readAll()).object();
+}
+
+// The interpreter the packages were installed for.
+[[nodiscard]] QString PythonExecutable() {
+	return ReadMarker().value(u"python"_q).toString();
+}
+
+[[nodiscard]] bool RuntimeInstalled() {
+	const auto marker = ReadMarker();
+	const auto python = marker.value(u"python"_q).toString();
+	return (marker.value(u"version"_q).toInt() == kRuntimeVersion)
+		&& !python.isEmpty()
+		&& QFile::exists(python);
 }
 
 [[nodiscard]] bool AnyPluginEnabled() {
@@ -155,24 +146,94 @@ void HideConsole(not_null<QProcess*> process) {
 #endif // Q_OS_WIN
 }
 
-#ifndef Q_OS_WIN
-void RunPip() {
-	auto &state = Instance();
-	state.status = u"Installing Telethon and Kurigram…"_q;
-	QDir().mkpath(SitePackages());
-	auto arguments = QStringList();
-	arguments
-		<< u"-m"_q
-		<< u"pip"_q
-		<< u"install"_q
-		<< u"--disable-pip-version-check"_q
-		<< u"--no-warn-script-location"_q
-		<< u"--upgrade"_q
-		<< u"--target"_q
-		<< SitePackages();
-	for (const auto package : kPackages) {
-		arguments.push_back(QString::fromLatin1(package));
+// Runs a candidate and returns the real interpreter path when it is
+// Python 3.9 or newer with pip.
+[[nodiscard]] QString ProbePython(
+		const QString &program,
+		const QStringList &prefix) {
+	if (program.isEmpty()) {
+		return QString();
 	}
+	auto process = QProcess();
+	HideConsole(&process);
+	process.start(program, prefix + QStringList{
+		u"-c"_q,
+		u"import sys, pip; print(sys.executable if sys.version_info >= "
+			"(3, 9) else '')"_q,
+	});
+	if (!process.waitForFinished(kProbeTimeout)
+		|| process.exitStatus() != QProcess::NormalExit
+		|| process.exitCode() != 0) {
+		process.kill();
+		return QString();
+	}
+	const auto result = QString::fromLocal8Bit(
+		process.readAllStandardOutput()).trimmed();
+	return QFile::exists(result) ? result : QString();
+}
+
+[[nodiscard]] QString FindPython() {
+#ifdef Q_OS_WIN
+	// The python.exe in WindowsApps only opens the Store.
+	const auto real = [](const QString &name) {
+		const auto path = QStandardPaths::findExecutable(name);
+		return path.contains(u"WindowsApps"_q, Qt::CaseInsensitive)
+			? QString()
+			: path;
+	};
+	for (const auto &name : { u"python"_q, u"python3"_q }) {
+		if (const auto found = ProbePython(real(name), {}); !found.isEmpty()) {
+			return found;
+		}
+	}
+	if (const auto found = ProbePython(real(u"py"_q), { u"-3"_q })
+		; !found.isEmpty()) {
+		return found;
+	}
+	// The python.org installer leaves PATH alone unless asked to.
+	const auto roots = {
+		qEnvironmentVariable("LOCALAPPDATA") + u"/Programs/Python"_q,
+		qEnvironmentVariable("ProgramFiles"),
+		qEnvironmentVariable("ProgramFiles(x86)"),
+	};
+	for (const auto &root : roots) {
+		auto folders = QDir(root).entryList(
+			{ u"Python3*"_q },
+			QDir::Dirs | QDir::NoDotAndDotDot,
+			QDir::Name | QDir::Reversed);
+		for (const auto &folder : folders) {
+			const auto path = root + '/' + folder + u"/python.exe"_q;
+			if (const auto found = ProbePython(path, {}); !found.isEmpty()) {
+				return found;
+			}
+		}
+	}
+	return QString();
+#else // Q_OS_WIN
+	for (const auto &name : { u"python3"_q, u"python"_q }) {
+		const auto path = QStandardPaths::findExecutable(name);
+		if (const auto found = ProbePython(path, {}); !found.isEmpty()) {
+			return found;
+		}
+	}
+	return QString();
+#endif // Q_OS_WIN
+}
+
+void RunPip(
+		const QString &python,
+		const QStringList &packages,
+		Fn<void(bool ok, QString output)> done) {
+	auto arguments = QStringList{
+		u"-m"_q,
+		u"pip"_q,
+		u"install"_q,
+		u"--disable-pip-version-check"_q,
+		u"--no-warn-script-location"_q,
+		u"--upgrade"_q,
+		u"--target"_q,
+		SitePackages(),
+	} + packages;
 	const auto process = new QProcess(QCoreApplication::instance());
 	HideConsole(process);
 	process->setProcessChannelMode(QProcess::MergedChannels);
@@ -181,28 +242,49 @@ void RunPip() {
 			QProcess::ExitStatus status) {
 		const auto output = QString::fromUtf8(process->readAll());
 		process->deleteLater();
-		if (status != QProcess::NormalExit || code != 0) {
-			const auto lines = output.trimmed().split('\n');
-			Fail(lines.isEmpty() ? u"pip failed"_q : lines.back().trimmed());
-			return;
-		}
-		auto marker = QJsonObject();
-		marker.insert(u"version"_q, kRuntimeVersion);
-		WriteFile(MarkerPath(), QJsonDocument(marker).toJson());
-		Instance().status = QString();
-		Instance().runtime = RuntimeState::Ready;
-		EnsureHost();
+		done(status == QProcess::NormalExit && code == 0, output);
 	});
 	QObject::connect(process, &QProcess::errorOccurred, [=](
 			QProcess::ProcessError error) {
 		if (error == QProcess::FailedToStart) {
 			process->deleteLater();
-			Fail(u"Python could not be started"_q);
+			done(false, u"Python could not be started"_q);
 		}
 	});
-	process->start(PythonExecutable(), arguments);
+	process->start(python, arguments);
 }
-#endif // !Q_OS_WIN
+
+void InstallPackages(const QString &python) {
+	auto &state = Instance();
+	state.status = u"Installing Telethon and Kurigram…"_q;
+	QDir(SitePackages()).removeRecursively();
+	QDir().mkpath(SitePackages());
+	auto packages = QStringList();
+	for (const auto package : kPackages) {
+		packages.push_back(QString::fromLatin1(package));
+	}
+	RunPip(python, packages, [=](bool ok, QString output) {
+		if (!ok) {
+			const auto lines = output.trimmed().split('\n');
+			Fail(lines.isEmpty() ? u"pip failed"_q : lines.back().trimmed());
+			return;
+		}
+		const auto finish = [=] {
+			auto marker = QJsonObject();
+			marker.insert(u"version"_q, kRuntimeVersion);
+			marker.insert(u"python"_q, python);
+			WriteFile(MarkerPath(), QJsonDocument(marker).toJson());
+			Instance().status = QString();
+			Instance().runtime = RuntimeState::Ready;
+			EnsureHost();
+		};
+		RunPip(
+			python,
+			{ QString::fromLatin1(kOptionalPackage) },
+			[=](bool, QString) { finish(); });
+	});
+}
+
 
 void CopyHostScripts() {
 	const auto prefix = u":/komaru_plugins"_q;
@@ -435,9 +517,7 @@ void StartHost() {
 	auto environment = QProcessEnvironment::systemEnvironment();
 	environment.insert(u"PYTHONIOENCODING"_q, u"utf-8"_q);
 	environment.insert(u"PYTHONUNBUFFERED"_q, u"1"_q);
-#ifndef Q_OS_WIN
 	environment.insert(u"PYTHONPATH"_q, SitePackages());
-#endif // !Q_OS_WIN
 	process->setProcessEnvironment(environment);
 	process->setStandardErrorFile(DataDir() + u"host-stderr.log"_q);
 	QObject::connect(process, &QProcess::readyReadStandardOutput, ReadOutput);
@@ -466,18 +546,12 @@ void Start() {
 		return;
 	}
 	state.started = true;
-#ifdef Q_OS_WIN
-	// Builds before 1.4.4 downloaded Python into tdata.
-	QDir(Root() + u"runtime"_q).removeRecursively();
-#endif // Q_OS_WIN
+	// Test builds downloaded their own Python here.
+	QDir(RuntimeDir() + u"python"_q).removeRecursively();
+	QFile::remove(RuntimeDir() + u"pip.whl"_q);
 	state.runtime = RuntimeInstalled()
 		? RuntimeState::Ready
 		: RuntimeState::Missing;
-#ifdef Q_OS_WIN
-	if (state.runtime.current() == RuntimeState::Missing) {
-		InstallRuntime();
-	}
-#endif // Q_OS_WIN
 	rpl::merge(
 		Core::App().domain().accountsChanges(),
 		Core::App().domain().activeSessionValue() | rpl::to_empty
@@ -518,26 +592,15 @@ void InstallRuntime() {
 	if (state.runtime.current() == RuntimeState::Installing) {
 		return;
 	}
-#ifdef Q_OS_WIN
-	// Nothing to download: look for the bundled runtime again.
-	if (RuntimeInstalled()) {
-		state.status = QString();
-		state.runtime = RuntimeState::Ready;
-		EnsureHost();
-	} else {
-		Fail(u"The plugin runtime was not found in %1. Reinstall "
-			"KomaruGram from the full release archive."_q.arg(
-				QDir::toNativeSeparators(RuntimeDir())));
-	}
-#else // Q_OS_WIN
 	state.runtime = RuntimeState::Installing;
+	state.status = u"Looking for Python…"_q;
 	QDir().mkpath(RuntimeDir());
-	if (PythonExecutable().isEmpty()) {
-		Fail(u"python3 was not found"_q);
+	const auto python = FindPython();
+	if (python.isEmpty()) {
+		Fail(tr::ayu_PluginsPythonMissing(tr::now));
 		return;
 	}
-	RunPip();
-#endif // Q_OS_WIN
+	InstallPackages(python);
 }
 
 void EnsureHost() {

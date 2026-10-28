@@ -2,10 +2,10 @@
 
 Plugins live under **Plugins** in the main menu, right below My Profile.
 They run in a separate Python process, so a broken plugin cannot crash the
-client. On Windows the official embeddable Python 3.11 with Telethon and
-Kurigram ships with KomaruGram in `plugins_runtime` next to the executable,
-so nothing is downloaded. On Linux KomaruGram installs them for the system
-`python3` with pip.
+client. They need Python 3.9 or newer installed on the computer (on
+Windows, from python.org with "Add python.exe to PATH" ticked). KomaruGram
+finds it and installs Telethon and Kurigram for it with pip into its own
+folder in tdata; nothing is added to that Python itself.
 
 A `.plugin`, `.elyx` or `.eaf` file opened in a chat shows an Install
 button, and so does a `.py` file that imports Telethon, Kurigram or the

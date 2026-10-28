@@ -377,15 +377,19 @@ void FillRuntime(
 	)->setClickedCallback([=] {
 		InstallRuntime();
 	});
+	AddButtonWithIcon(
+		container,
+		tr::ayu_PluginsGetPython(),
+		st::settingsButton,
+		{ &st::menuIconDownload }
+	)->setClickedCallback([] {
+		File::OpenUrl(u"https://www.python.org/downloads/"_q);
+	});
 	Ui::AddSkip(container);
 	if (state == RuntimeState::Failed) {
 		Ui::AddDividerText(container, RuntimeStatusValue());
 	} else {
-#ifdef Q_OS_WIN
 		Ui::AddDividerText(container, tr::ayu_PluginsRuntimeAbout());
-#else // Q_OS_WIN
-		Ui::AddDividerText(container, tr::ayu_PluginsRuntimeAboutSystem());
-#endif // Q_OS_WIN
 	}
 }
 

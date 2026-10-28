@@ -232,53 +232,6 @@ jobs:
 
           cmake --build ..\out --config MinSizeRel --parallel 1 -- /p:CL_MPCount=3 /p:UseMultiToolTask=true /p:EnforceProcessCountAcrossBuilds=true
 
-      - name: Bundle plugin runtime.
-        if: env.ONLY_CACHE == 'false'
-        shell: bash
-        run: |
-          # The client never downloads Python: the embeddable build with
-          # Telethon and Kurigram ships in plugins_runtime next to the exe.
-          if [ "${{ matrix.arch }}" = "x64" ]; then
-            EMBED=python-3.11.9-embed-amd64.zip
-            EMBED_SHA=009d6bf7e3b2ddca3d784fa09f90fe54336d5b60f0e0f305c37f400bf83cfd3b
-            PLATFORM=win_amd64
-          else
-            EMBED=python-3.11.9-embed-win32.zip
-            EMBED_SHA=daf24de7fb3b173e94e56a201d3f38dfedebbdc7ed1925f7aeb8ed588e2b4189
-            PLATFORM=win32
-          fi
-          RUNTIME="$GITHUB_WORKSPACE/plugins_runtime"
-          PY="$RUNTIME/python"
-          SITE="$PY/Lib/site-packages"
-          rm -rf "$RUNTIME"
-          mkdir -p "$PY" "$SITE"
-
-          curl -fsSL -o "$RUNNER_TEMP/$EMBED" "https://www.python.org/ftp/python/3.11.9/$EMBED"
-          echo "$EMBED_SHA  $RUNNER_TEMP/$EMBED" | sha256sum -c -
-          unzip -q "$RUNNER_TEMP/$EMBED" -d "$PY"
-          printf 'python311.zip\r\n.\r\nLib\\site-packages\r\nimport site\r\n' > "$PY/python311._pth"
-
-          # Pure Python packages install the same from any interpreter; the
-          # two binary ones are fetched as cp311 wheels for the target.
-          python -m pip install --disable-pip-version-check --no-compile \
-            --target "$SITE" \
-            pip==26.2.2 telethon==1.45.0 kurigram==2.2.26
-          python -m pip install --disable-pip-version-check --no-compile \
-            --target "$SITE" --upgrade --no-deps \
-            --platform "$PLATFORM" --python-version 3.11 \
-            --implementation cp --abi cp311 --only-binary=:all: \
-            pyyaml==6.0.3 tgcrypto==1.2.5
-          rm -rf "$SITE/bin"
-          if find "$SITE" -name '*.pyd' ! -name '*cp311*' | grep .; then
-            echo "::error::Extension modules for the wrong Python in the plugin runtime"
-            exit 1
-          fi
-
-          "$PY/python.exe" -c "import telethon, pyrogram, yaml, tgcrypto, pip; print('plugin runtime ok')"
-          "$PY/python.exe" -m compileall -q "$SITE" > /dev/null
-          echo '{"version": 1}' > "$RUNTIME/komaru-runtime.json"
-          du -sm "$RUNTIME"
-
       - name: Pack update.
         if: env.ONLY_CACHE == 'false' && env.BUILD_PACKER == 'ON'
         shell: bash
@@ -292,11 +245,7 @@ jobs:
           [ "${{ matrix.arch }}" = "x64" ] && TARGET="-target win64"
 
           cd "$TBUILD/$REPO_NAME/out/MinSizeRel"
-          rm -rf plugins_runtime
-          cp -r "$GITHUB_WORKSPACE/plugins_runtime" plugins_runtime
-          ./Packer.exe -path KomaruGram.exe -path Updater.exe -path plugins_runtime -version "$VERSION" $TARGET
-          # Keep the build cache free of the runtime.
-          rm -rf plugins_runtime
+          ./Packer.exe -path KomaruGram.exe -path Updater.exe -version "$VERSION" $TARGET
 
           mkdir -p "$GITHUB_WORKSPACE/update"
           mv tx64upd* tupdate* "$GITHUB_WORKSPACE/update/" 2>/dev/null || true
@@ -337,7 +286,6 @@ jobs:
           mkdir artifact
           move %OUT%\KomaruGram.exe artifact/
           move %OUT%\Updater.exe artifact/
-          move %GITHUB_WORKSPACE%\plugins_runtime artifact\plugins_runtime
       - uses: actions/upload-artifact@v7
         name: Upload artifact.
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
@@ -361,8 +309,7 @@ jobs:
 
           # Updater.exe must sit next to the client or updates cannot apply.
           ZIP="KomaruGram-$TAG-windows-$SUFFIX.zip"
-          # plugins_runtime is the bundled Python for plugins.
-          python -c "import os,sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED); [z.write('artifact/'+n, n) for n in ('KomaruGram.exe','Updater.exe')]; [z.write(os.path.join(r,f), os.path.relpath(os.path.join(r,f),'artifact')) for r,_,fs in os.walk('artifact/plugins_runtime') for f in fs]" "$ZIP"
+          python -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED); [z.write('artifact/'+n, n) for n in ('KomaruGram.exe','Updater.exe')]" "$ZIP"
 
           # Not marked latest yet: the update feed is served from the latest
           # release, so the feed job promotes it once current6 is in place.
