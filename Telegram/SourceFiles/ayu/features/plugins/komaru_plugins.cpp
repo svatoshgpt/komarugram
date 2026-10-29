@@ -636,6 +636,13 @@ void Request(QJsonObject command, Done done) {
 	}
 }
 
+bool InstalledOnDisk(const QString &id) {
+	return !id.isEmpty()
+		&& !id.contains('/')
+		&& !id.contains('\\')
+		&& QFile::exists(DataDir() + u"installed/"_q + id + u"/komaru.json"_q);
+}
+
 const std::vector<PluginInfo> &Plugins() {
 	return Instance().plugins;
 }

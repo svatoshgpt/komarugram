@@ -330,7 +330,7 @@ void ShowPluginBox(
 				controller->show(Ui::MakeConfirmBox({
 					.text = tr::ayu_PluginDeleteSure(),
 					.confirmed = [=](Fn<void()> &&close) {
-						Request(Command(u"uninstall"_q, id));
+						UninstallPlugin(id);
 						box->closeBox();
 						close();
 					},
@@ -493,17 +493,32 @@ void InstallPluginFile(
 			controller->showToast(error);
 			return;
 		}
-		if (installed) {
-			installed();
-		}
 		const auto id = value.toObject().value(u"id"_q).toString();
+		if (installed) {
+			Refresh();
+			installed();
+			return;
+		}
+		// The box needs the plugin in the list, which the refresh brings.
+		PluginsChanged(
+		) | rpl::take(1) | rpl::on_next(crl::guard(controller, [=] {
+			ShowPluginBox(controller, id, QString());
+		}), controller->lifetime());
 		Refresh();
-		ShowPluginBox(controller, id, QString());
 	}));
 }
 
+void UninstallPlugin(const QString &id, Fn<void()> done) {
+	Request(Command(u"uninstall"_q, id), [=](QJsonValue, QString) {
+		Refresh();
+		if (done) {
+			done();
+		}
+	});
+}
+
 bool PluginInstalled(const QString &id) {
-	return FindPlugin(id) != nullptr;
+	return (FindPlugin(id) != nullptr) || InstalledOnDisk(id);
 }
 
 } // namespace Settings

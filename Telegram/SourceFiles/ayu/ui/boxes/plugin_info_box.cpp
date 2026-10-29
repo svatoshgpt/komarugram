@@ -30,6 +30,7 @@
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
@@ -497,29 +498,53 @@ void FillPluginInfoBox(
 
 	Ui::AddSkip(box->verticalLayout());
 
-	const auto installed = ::Settings::PluginInstalled(metadata.id);
-	const auto closeButton = box->addButton(
-		installed
-			? tr::ayu_PluginUpdateButton()
-			: tr::ayu_PluginInstallButton(),
-		[=] {
-			const auto weak = base::make_weak(box);
-			::Settings::InstallPluginFile(controller, pluginPath, [=] {
-				if (const auto strong = weak.get()) {
-					strong->closeBox();
-				}
-			});
+	// The buttons follow the install state: Install while the plugin is
+	// not there, Delete and Update once it is.
+	const auto id = metadata.id;
+	const auto installed = box->lifetime().make_state<rpl::variable<bool>>(
+		::Settings::PluginInstalled(id));
+	const auto weak = base::make_weak(box);
+	const auto install = [=] {
+		::Settings::InstallPluginFile(controller, pluginPath, [=] {
+			if (weak.get()) {
+				*installed = true;
+			}
 		});
-	const auto buttonWidth = box->width()
-		- rect::m::sum::h(st::starrefFooterBox.buttonPadding);
-	closeButton->widthValue() | rpl::filter([=]
-	{
-		return (closeButton->widthNoMargins() != buttonWidth);
-	}) | rpl::on_next([=]
-					  {
-						  closeButton->resizeToWidth(buttonWidth);
-					  },
-					  closeButton->lifetime());
+	};
+	const auto remove = [=] {
+		controller->show(Ui::MakeConfirmBox({
+			.text = tr::ayu_PluginDeleteSure(),
+			.confirmed = [=](Fn<void()> &&close) {
+				::Settings::UninstallPlugin(id, [=] {
+					if (weak.get()) {
+						*installed = false;
+					}
+				});
+				close();
+			},
+			.confirmText = tr::ayu_PluginDelete(),
+			.confirmStyle = &st::attentionBoxButton,
+		}));
+	};
+	installed->value(
+	) | rpl::on_next([=](bool value) {
+		box->clearButtons();
+		if (value) {
+			box->addLeftButton(tr::ayu_PluginDelete(), remove);
+			box->addButton(tr::ayu_PluginUpdateButton(), install);
+			return;
+		}
+		const auto button = box->addButton(
+			tr::ayu_PluginInstallButton(),
+			install);
+		const auto buttonWidth = box->width()
+			- rect::m::sum::h(st::starrefFooterBox.buttonPadding);
+		button->widthValue() | rpl::filter([=] {
+			return (button->widthNoMargins() != buttonWidth);
+		}) | rpl::on_next([=] {
+			button->resizeToWidth(buttonWidth);
+		}, button->lifetime());
+	}, box->lifetime());
 }
 
 }

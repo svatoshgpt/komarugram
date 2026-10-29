@@ -58,6 +58,9 @@ void EnsureHost();
 void Request(QJsonObject command, Done done = nullptr);
 
 [[nodiscard]] const std::vector<PluginInfo> &Plugins();
+
+// Looks at the plugin folder, so it works before the host is running.
+[[nodiscard]] bool InstalledOnDisk(const QString &id);
 [[nodiscard]] rpl::producer<> PluginsChanged();
 [[nodiscard]] rpl::producer<QString> SettingsChanged();
 void Refresh();
