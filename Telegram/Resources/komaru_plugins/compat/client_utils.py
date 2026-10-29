@@ -139,6 +139,10 @@ def send_request(request, fn=None, account=None):
             result, error = None, e
             if record:
                 record.manager._log("warning", "%s: send_request failed: %r" % (record.id, e))
+                from komaru_runtime import protocol
+                protocol.event("toast", text="%s: %s" % (
+                    record.meta.get("name", record.id),
+                    str(e) or e.__class__.__name__))
         if callback:
             with context.running(record, index):
                 try:

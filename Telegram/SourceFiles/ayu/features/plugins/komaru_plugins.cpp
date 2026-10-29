@@ -26,6 +26,7 @@
 #include <QtCore/QSysInfo>
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
+#include <QtNetwork/QNetworkProxy>
 
 namespace KomaruPlugins {
 namespace {
@@ -367,6 +368,63 @@ void CopyHostScripts() {
 	return result;
 }
 
+// Plugins connect on their own, so they get the proxy the client uses:
+// the selected one, or the system one when the client follows the system.
+[[nodiscard]] QJsonValue SystemProxyEntry() {
+	const auto list = QNetworkProxyFactory::systemProxyForQuery(
+		QNetworkProxyQuery(u"149.154.167.50"_q, 443));
+	for (const auto &proxy : list) {
+		const auto type = (proxy.type() == QNetworkProxy::Socks5Proxy)
+			? u"socks5"_q
+			: (proxy.type() == QNetworkProxy::HttpProxy)
+			? u"http"_q
+			: QString();
+		if (type.isEmpty() || proxy.hostName().isEmpty()) {
+			continue;
+		}
+		auto result = QJsonObject();
+		result.insert(u"type"_q, type);
+		result.insert(u"host"_q, proxy.hostName());
+		result.insert(u"port"_q, int(proxy.port()));
+		result.insert(u"user"_q, proxy.user());
+		result.insert(u"password"_q, proxy.password());
+		result.insert(u"label"_q, u"system"_q);
+		return result;
+	}
+	return QJsonValue();
+}
+
+[[nodiscard]] QJsonValue ProxyEntry() {
+	const auto &settings = Core::App().settings().proxy();
+	if (settings.isSystem()) {
+		return SystemProxyEntry();
+	} else if (!settings.isEnabled()) {
+		return QJsonValue();
+	}
+	const auto &proxy = settings.selected();
+	using Type = MTP::ProxyData::Type;
+	const auto type = (proxy.type == Type::Socks5)
+		? u"socks5"_q
+		: (proxy.type == Type::Http)
+		? u"http"_q
+		: (proxy.type == Type::Mtproto)
+		? u"mtproto"_q
+		: QString();
+	auto result = QJsonObject();
+	if (type.isEmpty() || proxy.host.isEmpty() || !proxy.port) {
+		// Still a proxy: the host refuses to go direct.
+		result.insert(u"type"_q, u"unsupported"_q);
+		result.insert(u"label"_q, u"selected"_q);
+		return result;
+	}
+	result.insert(u"type"_q, type);
+	result.insert(u"host"_q, proxy.host);
+	result.insert(u"port"_q, int(proxy.port));
+	result.insert(u"user"_q, proxy.user);
+	result.insert(u"password"_q, proxy.password);
+	return result;
+}
+
 void SendAccounts() {
 	auto accounts = QJsonArray();
 	auto device = QJsonObject();
@@ -391,6 +449,7 @@ void SendAccounts() {
 	command.insert(u"api_hash"_q, QString::fromLatin1(ApiHash));
 	command.insert(u"device"_q, device);
 	command.insert(u"accounts"_q, accounts);
+	command.insert(u"proxy"_q, ProxyEntry());
 	Request(command);
 }
 
@@ -609,7 +668,8 @@ void Start() {
 		: RuntimeState::Missing;
 	rpl::merge(
 		Core::App().domain().accountsChanges(),
-		Core::App().domain().activeSessionValue() | rpl::to_empty
+		Core::App().domain().activeSessionValue() | rpl::to_empty,
+		Core::App().proxyChanges() | rpl::to_empty
 	) | rpl::on_next([] {
 		if (Instance().ready) {
 			SendAccounts();

@@ -5,7 +5,10 @@
 # as that account without a separate login. The connection presents the same
 # device, system and app version as KomaruGram itself, so the authorization
 # in Settings > Devices keeps its name. Clients are created on first use and
-# shared by every plugin.
+# shared by every plugin, and go through the proxy KomaruGram uses. When
+# KomaruGram uses a proxy a plugin never connects directly: Telegram is
+# blocked in places, and a direct connection would only hang or reveal the
+# user, so a proxy the libraries cannot use is an error instead.
 import asyncio
 import base64
 import struct
@@ -42,9 +45,10 @@ class Accounts:
         accounts = {}
         for entry in config.get("accounts", []):
             accounts[int(entry["index"])] = entry
+        proxy_changed = (config.get("proxy") != self._config.get("proxy"))
         stale = [
             index for index, entry in self._accounts.items()
-            if accounts.get(index) != entry
+            if proxy_changed or accounts.get(index) != entry
         ]
         self._config = config
         self._accounts = accounts
@@ -73,6 +77,59 @@ class Accounts:
     def _device(self):
         return self._config.get("device", {})
 
+    def _proxy(self):
+        return self._config.get("proxy") or {}
+
+    def _require(self, supported, library):
+        proxy = self._proxy()
+        if proxy and not supported:
+            raise AccountsError(
+                "%s cannot use the %s proxy KomaruGram is set to, and "
+                "plugins never connect without it. Use a SOCKS5 or "
+                "MTProto (not fake TLS) proxy." % (
+                    library, proxy.get("label") or proxy.get("type")))
+
+    def _telethon_connection(self):
+        """Connection and proxy arguments for TelegramClient."""
+        proxy = self._proxy()
+        kind = proxy.get("type")
+        if kind in ("socks5", "http"):
+            return {"proxy": {
+                "proxy_type": kind,
+                "addr": proxy["host"],
+                "port": int(proxy["port"]),
+                "username": proxy.get("user") or None,
+                "password": proxy.get("password") or None,
+                "rdns": True,
+            }}
+        if kind == "mtproto":
+            from telethon import connection
+            secret = (proxy.get("password") or "").lower()
+            if secret.startswith("ee"):
+                return None
+            kind = (connection.ConnectionTcpMTProxyRandomizedIntermediate
+                    if secret.startswith("dd")
+                    else connection.ConnectionTcpMTProxyAbridged)
+            return {
+                "connection": kind,
+                "proxy": (proxy["host"], int(proxy["port"]), secret),
+            }
+        return {} if not proxy else None
+
+    def _kurigram_proxy(self):
+        proxy = self._proxy()
+        if not proxy:
+            return {}
+        if proxy.get("type") not in ("socks5", "http"):
+            return None
+        return {
+            "scheme": proxy["type"],
+            "hostname": proxy["host"],
+            "port": int(proxy["port"]),
+            "username": proxy.get("user") or None,
+            "password": proxy.get("password") or None,
+        }
+
     async def telethon(self, index=None):
         await self.wait_ready()
         index, entry = self.account(index)
@@ -83,6 +140,9 @@ class Accounts:
             from telethon import TelegramClient
             from telethon.crypto import AuthKey
             from telethon.sessions import StringSession
+
+            connection = self._telethon_connection()
+            self._require(connection is not None, "Telethon")
 
             session = StringSession()
             session.set_dc(int(entry["dc_id"]), entry["ip"], int(entry["port"]))
@@ -97,6 +157,7 @@ class Accounts:
                 app_version=device.get("app") or "",
                 lang_code=device.get("lang") or "en",
                 system_lang_code=device.get("system_lang") or "en",
+                **connection,
             )
             await client.connect()
             if not await client.is_user_authorized():
@@ -114,6 +175,9 @@ class Accounts:
             if client is not None:
                 return client
             from pyrogram import Client
+
+            proxy = self._kurigram_proxy()
+            self._require(proxy is not None, "Kurigram")
 
             # Pyrogram 2 session string: dc, api id, test mode, auth key,
             # user id, is bot.
@@ -138,6 +202,7 @@ class Accounts:
                 system_version=device.get("system") or "",
                 app_version=device.get("app") or "",
                 lang_code=device.get("lang") or "en",
+                proxy=proxy or None,
             )
             await client.start()
             self._kurigram[index] = client
@@ -159,4 +224,5 @@ class Accounts:
             "api_id": int(self._config["api_id"]),
             "api_hash": self._config["api_hash"],
             "device": self._device(),
+            "proxy": self._proxy() or None,
         }
