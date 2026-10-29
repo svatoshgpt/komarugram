@@ -1976,6 +1976,7 @@ void Filler::fillContextMenuActions() {
 void Filler::fillHistoryActions() {
 	addToggleMuteSubmenu(true);
 	AyuUi::AddAyuGramActions(_peer, _thread, _controller, _addAction);
+	AyuUi::AddPluginsAction(_peer, _controller, _addAction);
 	addCreateTopic();
 	addInfo();
 	AyuUi::AddJumpToBeginningAction(_peer, _thread, _controller, _addAction);

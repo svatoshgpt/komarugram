@@ -26,6 +26,12 @@ void AddAyuGramActions(PeerData *peerData,
 							   not_null<Window::SessionController*> sessionController,
 							   const Window::PeerMenuCallback &addCallback);
 
+// The Plugins submenu: chat menu items of enabled plugins and a way to
+// the plugins screen.
+void AddPluginsAction(PeerData *peerData,
+					  not_null<Window::SessionController*> sessionController,
+					  const Window::PeerMenuCallback &addCallback);
+
 void AddJumpToBeginningAction(PeerData *peerData,
 							  Data::Thread *thread,
 							  not_null<Window::SessionController*> sessionController,

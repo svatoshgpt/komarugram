@@ -12,6 +12,8 @@
 #include <QtCore/QJsonArray>
 #include <QtCore/QJsonObject>
 
+class PeerData;
+
 namespace Main {
 class Session;
 } // namespace Main
@@ -23,6 +25,14 @@ enum class RuntimeState {
 	Installing,
 	Ready,
 	Failed,
+};
+
+// An item a plugin added to a menu with add_menu_item.
+struct PluginMenuItem {
+	QString id;
+	QString type;
+	QString text;
+	QString subtext;
 };
 
 struct PluginInfo {
@@ -38,6 +48,7 @@ struct PluginInfo {
 	bool loaded = false;
 	bool hasSettings = false;
 	bool sendHook = false;
+	std::vector<PluginMenuItem> menu;
 };
 
 using Done = Fn<void(QJsonValue result, QString error)>;
@@ -66,6 +77,14 @@ void Request(QJsonObject command, Done done = nullptr);
 void Refresh();
 
 [[nodiscard]] QString LogPath();
+
+// Runs a plugin menu item for a chat, as exteraGram does from the chat
+// action menu.
+void ClickMenuItem(
+	not_null<Main::Session*> session,
+	const QString &plugin,
+	const QString &item,
+	not_null<PeerData*> peer);
 
 struct Outgoing {
 	QString text;

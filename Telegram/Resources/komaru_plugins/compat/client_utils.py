@@ -123,17 +123,29 @@ def edit_message(message_obj, text=None, file_path=None, parse_mode=None, accoun
 
 
 def send_request(request, fn=None, account=None):
-    """Sends a Telethon TL request object and calls fn(result, error)."""
+    """Sends a Telethon request, or a TLRPC one built the exteraGram way,
+    and calls fn(result, error)."""
+    from komaru_runtime import tl_bridge
     index = _account(account)
+    record = context.current_record()
+    callback = getattr(fn, "fn", fn)
 
     async def call():
         client = await context.manager().accounts.telethon(index)
         try:
-            result, error = await client(request), None
+            prepared = await tl_bridge.to_telethon(request, client)
+            result, error = await client(prepared), None
         except Exception as e:
             result, error = None, e
-        if fn:
-            fn(result, error)
+            if record:
+                record.manager._log("warning", "%s: send_request failed: %r" % (record.id, e))
+        if callback:
+            with context.running(record, index):
+                try:
+                    callback(result, error)
+                except Exception:
+                    if record:
+                        record.log_exception("send_request callback")
     _schedule(call())
     return 0
 
@@ -169,10 +181,22 @@ def _none(*args, **kwargs):
 
 get_last_fragment = _none
 get_account_instance = _none
-get_messages_controller = _none
+
+
+def get_messages_controller(*args, **kwargs):
+    from komaru_runtime import tl_bridge
+    return tl_bridge.MessagesController()
+
+
 get_contacts_controller = _none
 get_media_data_controller = _none
-get_connections_manager = _none
+
+
+def get_connections_manager(*args, **kwargs):
+    from komaru_runtime import tl_bridge
+    return tl_bridge.ConnectionsManager()
+
+
 get_location_controller = _none
 get_notifications_controller = _none
 get_messages_storage = _none

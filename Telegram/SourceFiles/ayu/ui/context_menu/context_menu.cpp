@@ -14,6 +14,8 @@
 #include "ayu/ayu_state.h"
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
+#include "ayu/features/plugins/komaru_plugins.h"
+#include "ayu/ui/settings/settings_plugins.h"
 #include "ayu/features/forward/ayu_forward.h"
 #include "ayu/features/forward/ayu_forward_rich.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
@@ -320,6 +322,62 @@ void AddAyuGramActions(PeerData *peerData,
 					.isAttention = true,
 				});
 			}
+		},
+	});
+}
+
+void AddPluginsAction(PeerData *peerData,
+					  not_null<Window::SessionController*> sessionController,
+					  const Window::PeerMenuCallback &addCallback) {
+	if (!peerData) {
+		return;
+	}
+	struct Entry {
+		QString plugin;
+		KomaruPlugins::PluginMenuItem item;
+	};
+	auto entries = std::vector<Entry>();
+	for (const auto &plugin : KomaruPlugins::Plugins()) {
+		if (!plugin.enabled || !plugin.loaded) {
+			continue;
+		}
+		for (const auto &item : plugin.menu) {
+			if (item.type == u"chat_action_menu"_q) {
+				entries.push_back({ plugin.id, item });
+			}
+		}
+	}
+	const auto session = &sessionController->session();
+	addCallback(Window::PeerMenuCallback::Args{
+		.text = tr::ayu_PluginsTitle(tr::now),
+		.handler = nullptr,
+		.icon = &st::ayuPluginsIcon,
+		.fillSubmenu = [=](not_null<Ui::PopupMenu*> menu) {
+			const auto addAction = Ui::Menu::CreateAddActionCallback(menu);
+			for (const auto &entry : entries) {
+				const auto plugin = entry.plugin;
+				const auto id = entry.item.id;
+				addAction(
+					entry.item.text,
+					[=] {
+						KomaruPlugins::ClickMenuItem(
+							session,
+							plugin,
+							id,
+							peerData);
+					},
+					&st::menuIconCustomize);
+			}
+			if (!entries.empty()) {
+				addAction({ .isSeparator = true });
+			}
+			addAction(
+				tr::ayu_PluginsOpenScreen(tr::now),
+				[=] {
+					sessionController->showSettings(
+						Settings::KomaruPluginsId());
+				},
+				&st::ayuPluginsIcon);
 		},
 	});
 }

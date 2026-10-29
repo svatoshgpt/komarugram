@@ -3,6 +3,8 @@
 
 #include "config.h"
 #include "core/application.h"
+#include "core/core_settings.h"
+#include "data/data_peer.h"
 #include "lang/lang_keys.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
@@ -392,6 +394,56 @@ void SendAccounts() {
 	Request(command);
 }
 
+[[nodiscard]] std::vector<PluginMenuItem> ParseMenu(const QJsonValue &value) {
+	auto result = std::vector<PluginMenuItem>();
+	for (const auto &entry : value.toArray()) {
+		const auto object = entry.toObject();
+		result.push_back({
+			.id = object.value(u"id"_q).toString(),
+			.type = object.value(u"type"_q).toString(),
+			.text = object.value(u"text"_q).toString(),
+			.subtext = object.value(u"subtext"_q).toString(),
+		});
+	}
+	return result;
+}
+
+// A plugin switches the proxy every account uses, as ConnectionsManager
+// does on Android.
+void ApplyPluginProxy(const QJsonObject &message) {
+	if (!message.value(u"enabled"_q).toBool()) {
+		Core::App().setCurrentProxy(
+			Core::App().settings().proxy().selected(),
+			MTP::ProxyData::Settings::Disabled);
+		return;
+	}
+	const auto type = message.value(u"type"_q).toString();
+	auto proxy = MTP::ProxyData();
+	proxy.host = message.value(u"address"_q).toString();
+	proxy.port = uint32(message.value(u"port"_q).toInt());
+	if (type == u"MTPROTO"_q) {
+		proxy.type = MTP::ProxyData::Type::Mtproto;
+		proxy.password = message.value(u"secret"_q).toString();
+	} else {
+		proxy.type = (type == u"HTTP"_q)
+			? MTP::ProxyData::Type::Http
+			: MTP::ProxyData::Type::Socks5;
+		proxy.user = message.value(u"username"_q).toString();
+		proxy.password = message.value(u"password"_q).toString();
+	}
+	if (proxy.host.isEmpty() || !proxy.port || !proxy) {
+		LOG(("Komaru Plugins: proxy from a plugin ignored, %1:%2"
+			).arg(proxy.host).arg(proxy.port));
+		return;
+	}
+	auto &list = Core::App().settings().proxy().list();
+	if (!ranges::contains(list, proxy)) {
+		list.push_back(proxy);
+	}
+	Core::App().setCurrentProxy(proxy, MTP::ProxyData::Settings::Enabled);
+	Core::App().saveSettingsDelayed();
+}
+
 void ParsePlugins(const QJsonValue &value) {
 	auto &state = Instance();
 	state.plugins.clear();
@@ -410,6 +462,7 @@ void ParsePlugins(const QJsonValue &value) {
 			.loaded = object.value(u"loaded"_q).toBool(),
 			.hasSettings = object.value(u"has_settings"_q).toBool(),
 			.sendHook = object.value(u"send_hook"_q).toBool(),
+			.menu = ParseMenu(object.value(u"menu"_q)),
 		});
 	}
 	state.pluginsChanged.fire({});
@@ -429,6 +482,8 @@ void HandleEvent(const QJsonObject &message) {
 		Refresh();
 	} else if (event == u"settings_changed"_q) {
 		state.settingsChanged.fire(message.value(u"plugin"_q).toString());
+	} else if (event == u"proxy"_q) {
+		ApplyPluginProxy(message);
 	} else if (event == u"toast"_q) {
 		Ui::Toast::Show(message.value(u"text"_q).toString());
 	} else if (event == u"clipboard"_q) {
@@ -641,6 +696,30 @@ bool InstalledOnDisk(const QString &id) {
 		&& !id.contains('/')
 		&& !id.contains('\\')
 		&& QFile::exists(DataDir() + u"installed/"_q + id + u"/komaru.json"_q);
+}
+
+void ClickMenuItem(
+		not_null<Main::Session*> session,
+		const QString &plugin,
+		const QString &item,
+		not_null<PeerData*> peer) {
+	// exteraGram passes Android dialog ids: chats and channels negative.
+	const auto bare = peer->isUser()
+		? qint64(peerToUser(peer->id).bare)
+		: peer->isChat()
+		? qint64(peerToChat(peer->id).bare)
+		: qint64(peerToChannel(peer->id).bare);
+	auto command = QJsonObject();
+	command.insert(u"cmd"_q, u"menu_click"_q);
+	command.insert(u"plugin"_q, plugin);
+	command.insert(u"item"_q, item);
+	command.insert(u"account"_q, AccountIndex(&session->account()));
+	command.insert(u"dialog_id"_q, peer->isUser() ? bare : -bare);
+	Request(command, [](QJsonValue, QString error) {
+		if (!error.isEmpty()) {
+			Ui::Toast::Show(error);
+		}
+	});
 }
 
 const std::vector<PluginInfo> &Plugins() {

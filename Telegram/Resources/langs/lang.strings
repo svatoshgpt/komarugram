@@ -9489,6 +9489,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_PluginsRuntimeHeader" = "Plugin runtime";
 "ayu_PluginsRuntimeAbout" = "Plugins run on the Python installed on your computer, version 3.9 or newer. KomaruGram will install Telethon and Kurigram for it with pip.";
 "ayu_PluginsGetPython" = "Download Python";
+"ayu_PluginsOpenScreen" = "All plugins";
 "ayu_PluginsPythonMissing" = "Python 3.9 or newer was not found. Install it from python.org with \"Add python.exe to PATH\" ticked, then press Retry.";
 "ayu_PluginsRuntimeAboutSystem" = "Plugins run with the system python3. KomaruGram will install Telethon and Kurigram for it with pip.";
 "ayu_PluginsRuntimeInstall" = "Install plugin runtime";

@@ -2,8 +2,9 @@
 #
 # The exteraGram plugin base class, implemented over the desktop host. Hooks
 # that exist on desktop work: outgoing text, updates and settings. Xposed
-# method hooks and Android menu items have nothing to attach to here, so
-# they are accepted and ignored with one log line each.
+# method hooks have nothing to attach to here, so they are accepted and
+# ignored with one log line each. Chat menu items go to the Plugins submenu
+# of the chat menu in KomaruGram.
 import asyncio
 import logging
 from dataclasses import dataclass, field
@@ -153,11 +154,21 @@ class BasePlugin:
         return None
 
     def add_menu_item(self, item=None, *args, **kwargs):
-        self._komaru_record.unsupported("add_menu_item")
-        return None
+        if not isinstance(item, MenuItemData):
+            item = MenuItemData(*((item,) + args if item is not None else args), **kwargs)
+        record = self._komaru_record
+        item_id = item.item_id or "item%d" % (len(record.menu_items) + 1)
+        item.item_id = item_id
+        record.menu_items[item_id] = item
+        context.manager().notify_changed()
+        return item_id
 
-    def remove_menu_item(self, *args, **kwargs):
-        return False
+    def remove_menu_item(self, item_id=None, *args, **kwargs):
+        removed = self._komaru_record.menu_items.pop(
+            getattr(item_id, "item_id", item_id), None)
+        if removed is not None:
+            context.manager().notify_changed()
+        return removed is not None
 
     # Settings.
     def get_setting(self, key, default=None):

@@ -6,6 +6,9 @@
     <file alias="compat/elyx/__init__.py">../komaru_plugins/compat/elyx/__init__.py</file>
     <file alias="compat/file_utils.py">../komaru_plugins/compat/file_utils.py</file>
     <file alias="compat/hook_utils.py">../komaru_plugins/compat/hook_utils.py</file>
+    <file alias="compat/org/__init__.py">../komaru_plugins/compat/org/__init__.py</file>
+    <file alias="compat/org/telegram/__init__.py">../komaru_plugins/compat/org/telegram/__init__.py</file>
+    <file alias="compat/org/telegram/tgnet/__init__.py">../komaru_plugins/compat/org/telegram/tgnet/__init__.py</file>
     <file alias="compat/komaru.py">../komaru_plugins/compat/komaru.py</file>
     <file alias="compat/ui/__init__.py">../komaru_plugins/compat/ui/__init__.py</file>
     <file alias="compat/ui/alert.py">../komaru_plugins/compat/ui/alert.py</file>
@@ -17,6 +20,7 @@
     <file alias="komaru_runtime/context.py">../komaru_plugins/komaru_runtime/context.py</file>
     <file alias="komaru_runtime/goplugin.py">../komaru_plugins/komaru_runtime/goplugin.py</file>
     <file alias="komaru_runtime/manager.py">../komaru_plugins/komaru_runtime/manager.py</file>
+    <file alias="komaru_runtime/tl_bridge.py">../komaru_plugins/komaru_runtime/tl_bridge.py</file>
     <file alias="komaru_runtime/meta.py">../komaru_plugins/komaru_runtime/meta.py</file>
     <file alias="komaru_runtime/protocol.py">../komaru_plugins/komaru_runtime/protocol.py</file>
     <file alias="komaru_runtime/stubs.py">../komaru_plugins/komaru_runtime/stubs.py</file>

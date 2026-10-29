@@ -43,6 +43,7 @@ class Record:
         self.telethon_handlers = []
         self.sys_paths = []
         self.pages = {}
+        self.menu_items = {}
         self._unsupported = set()
 
     @property
@@ -122,7 +123,23 @@ class Record:
             "error": self.error,
             "has_settings": self.has_settings(),
             "send_hook": self.send_hook or bool(self.go and self.go.send_hook),
+            "menu": self.describe_menu(),
         }
+
+    def describe_menu(self):
+        result = []
+        items = sorted(
+            self.menu_items.values(),
+            key=lambda item: -int(getattr(item, "priority", 0) or 0))
+        for item in items:
+            kind = getattr(item.menu_type, "value", item.menu_type)
+            result.append({
+                "id": item.item_id,
+                "type": str(kind or ""),
+                "text": str(item.text or item.item_id),
+                "subtext": str(item.subtext or ""),
+            })
+        return result
 
 
 class Manager:
@@ -413,6 +430,7 @@ class Manager:
                 pass
         record.telethon_handlers.clear()
         record.update_hooks.clear()
+        record.menu_items.clear()
         record.send_hook = False
         record.instance = None
         record.go = None
@@ -504,6 +522,27 @@ class Manager:
         if getattr(node, "create_sub_fragment", None):
             return (page + "/" if page else "") + str(index)
         return None
+
+    def menu_click(self, record, item_id, message):
+        item = record.menu_items.get(item_id)
+        if item is None or not callable(item.on_click):
+            raise KeyError("Unknown menu item")
+        account = message.get("account")
+        dialog_id = int(message.get("dialog_id") or 0)
+        from komaru_runtime.tl_bridge import TLObject
+        menu_context = {"account": account, "dialog_id": dialog_id}
+        if dialog_id > 0:
+            user = TLObject(id=dialog_id, access_hash=0)
+            menu_context.update(user=user, userId=dialog_id)
+        elif dialog_id < 0:
+            chat = TLObject(id=-dialog_id)
+            menu_context.update(chat=chat, chatId=-dialog_id)
+        with context.running(record, account):
+            try:
+                item.on_click(menu_context)
+            except Exception:
+                record.log_exception("menu item " + item_id)
+        return True
 
     # Hooks.
     async def transform_outgoing(self, account, peer, text, reply_to):
@@ -610,6 +649,8 @@ class Manager:
         if command == "set_setting":
             self.set_setting(record, message.get("page", ""), int(message["index"]), message.get("value"))
             return self.settings_page(record, message.get("page", ""))
+        if command == "menu_click":
+            return self.menu_click(record, message.get("item", ""), message)
         if command == "click":
             return {"open": self.click(record, message.get("page", ""), int(message["index"]))}
         raise KeyError("Unknown command %s" % command)
