@@ -53,9 +53,15 @@ struct PluginInfo {
 
 using Done = Fn<void(QJsonValue result, QString error)>;
 
-// Starts the host at launch when the runtime is installed and some plugin
-// is enabled.
+// Prepares the plugins at launch and starts the host a few seconds later,
+// so Telegram itself comes up first, when the runtime is installed and some
+// plugin is enabled.
 void Start();
+
+// The switch on the plugins screen. While off, the host does not run at all
+// and the choice of each plugin stays as it was.
+[[nodiscard]] bool PluginsEnabled();
+void SetPluginsEnabled(bool enabled);
 
 [[nodiscard]] RuntimeState CurrentRuntimeState();
 [[nodiscard]] rpl::producer<RuntimeState> RuntimeStateValue();

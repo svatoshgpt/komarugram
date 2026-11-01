@@ -24,6 +24,7 @@
 #include <QtCore/QProcess>
 #include <QtCore/QStandardPaths>
 #include <QtCore/QSysInfo>
+#include <QtCore/QTimer>
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
 #include <QtNetwork/QNetworkProxy>
@@ -35,11 +36,18 @@ constexpr auto kPackages = {
 	"telethon==1.45.0",
 	"kurigram==2.2.26",
 	"pyyaml==6.0.3",
+	// For the built-in tg-ws-proxy.
+	"cryptography",
+	"certifi",
+	"httpx[http2]==0.28.1",
 };
-// Only speeds up Kurigram, and has no wheels for new Pythons.
-constexpr auto kOptionalPackage = "tgcrypto==1.2.5";
-constexpr auto kRuntimeVersion = 2;
+// They only speed encryption up, for Kurigram and Telethon, and may have no
+// wheels for a new Python.
+constexpr auto kOptionalPackages = { "tgcrypto==1.2.5", "cryptg" };
+constexpr auto kRuntimeVersion = 3;
 constexpr auto kProbeTimeout = 10000;
+constexpr auto kStartDelay = 5000;
+constexpr auto kStopTimeout = 3000;
 constexpr auto kSendHookTimeout = 1500;
 constexpr auto kCreateNoWindow = 0x08000000;
 
@@ -84,6 +92,10 @@ struct State {
 
 [[nodiscard]] QString SitePackages() {
 	return RuntimeDir() + u"site-packages"_q;
+}
+
+[[nodiscard]] QString DisabledPath() {
+	return Root() + u"disabled"_q;
 }
 
 [[nodiscard]] QString MarkerPath() {
@@ -257,6 +269,17 @@ void RunPip(
 	process->start(python, arguments);
 }
 
+void InstallOptional(const QString &python, int index, Fn<void()> done) {
+	if (index >= int(kOptionalPackages.size())) {
+		done();
+		return;
+	}
+	const auto package = *(kOptionalPackages.begin() + index);
+	RunPip(python, { QString::fromLatin1(package) }, [=](bool, QString) {
+		InstallOptional(python, index + 1, done);
+	});
+}
+
 void InstallPackages(const QString &python) {
 	auto &state = Instance();
 	state.status = u"Installing Telethon and Kurigram…"_q;
@@ -281,10 +304,7 @@ void InstallPackages(const QString &python) {
 			Instance().runtime = RuntimeState::Ready;
 			EnsureHost();
 		};
-		RunPip(
-			python,
-			{ QString::fromLatin1(kOptionalPackage) },
-			[=](bool, QString) { finish(); });
+		InstallOptional(python, 0, finish);
 	});
 }
 
@@ -620,7 +640,7 @@ void HostStopped() {
 
 void StartHost() {
 	auto &state = Instance();
-	if (state.process || !RuntimeInstalled()) {
+	if (state.process || !PluginsEnabled() || !RuntimeInstalled()) {
 		return;
 	}
 	QDir().mkpath(DataDir());
@@ -685,9 +705,48 @@ void Start() {
 			}
 		}
 	});
-	if (state.runtime.current() == RuntimeState::Ready && AnyPluginEnabled()) {
-		StartHost();
+	QTimer::singleShot(kStartDelay, QCoreApplication::instance(), [] {
+		auto &state = Instance();
+		if (!PluginsEnabled()) {
+			return;
+		}
+		// An older client installed fewer packages: bring them up to date.
+		const auto python = PythonExecutable();
+		if (state.runtime.current() == RuntimeState::Missing
+			&& !python.isEmpty()
+			&& QFile::exists(python)) {
+			state.runtime = RuntimeState::Installing;
+			InstallPackages(python);
+		} else if (state.runtime.current() == RuntimeState::Ready
+			&& AnyPluginEnabled()) {
+			StartHost();
+		}
+	});
+}
+
+bool PluginsEnabled() {
+	return !QFile::exists(DisabledPath());
+}
+
+void SetPluginsEnabled(bool enabled) {
+	if (PluginsEnabled() == enabled) {
+		return;
 	}
+	auto &state = Instance();
+	if (enabled) {
+		QFile::remove(DisabledPath());
+		EnsureHost();
+		Refresh();
+		state.pluginsChanged.fire({});
+		return;
+	}
+	WriteFile(DisabledPath(), QByteArray());
+	if (const auto process = state.process) {
+		process->write("{\"cmd\": \"shutdown\"}\n");
+		QTimer::singleShot(kStopTimeout, process, [=] { process->kill(); });
+	}
+	state.plugins.clear();
+	state.pluginsChanged.fire({});
 }
 
 RuntimeState CurrentRuntimeState() {

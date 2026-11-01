@@ -8,7 +8,8 @@
 # shared by every plugin, and go through the proxy KomaruGram uses. When
 # KomaruGram uses a proxy a plugin never connects directly: Telegram is
 # blocked in places, and a direct connection would only hang or reveal the
-# user, so a proxy the libraries cannot use is an error instead.
+# user, so a proxy the libraries cannot use is an error instead. Without a
+# proxy in KomaruGram, Telethon goes through the built-in tg-ws-proxy.
 import asyncio
 import base64
 import struct
@@ -132,6 +133,33 @@ class Accounts:
             "password": proxy.get("password") or None,
         }
 
+    async def _telethon_route(self):
+        connection = self._telethon_connection()
+        self._require(connection is not None, "Telethon")
+        if connection or self._proxy():
+            return connection
+        from komaru_runtime import tgws
+        try:
+            info = await tgws.start()
+        except Exception as error:
+            self._log("warning", "tg-ws-proxy is not available: %r" % (error,))
+            return connection
+        from telethon import connection as modes
+        return {
+            "connection": modes.ConnectionTcpMTProxyRandomizedIntermediate,
+            "proxy": (info["host"], info["port"], "dd" + info["secret"]),
+        }
+
+    async def warm(self):
+        """Connects ahead of the first plugin call, which would otherwise
+        pay for the whole connection and authorization."""
+        try:
+            await self.wait_ready()
+            for index in self.indices():
+                await self.telethon(index)
+        except Exception as error:
+            self._log("warning", "Could not connect plugins: %r" % (error,))
+
     async def telethon(self, index=None):
         await self.wait_ready()
         index, entry = self.account(index)
@@ -143,8 +171,7 @@ class Accounts:
             from telethon.crypto import AuthKey
             from telethon.sessions import StringSession
 
-            connection = self._telethon_connection()
-            self._require(connection is not None, "Telethon")
+            connection = await self._telethon_route()
 
             session = StringSession()
             session.set_dc(int(entry["dc_id"]), entry["ip"], int(entry["port"]))

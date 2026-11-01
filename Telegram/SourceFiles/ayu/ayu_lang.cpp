@@ -73,6 +73,8 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_PluginsRuntimeHeader", u"Среда для плагинов"_q },
 		std::pair{ "ayu_PluginsRuntimeAbout", u"Плагины работают на Python, установленном на компьютере, версии 3.9 или новее. KomaruGram поставит для него Telethon и Kurigram через pip."_q },
 		std::pair{ "ayu_PluginsGetPython", u"Скачать Python"_q },
+		std::pair{ "ayu_PluginsEnableAll", u"Включить плагины"_q },
+		std::pair{ "ayu_PluginsAllOff", u"Плагины выключены и совсем не запускаются. Выбор для каждого плагина сохранён."_q },
 		std::pair{ "ayu_PluginsOpenScreen", u"Все плагины"_q },
 		std::pair{ "ayu_PluginsPythonMissing", u"Python 3.9 или новее не найден. Установите его с python.org, отметив «Add python.exe to PATH», и нажмите «Повторить»."_q },
 		std::pair{ "ayu_PluginsRuntimeAboutSystem", u"Плагины работают на системном python3. KomaruGram поставит для него Telethon и Kurigram через pip."_q },

@@ -608,6 +608,11 @@ class Manager:
                             record.log_exception("on_update_hook")
                     break
 
+    def warm_accounts(self):
+        if any(r.instance is not None or r.go is not None
+               for r in self.records.values()):
+            self.spawn(None, self.accounts.warm())
+
     # Commands.
     async def handle(self, message):
         command = message.get("cmd")
@@ -621,6 +626,7 @@ class Manager:
         if command == "accounts":
             await self.accounts.configure(message)
             self._update_clients.clear()
+            self.warm_accounts()
             for r in self.records.values():
                 if r.go is not None:
                     r.go.send_accounts()
@@ -643,6 +649,7 @@ class Manager:
             return True
         if command == "set_enabled":
             self.set_enabled(record, message.get("enabled"))
+            self.warm_accounts()
             return record.describe()
         if command == "settings":
             return self.settings_page(record, message.get("page", ""))
@@ -676,6 +683,8 @@ class Manager:
         for record in list(self.records.values()):
             self.unload(record)
         await self.accounts.close()
+        from komaru_runtime import tgws
+        tgws.stop()
         self.loop.stop()
 
 

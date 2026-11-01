@@ -397,6 +397,24 @@ void FillList(
 		not_null<Window::SessionController*> controller,
 		not_null<Ui::VerticalLayout*> container) {
 	Ui::AddSkip(container);
+	const auto toggle = container->add(object_ptr<Ui::SettingsButton>(
+		container,
+		tr::ayu_PluginsEnableAll(),
+		st::settingsButtonNoIcon));
+	toggle->toggleOn(rpl::single(PluginsEnabled()));
+	toggle->toggledChanges(
+	) | rpl::on_next([](bool enabled) {
+		// Switching rebuilds this screen, button included.
+		crl::on_main([=] { SetPluginsEnabled(enabled); });
+	}, toggle->lifetime());
+	if (!PluginsEnabled()) {
+		Ui::AddSkip(container);
+		Ui::AddDividerText(container, tr::ayu_PluginsAllOff());
+		return;
+	}
+	Ui::AddSkip(container);
+	Ui::AddDivider(container);
+	Ui::AddSkip(container);
 	AddButtonWithIcon(
 		container,
 		tr::ayu_PluginsInstall(),
@@ -479,6 +497,11 @@ void InstallPluginFile(
 		not_null<Window::SessionController*> controller,
 		const QString &path,
 		Fn<void()> installed) {
+	if (!PluginsEnabled()) {
+		controller->showToast(tr::ayu_PluginsAllOff(tr::now));
+		controller->showSettings(KomaruPluginsId());
+		return;
+	}
 	if (CurrentRuntimeState() != RuntimeState::Ready) {
 		controller->showToast(tr::ayu_PluginsNeedRuntime(tr::now));
 		controller->showSettings(KomaruPluginsId());

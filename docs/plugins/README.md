@@ -7,6 +7,14 @@ Windows, from python.org with "Add python.exe to PATH" ticked). KomaruGram
 finds it and installs Telethon and Kurigram for it with pip into its own
 folder in tdata; nothing is added to that Python itself.
 
+Plugins use the proxy set in KomaruGram and never connect directly while
+one is set, fake TLS MTProto included for Telethon. Without a proxy in the
+client, Telethon goes through the built-in
+[tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy) by Flowseal (MIT).
+Plugins can use it too: `import tgws`, then `await tgws.start()` for
+`host`, `port`, `secret` and `link`, and `tgws.use_in_client()` to point
+KomaruGram itself at it.
+
 A `.plugin`, `.elyx` or `.eaf` file opened in a chat shows an Install
 button, and so does a `.py` file that imports Telethon, Kurigram or the
 `komaru` SDK. A `.py` without `__id__` is named after its file.
