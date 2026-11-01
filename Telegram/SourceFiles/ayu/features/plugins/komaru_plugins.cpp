@@ -269,13 +269,28 @@ void RunPip(
 	process->start(python, arguments);
 }
 
+[[nodiscard]] bool PackagePresent(const QString &package) {
+	const auto name = package.section('=', 0, 0);
+	return !QDir(SitePackages()).entryList(
+		{ name + u"*"_q },
+		QDir::Dirs | QDir::Files | QDir::NoDotAndDotDot).isEmpty();
+}
+
+// Goes over what is missing, so a failed package gets another try on the
+// next launch. Only wheels: building from source needs a compiler and takes
+// long to fail.
 void InstallOptional(const QString &python, int index, Fn<void()> done) {
 	if (index >= int(kOptionalPackages.size())) {
 		done();
 		return;
 	}
-	const auto package = *(kOptionalPackages.begin() + index);
-	RunPip(python, { QString::fromLatin1(package) }, [=](bool, QString) {
+	const auto package = QString::fromLatin1(
+		*(kOptionalPackages.begin() + index));
+	if (PackagePresent(package)) {
+		InstallOptional(python, index + 1, done);
+		return;
+	}
+	RunPip(python, { u"--only-binary=:all:"_q, package }, [=](bool, QString) {
 		InstallOptional(python, index + 1, done);
 	});
 }
@@ -720,6 +735,8 @@ void Start() {
 		} else if (state.runtime.current() == RuntimeState::Ready
 			&& AnyPluginEnabled()) {
 			StartHost();
+			// In the background: the host picks them up on the next start.
+			InstallOptional(python, 0, [] {});
 		}
 	});
 }
