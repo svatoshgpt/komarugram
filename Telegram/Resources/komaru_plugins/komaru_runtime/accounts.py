@@ -85,8 +85,8 @@ class Accounts:
         if proxy and not supported:
             raise AccountsError(
                 "%s cannot use the %s proxy KomaruGram is set to, and "
-                "plugins never connect without it. Use a SOCKS5 or "
-                "MTProto (not fake TLS) proxy." % (
+                "plugins never connect without it. Use a SOCKS5 "
+                "proxy for this plugin." % (
                     library, proxy.get("label") or proxy.get("type")))
 
     def _telethon_connection(self):
@@ -104,15 +104,17 @@ class Accounts:
             }}
         if kind == "mtproto":
             from telethon import connection
-            secret = (proxy.get("password") or "").lower()
-            if secret.startswith("ee"):
-                return None
-            kind = (connection.ConnectionTcpMTProxyRandomizedIntermediate
-                    if secret.startswith("dd")
-                    else connection.ConnectionTcpMTProxyAbridged)
+            from komaru_runtime import faketls
+            secret = faketls.parse_secret(proxy.get("password"))
+            if secret[:1] == b"\xee":
+                kind = faketls.ConnectionTcpMTProxyFakeTLS
+            elif secret[:1] == b"\xdd":
+                kind = connection.ConnectionTcpMTProxyRandomizedIntermediate
+            else:
+                kind = connection.ConnectionTcpMTProxyAbridged
             return {
                 "connection": kind,
-                "proxy": (proxy["host"], int(proxy["port"]), secret),
+                "proxy": (proxy["host"], int(proxy["port"]), secret.hex()),
             }
         return {} if not proxy else None
 
