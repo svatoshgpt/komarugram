@@ -1029,7 +1029,7 @@ void AddBurnAction(not_null<Ui::PopupMenu*> menu, HistoryItem *item) {
 					item->markContentsRead();
 				}).send();
 		},
-		&st::menuIconTTLAny);
+		&st::ayuMenuIconTTLAny);
 }
 
 void AddCreateFilterAction(not_null<Ui::PopupMenu*> menu,
