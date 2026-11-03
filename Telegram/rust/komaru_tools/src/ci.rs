@@ -9,12 +9,13 @@ use crate::git;
 
 pub fn run(list: &[String]) -> Result<u8, String> {
     let Some((command, rest)) = list.split_first() else {
-        return Err("expected keep-dates or packer-key".into());
+        return Err("expected keep-dates, packer-key or dockerfile".into());
     };
     let args = Args::parse(rest)?;
     match command.as_str() {
         "keep-dates" => keep_dates(&args),
         "packer-key" => packer_key(&args),
+        "dockerfile" => dockerfile(&args),
         _ => Err(format!("unknown command {command}")),
     }
 }
@@ -113,10 +114,46 @@ fn packer_key(args: &Args) -> Result<u8, String> {
     Ok(0)
 }
 
+/// A switch of the Dockerfile template: set and empty turns it off.
+fn switch(name: &str, default: bool) -> bool {
+    std::env::var(name).map(|v| !v.is_empty()).unwrap_or(default)
+}
+
+fn render(template: &str) -> Result<String, String> {
+    let mut env = minijinja::Environment::new();
+    env.add_template("Dockerfile", template).map_err(|e| e.to_string())?;
+    let context = minijinja::context! {
+        DEBUG => switch("DEBUG", true),
+        MINSIZE => switch("MINSIZE", false),
+        LTO => switch("LTO", true),
+        ASAN => switch("ASAN", false),
+        JOBS => std::env::var("JOBS").unwrap_or_default(),
+    };
+    env.get_template("Dockerfile")
+        .and_then(|t| t.render(context))
+        .map_err(|e| e.to_string())
+}
+
+/// Renders Telegram/build/docker/centos_env/Dockerfile to stdout.
+fn dockerfile(args: &Args) -> Result<u8, String> {
+    let path = args.required("template")?;
+    let template = fs::read_to_string(path).map_err(|e| format!("can't read {path}: {e}"))?;
+    // Jinja2 reads every line ending as \n, so a CRLF checkout renders the same.
+    let template = template.replace("\r\n", "\n");
+    println!("{}", render(&template)?);
+    Ok(0)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
     fn literal() {
         assert_eq!(super::c_literal("a\"b\\c\nd"), "\"a\\\"b\\\\c\\nd\\n\"");
+    }
+
+    #[test]
+    fn template() {
+        let text = "a\n{%- if JOBS %}\nb{% else %}c{% endif %} {{ JOBS or \"x\" }}\n";
+        assert_eq!(super::render(text).unwrap(), "ac x");
     }
 }

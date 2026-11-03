@@ -10,6 +10,8 @@ name = "komaru"
 path = "src/main.rs"
 
 [dependencies]
+minijinja = { version = "2", default-features = false, features = ["serde"] }
+regex = { version = "1", default-features = false, features = ["std", "unicode-perl"] }
 serde_json = "1"
 
 [profile.release]

@@ -4,17 +4,24 @@
 //!   komaru review snapshot --session DIR --round R
 //!   komaru ci keep-dates --repo DIR --old SHA
 //!   komaru ci packer-key --out FILE
+//!   komaru rules [--staged]   (an edit hook reading JSON from stdin)
+//!   komaru ci dockerfile --template FILE
+//!   komaru tidy compile-db [BUILD]
 
 mod args;
 mod ci;
 mod git;
 mod review;
+mod rules;
+mod tidy;
 
 use std::process::ExitCode;
 
 fn usage() -> ExitCode {
     eprintln!("usage: komaru review <init|snapshot> ...");
-    eprintln!("       komaru ci <keep-dates|packer-key> ...");
+    eprintln!("       komaru ci <keep-dates|packer-key|dockerfile> ...");
+    eprintln!("       komaru rules [--staged]");
+    eprintln!("       komaru tidy compile-db [BUILD]");
     ExitCode::from(2)
 }
 
@@ -26,6 +33,8 @@ fn main() -> ExitCode {
     let result = match group.as_str() {
         "review" => review::run(rest),
         "ci" => ci::run(rest),
+        "rules" => rules::run(rest),
+        "tidy" => tidy::run(rest),
         _ => return usage(),
     };
     match result {
