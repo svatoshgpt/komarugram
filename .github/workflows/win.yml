@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: write
+  # The Linux build environment image lives in GHCR.
+  packages: write
 
 jobs:
 
@@ -36,17 +38,13 @@ jobs:
         shell: cmd
 
     steps:
-      - name: Free up runner disk space.
-        # Best effort: it needs PSGallery, which some runner images lack.
-        continue-on-error: true
-        uses: hugoalh/disk-space-optimizer-ghaction@v0.8.1
-        with:
-          operate_async: "True"
-          general_include: ".+"
-          general_exclude: "^(VisualStudio/(2022|All)|DotNet|VCPkg)"
-
       - name: Prepare directories.
+        # C: has about 30 GB free and D: about 150 GB. The build keeps its
+        # C: path, which the cached libraries were made with, through a
+        # junction to D:.
         run: |
+          mkdir D:\TBuild
+          mklink /J %userprofile%\TBuild D:\TBuild
           mkdir %userprofile%\TBuild\Libraries
           mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
           echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
@@ -346,13 +344,46 @@ jobs:
       - name: Set up Docker Buildx.
         uses: docker/setup-buildx-action@v3
 
+      - name: Log in to GHCR.
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Building the image takes well over an hour, so it is pushed to GHCR
+      # under a hash of its recipe and only pulled while that stays the same.
+      - name: Find the build environment image.
+        id: env_image
+        run: |
+          HASH=$(cat Telegram/build/docker/centos_env/Dockerfile.generated \
+            Telegram/build/docker/centos_env/build.sh \
+            | sha256sum | cut -c1-16)
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/$OWNER/komarugram-build-env:$HASH"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          if docker pull "$IMAGE"; then
+            docker tag "$IMAGE" "$IMAGE_TAG"
+            echo "cached=true" >> $GITHUB_OUTPUT
+          else
+            echo "cached=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build Docker image.
+        if: steps.env_image.outputs.cached != 'true'
         uses: docker/build-push-action@v7
         with:
           context: Telegram/build/docker/centos_env
           file: Telegram/build/docker/centos_env/Dockerfile.generated
           load: true
           tags: ${{ env.IMAGE_TAG }}
+
+      - name: Push the build environment image.
+        if: steps.env_image.outputs.cached != 'true'
+        continue-on-error: true
+        run: |
+          docker tag "$IMAGE_TAG" "${{ steps.env_image.outputs.image }}"
+          docker push "${{ steps.env_image.outputs.image }}"
 
       - name: Update signing setup.
         env:
