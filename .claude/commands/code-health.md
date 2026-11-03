@@ -10,8 +10,7 @@ Read `.claude/ai-workflow-adapter.md` and
 the Claude adapter's delegation substitutions. The arguments choose the mode:
 none or `scan` for a scan, `survey [area]` for one area survey, `check [base]`
 for a change. Route proposals into the inbox only when the arguments say
-`route`; the scheduled run is `scan route`. Codex verifier leaves run in the
-`work` Codex home unless the arguments ask for `codex-default`.
+`route`; the scheduled run is `scan route`.
 
 Arguments:
 

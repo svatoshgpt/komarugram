@@ -61,8 +61,7 @@ words, once, and approves amendments as the code changes.
    another more than with itself belongs with it; a directory grouping
    unrelated widgets is split by responsibility), assign layers, and write
    `atlas.md` in the format above.
-4. **Verify**, with the other provider when the host can run one (on Claude
-   Code a Codex CLI leaf, `--cwd <scan worktree> --sandbox read-only`): it
+4. **Verify**, with a fresh read-only agent in the scan worktree: it
    samples each area's responsibility against the code and reports claims
    the code contradicts. `health.py atlas --check <draft>` must report every
    file matched by exactly one area and no pattern that matches nothing.

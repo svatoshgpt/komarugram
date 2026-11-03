@@ -41,8 +41,7 @@ every applicable placeholder: `<TASK>`, `<TASK_ID>`, `<WORK_DIR>`,
 - Give each phase a unique lowercase/digit/underscore task name and tell the phase it is a leaf that must not delegate.
 - For Phase 1, Phase 3, Phase 4, and Phase 6, if delegated retries still fail,
   report a recoverable hard stop to the caller instead of rerunning locally.
-- On a Codex host, delegate only through native subagents; never shell out to `codex exec` or start background shell child processes there.
-- On Claude Code, reviews and assessments run as Codex CLI leaves unless the invocation opted out, per the Claude adapter's review and assessment provider and [Codex CLI leaves](../../../shared/codex-cli-leaves.md). Their transcripts stay in `TASK_DIR/.local/codex/`, never in tracked artifacts.
+- Delegate only through native subagents; never start background shell child processes for a phase.
 
 ### Claude Code: synchronous delegation
 
@@ -56,20 +55,11 @@ every applicable placeholder: `<TASK>`, `<TASK_ID>`, `<WORK_DIR>`,
 - If a returned leaf fails its completion check, retry that disposable phase
   once in a fresh Agent with more specific instructions before stopping to
   ask the user.
-- With the `codex` review provider, Phase 3, every Phase 6 review and the
-  convergence and campaign-cap assessments run as Codex CLI leaves instead:
-  start the leaves of one step together, block on `codex_leaf.py wait`, then
-  validate the same completion checks. The general reviewer's pass-2
-  synthesis resumes its pass-1 leaf with `--resume`.
+- The general reviewer's pass-2 synthesis resumes its pass-1 agent through
+  `SendMessage` when its id is available, otherwise a fresh leaf gets the
+  pass-1 report with the specialist reports.
 
 
-### Codex: wait for child completion
-
-Follow [child completion and recovery](../../../shared/codex-delegation.md)
-for native waits, missing-result detection, and bounded recovery. The
-performer owns that contract; do not make leaf agents read orchestration
-references. Preserve the initial general reviewer's canonical target and use
-`followup_task` for pass-2 synthesis after the specialist reports are accepted.
 
 ## Standard Compact Reply Block
 
@@ -1012,7 +1002,7 @@ not begin another campaign automatically.
 Run this phase only in a native, non-WSL Windows checkout and only after the review loop has
 finished. Keep WSL/Linux text LF/no-BOM.
 
-Use the current task's result logs as the source of truth for what Codex touched. Do not sweep the whole repo and do not rewrite unrelated files from a dirty worktree.
+Use the current task's result logs as the source of truth for what this task touched. Do not sweep the whole repo and do not rewrite unrelated files from a dirty worktree.
 
 ```text
 You are performing the final native-Windows-only text normalization phase for perform-task.
@@ -1026,7 +1016,7 @@ Read these files:
 Your job:
 - Collect the union of repo file paths listed in the exact `TOUCHED:` fields in those result logs.
 - Keep only files inside the repository that currently exist and are textual project files: source, headers, build/config files, localization files, style files, and similar text assets.
-- Exclude `out/`, binary files, and unrelated user files that were not touched by Codex in this task.
+- Exclude `out/`, binary files, and unrelated user files that were not touched in this task.
 - Rewrite each kept file so all line endings are CRLF.
 - If a kept file is UTF-8 or ASCII text, write it back as UTF-8 without BOM. Never add a UTF-8 BOM to source/config/project text files.
 - Preserve file content otherwise. Preserve whether the file ended with a trailing newline.
@@ -1101,29 +1091,3 @@ For review iterations, include the iteration and lens in the file name, for exam
 3. When the calls return, validate the expected artifacts or code changes with
    small shell summaries and the completion checks above.
 4. Write the result log from the validated outcome and the compact reply block.
-
-For a review or assessment phase under the `codex` review provider, replace
-step 2 with one `codex_leaf.py start` per leaf — working directory
-`WORK_DIR`, `workspace-write` sandbox, `--no-project-doc`, the selected
-`--effort`, `--model` where the effort policy's lens models pin one, and the
-Codex CLI leaves preamble before the prompt — followed by
-foreground `codex_leaf.py wait` calls until they all finish. Steps 3 and 4 are
-unchanged; the compact reply is the leaf's `<name>.last.md`.
-
-## Subagent Pattern (Codex)
-
-Use this pattern conceptually for delegated phases:
-
-1. Write the phase prompt file.
-2. Spawn a fresh leaf subagent with a unique tool-valid task name and
-   `fork_turns: "none"` unless a small recent-turn fork is required. Pass
-   the selected `reasoning_effort` when supported, per the shared phase
-   effort policy; omit `model` to inherit the parent model, except where
-   the policy's lens models pin one.
-3. Wait for the child's final result under the shared Codex completion and
-   recovery contract. Keep heartbeat and progress checks out of the parent.
-4. Validate the expected artifacts or code changes after completion with small
-   shell summaries and the completion checks above.
-5. Write the result log from the validated outcome and the compact reply block.
-
-Do not replace this pattern with shell-launched `codex exec`.

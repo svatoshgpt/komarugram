@@ -96,11 +96,7 @@ edit.
 5. **Review.** One fresh reviewer with the prompt below writes
    `work/review1-mechanical.md`; keep the prompt and its result log at
    `work/logs/phase-mechanical-review-1.prompt.md` and `.result.md`, and
-   checkpoint `mechanical-reviewed`. On Claude Code it is a Codex CLI leaf under
-   the adapter's review provider and
-   [Codex CLI leaves](../../../shared/codex-cli-leaves.md) (`--cwd WORK_DIR
-   --sandbox workspace-write --no-project-doc`); when Codex is unavailable,
-   and on other hosts, it is a fresh native leaf. Effort is `high` for Q0
+   checkpoint `mechanical-reviewed`. It is a fresh Agent leaf. Effort is `high` for Q0
    and Q1, because the bounds forbid any logic change and the proofs are
    attached, and `xhigh` for Q2.
 6. **Fix once.** On `NEEDS_CHANGES`, fix each finding within bounds or drop

@@ -65,8 +65,7 @@ Once a day, from any checkout:
 4. Publish with `health-publish --message "Publish code health report for
    <date>"`.
 
-The scheduled run is `/code-health scan route` in Claude Code or
-`$code-health scan route` in Codex.
+The scheduled run is `/code-health scan route`.
 
 ## Scan
 
@@ -229,10 +228,8 @@ the owner. Never route a class an audit has suspended in that area.
 Each scheduled run picks at random one code-health task approved since the
 previous audit. A fresh agent with no task context checks it against its
 class: the proof was run and supports the claim, behavior did not change, and
-the metric moved as stated. Use the other provider when the host can run
-one: on Claude Code a Codex CLI leaf under
-[Codex CLI leaves](../../shared/codex-cli-leaves.md) (`--cwd <scan worktree>
---sandbox read-only`); otherwise a fresh native agent. Mechanical tasks had one
+the metric moved as stated. The checker is a fresh read-only agent that
+starts in the scan worktree. Mechanical tasks had one
 reviewer, so this sample is their second look. Record the result in
 `audits.json` in `health_state`, with suspended class and area pairs. A
 failed audit suspends routing of that class in that area and becomes an
