@@ -893,6 +893,22 @@ void AyuSettings::setShowPluginsInDrawer(bool val) {
 	save();
 }
 
+void AyuSettings::setDisableSendAnimation(bool val) {
+	if (_disableSendAnimation.current() == val) {
+		return;
+	}
+	_disableSendAnimation = val;
+	save();
+}
+
+void AyuSettings::setDisableDeleteAnimation(bool val) {
+	if (_disableDeleteAnimation.current() == val) {
+		return;
+	}
+	_disableDeleteAnimation = val;
+	save();
+}
+
 void AyuSettings::setShowWalletInDrawer(bool val) {
 	if (_showWalletInDrawer.current() == val) {
 		return;
@@ -1324,6 +1340,8 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"showSavedMessagesInDrawer", s._showSavedMessagesInDrawer.current()},
 		{"showWalletInDrawer", s._showWalletInDrawer.current()},
 		{"showPluginsInDrawer", s._showPluginsInDrawer.current()},
+		{"disableSendAnimation", s._disableSendAnimation.current()},
+		{"disableDeleteAnimation", s._disableDeleteAnimation.current()},
 		{"showLReadToggleInDrawer", s._showLReadToggleInDrawer.current()},
 		{"showSReadToggleInDrawer", s._showSReadToggleInDrawer.current()},
 		{"showNightModeToggleInDrawer", s._showNightModeToggleInDrawer.current()},
@@ -1434,6 +1452,8 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._showSavedMessagesInDrawer = j.value("showSavedMessagesInDrawer", defaults._showSavedMessagesInDrawer.current());
 	s._showWalletInDrawer = j.value("showWalletInDrawer", defaults._showWalletInDrawer.current());
 	s._showPluginsInDrawer = j.value("showPluginsInDrawer", defaults._showPluginsInDrawer.current());
+	s._disableSendAnimation = j.value("disableSendAnimation", defaults._disableSendAnimation.current());
+	s._disableDeleteAnimation = j.value("disableDeleteAnimation", defaults._disableDeleteAnimation.current());
 	s._showLReadToggleInDrawer = j.value("showLReadToggleInDrawer", defaults._showLReadToggleInDrawer.current());
 	s._showSReadToggleInDrawer = j.value("showSReadToggleInDrawer", defaults._showSReadToggleInDrawer.current());
 	s._showNightModeToggleInDrawer = j.value("showNightModeToggleInDrawer", defaults._showNightModeToggleInDrawer.current());

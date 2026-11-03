@@ -206,6 +206,18 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setMaterialSwitches,
 	});
 	ayu.addSettingToggle({
+		.id = u"ayu/disableSendAnimation"_q,
+		.title = tr::ayu_DisableSendAnimation(),
+		.getter = &AyuSettings::disableSendAnimation,
+		.setter = &AyuSettings::setDisableSendAnimation,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/disableDeleteAnimation"_q,
+		.title = tr::ayu_DisableDeleteAnimation(),
+		.getter = &AyuSettings::disableDeleteAnimation,
+		.setter = &AyuSettings::setDisableDeleteAnimation,
+	});
+	ayu.addSettingToggle({
 		.id = u"ayu/disableCustomBackgrounds"_q,
 		.altIds = { u"ayu/customThemes"_q },
 		.title = tr::ayu_DisableCustomBackgrounds(),

@@ -327,6 +327,8 @@ public:
 	[[nodiscard]] bool showSavedMessagesInDrawer() const { return _showSavedMessagesInDrawer.current(); }
 	[[nodiscard]] bool showWalletInDrawer() const { return _showWalletInDrawer.current(); }
 	[[nodiscard]] bool showPluginsInDrawer() const { return _showPluginsInDrawer.current(); }
+	[[nodiscard]] bool disableSendAnimation() const { return _disableSendAnimation.current(); }
+	[[nodiscard]] bool disableDeleteAnimation() const { return _disableDeleteAnimation.current(); }
 	[[nodiscard]] bool showLReadToggleInDrawer() const { return _showLReadToggleInDrawer.current(); }
 	[[nodiscard]] bool showSReadToggleInDrawer() const { return _showSReadToggleInDrawer.current(); }
 	[[nodiscard]] bool showNightModeToggleInDrawer() const { return _showNightModeToggleInDrawer.current(); }
@@ -428,6 +430,8 @@ public:
 	void setShowSavedMessagesInDrawer(bool val);
 	void setShowWalletInDrawer(bool val);
 	void setShowPluginsInDrawer(bool val);
+	void setDisableSendAnimation(bool val);
+	void setDisableDeleteAnimation(bool val);
 	void setShowLReadToggleInDrawer(bool val);
 	void setShowSReadToggleInDrawer(bool val);
 	void setShowNightModeToggleInDrawer(bool val);
@@ -707,6 +711,8 @@ private:
 	rpl::variable<bool> _showSavedMessagesInDrawer = true;
 	rpl::variable<bool> _showWalletInDrawer = true;
 	rpl::variable<bool> _showPluginsInDrawer = true;
+	rpl::variable<bool> _disableSendAnimation = false;
+	rpl::variable<bool> _disableDeleteAnimation = false;
 	rpl::variable<bool> _showLReadToggleInDrawer = false;
 	rpl::variable<bool> _showSReadToggleInDrawer = true;
 	rpl::variable<bool> _showNightModeToggleInDrawer = true;

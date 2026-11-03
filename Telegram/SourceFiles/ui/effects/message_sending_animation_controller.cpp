@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/effects/message_sending_animation_controller.h"
 
+#include "ayu/ayu_settings.h"
+
 #include "data/data_document.h"
 #include "data/data_session.h"
 #include "history/history_item.h"
@@ -467,7 +469,8 @@ void MessageSendingAnimationController::subscribeToDestructions() {
 
 void MessageSendingAnimationController::appendSending(
 		MessageSendingAnimationFrom from) {
-	if (anim::Disabled()) {
+	if (anim::Disabled()
+		|| AyuSettings::getInstance().disableSendAnimation()) {
 		return;
 	}
 	if (from.localId) {
@@ -480,7 +483,8 @@ auto MessageSendingAnimationController::startAnimation(
 		bool textFlightOnly)
 -> std::optional<MessageSendingReveal> {
 	if (anim::Disabled()
-		|| PowerSaving::On(PowerSaving::Flag::kChatEffects)) {
+		|| PowerSaving::On(PowerSaving::Flag::kChatEffects)
+		|| AyuSettings::getInstance().disableSendAnimation()) {
 		dropPendingSnapshot(target.view()->data());
 		return std::nullopt;
 	}
