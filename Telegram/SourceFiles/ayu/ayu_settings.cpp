@@ -909,6 +909,15 @@ void AyuSettings::setDisableDeleteAnimation(bool val) {
 	save();
 }
 
+void AyuSettings::setSmoothScroll(bool val) {
+	if (_smoothScroll.current() == val) {
+		return;
+	}
+	_smoothScroll = val;
+	AyuUiSettings::setSmoothScroll(val);
+	save();
+}
+
 void AyuSettings::setShowWalletInDrawer(bool val) {
 	if (_showWalletInDrawer.current() == val) {
 		return;
@@ -1342,6 +1351,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"showPluginsInDrawer", s._showPluginsInDrawer.current()},
 		{"disableSendAnimation", s._disableSendAnimation.current()},
 		{"disableDeleteAnimation", s._disableDeleteAnimation.current()},
+		{"smoothScroll", s._smoothScroll.current()},
 		{"showLReadToggleInDrawer", s._showLReadToggleInDrawer.current()},
 		{"showSReadToggleInDrawer", s._showSReadToggleInDrawer.current()},
 		{"showNightModeToggleInDrawer", s._showNightModeToggleInDrawer.current()},
@@ -1454,6 +1464,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._showPluginsInDrawer = j.value("showPluginsInDrawer", defaults._showPluginsInDrawer.current());
 	s._disableSendAnimation = j.value("disableSendAnimation", defaults._disableSendAnimation.current());
 	s._disableDeleteAnimation = j.value("disableDeleteAnimation", defaults._disableDeleteAnimation.current());
+	s._smoothScroll = j.value("smoothScroll", defaults._smoothScroll.current());
 	s._showLReadToggleInDrawer = j.value("showLReadToggleInDrawer", defaults._showLReadToggleInDrawer.current());
 	s._showSReadToggleInDrawer = j.value("showSReadToggleInDrawer", defaults._showSReadToggleInDrawer.current());
 	s._showNightModeToggleInDrawer = j.value("showNightModeToggleInDrawer", defaults._showNightModeToggleInDrawer.current());

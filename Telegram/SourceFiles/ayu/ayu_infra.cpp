@@ -46,6 +46,7 @@ void initUiSettings() {
 	AyuUiSettings::setWideMultiplier(settings.wideMultiplier());
 	AyuUiSettings::setMaterialSwitches(settings.materialSwitches());
 	AyuUiSettings::setAvatarCorners(settings.avatarCorners());
+	AyuUiSettings::setSmoothScroll(settings.smoothScroll());
 	Ui::SetAppliedBubbleRadius(settings.messageBubbleRadius());
 }
 
