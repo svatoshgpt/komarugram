@@ -280,9 +280,7 @@ Write the delegated prompt first. Require a final reply containing only
 status, artifact paths, touched paths, and blocker. On Claude Code, run each
 leaf as a synchronous foreground call and validate its artifacts when the call
 returns; run independent leaves of one step as parallel calls in a single
-message. On Grok Build, follow `.grok/ai-workflow-adapter.md`: blocking
-`spawn_subagent` leaves from a top-level performer, same-session checklists
-from a `/continue` child. On Codex, follow
+message. On Codex, follow
 [child completion and recovery](../../../shared/codex-delegation.md). Keep
 waiting in the performer turn until each child returns or recovery reaches a
 hard stop, then validate the phase artifacts. Never end the turn with a
@@ -714,7 +712,7 @@ exactly `[ai] ` only when every retained change in that commit, and the commit's
 purpose, are exclusively about the AI workflow: the agent harness, skills,
 prompts, custom commands, agent documentation, or AI testing infrastructure.
 Typical qualifying paths include `Telegram/SourceFiles/test/`, `.agents/`,
-`.claude/`, `.grok/`, `AGENTS.md`, `CLAUDE.md`, and `GROK.md`, but paths alone
+`.claude/`, `AGENTS.md`, and `CLAUDE.md`, but paths alone
 do not decide the prefix. Product-specific test seams, app code, and build-system
 integration do not qualify merely because agents use them for verification.
 Split mixed workflow and product work into separate implementation commits when
