@@ -1,0 +1,17 @@
+[package]
+name = "komaru_core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Native parts of KomaruGram written in Rust"
+
+# No dependencies on purpose: the crate builds offline in seconds and talks
+# to the sqlite3.c that the client already compiles.
+
+[lib]
+crate-type = ["staticlib"]
+
+[profile.release]
+opt-level = "s"
+codegen-units = 1
+debug = false

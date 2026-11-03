@@ -77,3 +77,6 @@ settings.local.json
 
 # Project specific
 Telegram/SourceFiles/_other/packer_private.h
+
+# cargo, when run by hand in Telegram/rust
+Telegram/rust/**/target/
