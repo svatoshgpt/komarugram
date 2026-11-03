@@ -501,7 +501,7 @@ void RunPluginRequest(const QJsonObject &message) {
 	auto reply = QJsonObject();
 	reply.insert(u"request"_q, requestId);
 	reply.insert(u"account"_q, accountIndex);
-	const auto fail = [=](int code, const QString &type) mutable {
+	const auto fail = [=](int code, const QString &type) {
 		auto result = reply;
 		result.insert(u"ok"_q, false);
 		result.insert(u"code"_q, code);
