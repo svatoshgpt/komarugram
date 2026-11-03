@@ -267,10 +267,6 @@ prompts, plus the host-specific orchestration rules.
   with the parent's concrete justification that the phase has no complexity.
   Apply the host mapping, including Claude's `opus` pin for `medium` or
   justified `high` work.
-- On Claude Code, assessment, every review and the convergence and
-  campaign-cap assessments run as Codex CLI leaves unless the invocation opted
-  out; see the Claude adapter's review and assessment provider. Prompts,
-  artifacts, completion checks and verdict handling are unchanged.
 - Keep implementation units sequential unless the assessed plan proves
   disjoint write sets and capacity makes parallel edits safe.
 - Never duplicate the performer or an implementation unit with uncertain
@@ -280,8 +276,7 @@ Write the delegated prompt first. Require a final reply containing only
 status, artifact paths, touched paths, and blocker. On Claude Code, run each
 leaf as a synchronous foreground call and validate its artifacts when the call
 returns; run independent leaves of one step as parallel calls in a single
-message. On Codex, follow
-[child completion and recovery](../../../shared/codex-delegation.md). Keep
+message. Keep
 waiting in the performer turn until each child returns or recovery reaches a
 hard stop, then validate the phase artifacts. Never end the turn with a
 progress-only result while children or commands are pending. On any host,

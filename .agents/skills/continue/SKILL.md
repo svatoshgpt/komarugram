@@ -1,17 +1,12 @@
 ---
 name: continue
-description: Continue autonomous Telegram Desktop development from the shared ai-tdesktop repository. Use when the user invokes $continue or /continue with a batch specification (named tasks, projects, a described theme, the active task, the inbox, or explicitly all pending tasks), or asks Codex to work through a specified part of the AI queue. Resumes this checkout's active task first, freezes exactly the specified batch, includes and consolidates follow-ups discovered from it, and defers everything else; without a specification it only reports the queue and asks for one.
+description: Continue autonomous Telegram Desktop development from the shared ai-tdesktop repository. Use when the user invokes $continue or /continue with a batch specification (named tasks, projects, a described theme, the active task, the inbox, or explicitly all pending tasks), or asks the agent to work through a specified part of the AI queue. Resumes this checkout's active task first, freezes exactly the specified batch, includes and consolidates follow-ups discovered from it, and defers everything else; without a specification it only reports the queue and asks for one.
 ---
 
 # Continue AI Work
 
 Before assigning workers, read [phase effort](../../shared/phase-effort.md)
-and apply its scope-based effort selection and host mappings. On Codex, also
-read [child completion and recovery](../../shared/codex-delegation.md) and
-apply it to every worker below, including inbox, split, routing, and
-consolidation workers. Include that reference in each publication-owning or
-orchestrating child prompt, even when it must not delegate. Only disposable
-phase leaves receive the phase final-reply contract instead.
+and apply its scope-based effort selection and host mappings.
 
 Act as the checkout-level scheduler. Choose one invocation mode at startup,
 freeze its task batch, and keep looping only through that batch and follow-ups
@@ -123,9 +118,8 @@ select:
   waiting on dependencies. Blocked tasks are not pending.
 
 This checkout's blocked and legacy-reserved tasks join only when the
-specification selects them, by name or by a description they match. A Codex
-opt-out such as "no codex" is not a specification, and neither is a purely
-procedural argument.
+specification selects them, by name or by a description they match. A purely
+procedural argument is not a specification.
 
 Without a specification, stop after the read-only `queue` call, before
 publishing leftovers, recovering consolidations, routing a split, or touching

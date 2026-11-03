@@ -27,9 +27,7 @@ This file adapts harness mechanics and removes unnecessary text normalization.
   returning is the completion signal: validate the required files and
   repository state right there, treating the short reply as notification
   only. Do not use background Agent calls plus shell `sleep`/`until` polling
-  loops for phase leaves — the Codex wait ladder, heartbeat-mtime checks, and
-  five-minute stall windows in the shared references are Codex-only mechanics
-  and do not apply in Claude Code. Leaves still write their progress files
+  loops for phase leaves. Leaves still write their progress files
   (they are cheap resumability evidence), but the performer never polls them.
 - A leaf's return value IS its report. Never tell a leaf to send its findings
   back through `SendMessage`, and never wait on one to do so. A leaf has no
@@ -46,8 +44,7 @@ This file adapts harness mechanics and removes unnecessary text normalization.
 - Run independent leaves that truly share one step — the surviving specialist
   reviews in an iteration, or assessed-disjoint implementation units — as
   parallel Agent calls in a single message so they run concurrently and all
-  return together. Reviews and assessments use Codex leaves instead unless
-  the invocation opted out; see the review and assessment provider below. The mandatory general reviewer is not one of them: it runs
+  return together. The mandatory general reviewer is not one of them: it runs
   alone before them to emit the retirement list, and alone again after their
   reports exist to own the verdict.
 - A long Debug build may run as background Bash; the harness re-invokes the
@@ -79,50 +76,15 @@ This file adapts harness mechanics and removes unnecessary text normalization.
   leaf rules (no delegation, no commits, progress and reply contracts); an
   adapter read there is wasted context.
 
-## Review and assessment provider
+## Reviews and assessments
 
-In Claude Code, `perform-task` runs its independent reviews and assessments
-as Codex CLI leaves by default, under
-[Codex CLI leaves](../.agents/shared/codex-cli-leaves.md). The performer reads
-that contract completely before its first Codex leaf. These phases use Codex:
-
-- Phase 3 plan assessment;
-- the Phase 6 initial general review, all five standard lenses, any named
-  domain specialist, every focused general re-review and every rerun
-  specialist; the general reviewer's synthesis pass resumes its own pass-1
-  Codex leaf;
-- the review convergence assessment and the evidence-campaign-cap
-  assessment.
-
-Everything else stays on Claude `Agent` leaves: context and plan, visual
-design, implementation units, builds, review fixes, evidence authoring, test
-runs and failure diagnosis. The phase prompts, artifacts, completion checks,
-carry-forward rules and verdict handling are the same for both providers.
-
-The provider is one of:
-
-- `codex`, the default: Codex leaves in the `work` Codex home,
-  `~/.codex-accounts/work`;
-- `codex-default`: Codex leaves in the user's default Codex home, `~/.codex`,
-  for a user who asks for it — for example "use codex-default for review".
-  Pass `--home default` to `codex_leaf.py check` and every `start`;
-- `native`: Claude `Agent` leaves exactly as before, for a user who asks
-  `perform-task` or `continue` not to use Codex — for example "use your model
-  for review", "no codex" or "Claude-only reviews".
-
-A `continue` scheduler passes `Review provider: codex`, `Review provider:
-codex-default` or `Review provider: native` in every performer prompt, and the
-performer follows that line. When `codex_leaf.py check` fails, the performer
-uses `native` for the invocation and records why; it never switches between
-the two Codex homes on its own. Other Claude Code commands that run Codex
-leaves, such as `cross-review` and `code-health`, use the `work` home unless
-their arguments ask for `codex-default`.
-
-A Codex leaf is not an `Agent` call. Start the leaves of one step back to back
-with `codex_leaf.py start`, then block on them with foreground
-`codex_leaf.py wait` calls until it exits 0. That blocking wait is the
-sanctioned completion signal for these leaves, not an artifact poll. Record
-the provider and effort of each Codex phase in its result `NOTES:`.
+Every review and assessment runs as a fresh Claude `Agent` leaf, like every
+other phase: Phase 3 plan assessment, the Phase 6 general review and its
+lenses, focused re-reviews, the general reviewer's synthesis pass (resume the
+pass-1 agent through `SendMessage` when its id is available, otherwise a fresh
+leaf given the pass-1 report) and the convergence and campaign-cap
+assessments. A reviewer is independent because it starts blind: it gets only
+its prompt, never the performer's reasoning or another reviewer's report.
 
 ## Model self-reporting
 
@@ -187,8 +149,8 @@ shared skill, so do not restate or weaken that routing rule in a leaf prompt.
 
 ## UI-driver capability
 
-The shared Computer Use reference describes Codex's driver. In Claude Code,
-treat that particular driver as unavailable unless an equivalent UI-driver
+In Claude Code, treat the Computer Use driver of the shared reference as
+unavailable unless an equivalent UI-driver
 tool is actually exposed in the current session. Preserve the same policy:
 `auto` uses the already planned overlay fallback, while `required` reports the
 exact unverified interaction. Driver availability never permits skipping the
