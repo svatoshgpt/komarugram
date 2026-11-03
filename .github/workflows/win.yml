@@ -258,6 +258,18 @@ jobs:
               f.write('static const char *AlphaPrivateKey = "";\n')
           EOF
 
+      # Telegram/rust/komaru_core. The runner has rustup with the x64 MSVC
+      # toolchain; the 32-bit build needs its target too.
+      - name: Rust toolchain.
+        if: env.ONLY_CACHE == 'false'
+        shell: bash
+        run: |
+          if [ "${{ matrix.arch }}" = "x64_x86" ]; then
+            rustup target add i686-pc-windows-msvc
+          fi
+          rustc --version
+          cargo --version
+
       - name: KomaruGram build.
         if: env.ONLY_CACHE == 'false'
         run: |
@@ -460,14 +472,22 @@ jobs:
               f.write('static const char *AlphaPrivateKey = "";\n')
           EOF
 
+      # The image has no Rust: the runner's rustup is mounted instead.
       - name: KomaruGram build.
         run: |
+          rustc --version
           docker run --rm \
           -u $(id -u) \
           -v $PWD:/usr/src/tdesktop \
+          -v $HOME/.cargo:/opt/cargo \
+          -v $HOME/.rustup:/opt/rustup \
+          -e CARGO_HOME=/opt/cargo \
+          -e RUSTUP_HOME=/opt/rustup \
           -w /usr/src/tdesktop \
           $IMAGE_TAG \
           /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+          -D Rust_COMPILER=/opt/cargo/bin/rustc \
+          -D Rust_CARGO=/opt/cargo/bin/cargo \
           -D CMAKE_CONFIGURATION_TYPES=Release \
           -D CMAKE_INSTALL_PREFIX="/usr" \
           -D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} \

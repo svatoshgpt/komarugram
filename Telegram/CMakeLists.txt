@@ -46,6 +46,7 @@ include(cmake/td_ui.cmake)
 include(cmake/td_webauthn.cmake)
 include(cmake/telegram_apple_swift_runtime.cmake)
 include(cmake/generate_appstream_changelog.cmake)
+include(cmake/komaru_core.cmake)
 
 if (DESKTOP_APP_TEST_APPS)
     include(cmake/tests.cmake)
@@ -228,7 +229,6 @@ set(ayugram_files
         ayu/libs/json_ext.hpp
         ayu/libs/sqlite/sqlite3.c
         ayu/libs/sqlite/sqlite3.h
-        ayu/libs/sqlite/sqlite_orm.h
         ayu/features/streamer_mode/platform/linux/streamer_mode_linux.cpp
         ayu/features/streamer_mode/platform/linux/streamer_mode_linux.h
         ayu/features/streamer_mode/platform/mac/streamer_mode_mac.mm
