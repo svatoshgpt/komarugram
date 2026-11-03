@@ -39,20 +39,21 @@ jobs:
         shell: cmd
 
     steps:
-      - name: Prepare directories.
-        # C: has about 30 GB free and D: about 150 GB. The build keeps its
-        # C: path, which the cached libraries were made with, through a
-        # junction to D:.
-        run: |
-          mkdir D:\TBuild
-          mklink /J %userprofile%\TBuild D:\TBuild
-          mkdir %userprofile%\TBuild\Libraries
-          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
-          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
-
       - name: Get repository name.
         shell: bash
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+
+      - name: Prepare directories.
+        # C: has about 30 GB free and D: about 150 GB. Libraries stay on C:
+        # for real: prepare.py keys them by their resolved path, so moving
+        # them would rebuild all of them. The sources and the build output
+        # go to D: through a junction.
+        run: |
+          mkdir %userprofile%\TBuild\Libraries
+          mkdir D:\%REPO_NAME%
+          mklink /J %userprofile%\TBuild\%REPO_NAME% D:\%REPO_NAME%
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
 
       - name: Configure git auth for private repo.
         shell: bash
