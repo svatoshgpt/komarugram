@@ -219,15 +219,17 @@ jobs:
             ${{ runner.OS }}-${{ matrix.arch }}-build-
 
       # Telegram/rust/komaru_tools: the helpers the steps below call.
+      # Not bash: Git's /usr/bin/link would stand in for MSVC's link.exe.
       - name: KomaruGram tools.
         if: env.ONLY_CACHE == 'false'
-        shell: bash
+        shell: pwsh
         run: |
-          cd "$TBUILD/$REPO_NAME"
-          cargo build -q --release --locked \
-            --manifest-path Telegram/rust/komaru_tools/Cargo.toml \
-            --target-dir "$RUNNER_TEMP/komaru_tools"
-          echo "KOMARU=$RUNNER_TEMP/komaru_tools/release/komaru" >> $GITHUB_ENV
+          $target = "$env:RUNNER_TEMP/komaru_tools" -replace '\\', '/'
+          cargo build -q --release --locked `
+            --manifest-path "$env:TBUILD/$env:REPO_NAME/Telegram/rust/komaru_tools/Cargo.toml" `
+            --target-dir $target
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          "KOMARU=$target/release/komaru.exe" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       # Checkout gives every file a new date, so MSBuild rebuilt everything
       # despite the cached objects. Files unchanged since the cached build
