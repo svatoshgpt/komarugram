@@ -40,65 +40,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Data {
 namespace {
 
-constexpr auto kPremiumToastDuration = 3 * crl::time(1000);
-
 using SetFlag = StickersSetFlag;
-
-[[nodiscard]] TextWithEntities SavedGifsToast(
-		const Data::PremiumLimits &limits) {
-	const auto defaultLimit = limits.gifsDefault();
-	const auto premiumLimit = limits.gifsPremium();
-	return tr::bold(
-		tr::lng_saved_gif_limit_title(tr::now, lt_count, defaultLimit)
-	).append('\n').append(
-		tr::lng_saved_gif_limit_more(
-			tr::now,
-			lt_count,
-			premiumLimit,
-			lt_link,
-			tr::link(tr::lng_saved_gif_limit_link(tr::now)),
-			tr::marked));
-}
-
-[[nodiscard]] TextWithEntities FaveStickersToast(
-		const Data::PremiumLimits &limits) {
-	const auto defaultLimit = limits.stickersFavedDefault();
-	const auto premiumLimit = limits.stickersFavedPremium();
-	return tr::bold(
-		tr::lng_fave_sticker_limit_title(tr::now, lt_count, defaultLimit)
-	).append('\n').append(
-		tr::lng_fave_sticker_limit_more(
-			tr::now,
-			lt_count,
-			premiumLimit,
-			lt_link,
-			tr::link(tr::lng_fave_sticker_limit_link(tr::now)),
-			tr::marked));
-}
-
-void MaybeShowPremiumToast(
-		std::shared_ptr<ChatHelpers::Show> show,
-		TextWithEntities text,
-		const QString &ref) {
-	if (!show) {
-		return;
-	}
-	const auto session = &show->session();
-	if (session->user()->isPremium()) {
-		return;
-	}
-	const auto filter = [=](const auto ...) {
-		if (const auto controller = show->resolveWindow()) {
-			Settings::ShowPremium(controller, ref);
-		}
-		return false;
-	};
-	show->showToast({
-		.text = std::move(text),
-		.filter = filter,
-		.duration = kPremiumToastDuration,
-	});
-}
 
 void RemoveFromSet(
 		StickersSets &sets,
@@ -327,15 +269,9 @@ void Stickers::addSavedGif(
 		_savedGifs.remove(index);
 	}
 	_savedGifs.push_front(document);
+	// KomaruGram: no limit. The server keeps only its own number, the
+	// rest stays here (see gifsReceived).
 	const auto session = &document->session();
-	const auto limits = Data::PremiumLimits(session);
-	if (_savedGifs.size() > limits.gifsCurrent()) {
-		_savedGifs.pop_back();
-		MaybeShowPremiumToast(
-			show,
-			SavedGifsToast(limits),
-			LimitsPremiumRef("saved_gifs"));
-	}
 	session->local().writeSavedGifs();
 
 	notifySavedGifsUpdated();
@@ -522,28 +458,8 @@ bool Stickers::isFaved(not_null<const DocumentData*> document) const {
 void Stickers::checkFavedLimit(
 		StickersSet &set,
 		std::shared_ptr<ChatHelpers::Show> show) {
-	const auto session = &_owner->session();
-	const auto limits = Data::PremiumLimits(session);
-	if (set.stickers.size() <= limits.stickersFavedCurrent()) {
-		return;
-	}
-	auto removing = set.stickers.back();
-	set.stickers.pop_back();
-	for (auto i = set.emoji.begin(); i != set.emoji.end();) {
-		auto index = i->second.indexOf(removing);
-		if (index >= 0) {
-			i->second.removeAt(index);
-			if (i->second.empty()) {
-				i = set.emoji.erase(i);
-				continue;
-			}
-		}
-		++i;
-	}
-	MaybeShowPremiumToast(
-		std::move(show),
-		FaveStickersToast(limits),
-		LimitsPremiumRef("stickers_faved"));
+	// KomaruGram: no limit. The server keeps only its own number, the
+	// rest stays here (see specialSetReceived).
 }
 
 void Stickers::pushFavedToFront(
@@ -851,7 +767,17 @@ void Stickers::specialSetReceived(
 	auto &sets = setsRef();
 	auto it = sets.find(setId);
 
-	if (items.isEmpty()) {
+	// KomaruGram: faved stickers over the server limit live only here.
+	auto localFaved = StickersPack();
+	auto localFavedEmoji = base::flat_map<EmojiPtr, StickersPack>();
+	if (setId == FavedSetId && it != sets.cend()) {
+		localFaved = it->second->stickers;
+		for (const auto &[emoji, list] : it->second->emoji) {
+			localFavedEmoji.emplace(emoji, list);
+		}
+	}
+
+	if (items.isEmpty() && localFaved.isEmpty()) {
 		if (it != sets.cend()) {
 			sets.erase(it);
 		}
@@ -906,6 +832,13 @@ void Stickers::specialSetReceived(
 			sets.erase(customIt);
 			customIt = sets.end();
 		}
+		auto kept = StickersPack();
+		for (const auto &document : localFaved) {
+			if (!pack.contains(document)) {
+				pack.push_back(document);
+				kept.push_back(document);
+			}
+		}
 
 		auto writeRecent = false;
 		auto &recent = getRecentPack();
@@ -922,6 +855,13 @@ void Stickers::specialSetReceived(
 			sets.erase(it);
 		} else {
 			setPackAndEmoji(*set, std::move(pack), std::move(dates), packs);
+			for (const auto &[emoji, list] : localFavedEmoji) {
+				for (const auto &document : list) {
+					if (kept.contains(document)) {
+						set->emoji[emoji].push_back(document);
+					}
+				}
+			}
 		}
 
 		if (writeRecent) {
@@ -1129,7 +1069,8 @@ void Stickers::featuredReceived(
 
 void Stickers::gifsReceived(const QVector<MTPDocument> &items, uint64 hash) {
 	auto &saved = savedGifsRef();
-	saved.clear();
+	// KomaruGram: GIFs over the server limit live only here.
+	const auto local = base::take(saved);
 
 	saved.reserve(items.size());
 	for (const auto &item : items) {
@@ -1141,6 +1082,11 @@ void Stickers::gifsReceived(const QVector<MTPDocument> &items, uint64 hash) {
 		}
 
 		saved.push_back(document);
+	}
+	for (const auto &document : local) {
+		if (!saved.contains(document)) {
+			saved.push_back(document);
+		}
 	}
 	const auto counted = Api::CountSavedGifsHash(&session());
 	if (counted != hash) {
