@@ -1192,15 +1192,14 @@ jobs:
 
       - name: First set up.
         run: |
-          # The template only needs Jinja2: the distro package replaces
-          # the curl-piped poetry installer linux.yml uses, so no code
-          # from an unpinned URL runs in a job that later signs.
-          sudo apt update
-          sudo apt install -y python3-jinja2
-          cd Telegram/build/docker/centos_env
-          DOCKERFILE=$(DEBUG= python3 gen_dockerfile.py)
-          echo "$DOCKERFILE" > Dockerfile
-          rm -rf __pycache__
+          # komaru_tools builds from the locked crates, so no code from an
+          # unpinned URL runs in a job that later signs.
+          T=Telegram/build/docker/centos_env
+          DOCKERFILE=$(DEBUG= cargo run -q --release --locked \
+            --manifest-path Telegram/rust/komaru_tools/Cargo.toml \
+            --target-dir "$RUNNER_TEMP/komaru_tools" -- \
+            ci dockerfile --template $T/Dockerfile)
+          echo "$DOCKERFILE" > $T/Dockerfile
 
       - name: Free up some disk space.
         uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be

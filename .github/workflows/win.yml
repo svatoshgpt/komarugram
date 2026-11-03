@@ -397,11 +397,12 @@ jobs:
 
       - name: Prepare Dockerfile.
         run: |
-          python3 -m venv "$RUNNER_TEMP/dockerfile-generator"
-          "$RUNNER_TEMP/dockerfile-generator/bin/python" -m pip install Jinja2==3.1.6
-          cd Telegram/build/docker/centos_env
-          DEBUG= LTO= "$RUNNER_TEMP/dockerfile-generator/bin/python" gen_dockerfile.py > Dockerfile.generated
-          grep -q '^FROM ' Dockerfile.generated
+          T=Telegram/build/docker/centos_env
+          DEBUG= LTO= cargo run -q --release --locked \
+            --manifest-path Telegram/rust/komaru_tools/Cargo.toml \
+            --target-dir "$RUNNER_TEMP/komaru_tools" -- \
+            ci dockerfile --template $T/Dockerfile > $T/Dockerfile.generated
+          grep -q '^FROM ' $T/Dockerfile.generated
 
       - name: Set up Docker Buildx.
         uses: docker/setup-buildx-action@v3

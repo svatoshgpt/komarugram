@@ -58,7 +58,7 @@ KOMARU=Telegram/rust/komaru_tools/target/release/komaru
    build as AGENTS.md describes and prove the build per its rules; fix a
    broken build before the next round. Snapshot the next round, then check
    the comment rules over that snapshot with
-   `GIT_INDEX_FILE=SESSION/index python3 tools/rules/hook.py --staged`.
+   `GIT_INDEX_FILE=SESSION/index sh tools/rules/hook.sh --staged`.
 7. Apply the protocol's stop conditions, then start the next round's focused
    reviewers or finish.
 
