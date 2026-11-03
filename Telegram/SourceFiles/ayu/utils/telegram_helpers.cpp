@@ -251,6 +251,9 @@ Fn<void()> badgeClickHandler(
 		const auto badge = source
 			? source->clickedContent()
 			: ComputeExteraBadgeContent(peer);
+		if (badge.badge == Info::Profile::BadgeType::None) {
+			return;
+		}
 		const auto isCustomBadge = isCustomBadgePeer(getBareID(peer));
 		const auto isExtera = isExteraPeer(getBareID(peer));
 		const auto isSupporter = isSupporterPeer(getBareID(peer));
