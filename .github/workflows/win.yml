@@ -60,15 +60,18 @@ jobs:
           submodules: recursive
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
 
-      # C: has about 30 GB free and D: about 150 GB, so the build output
-      # goes to D:. The sources and libraries must stay on C: for real:
-      # prepare.py finds its root from the resolved path of its own script
-      # and keys every library by resolved paths, so moving them rebuilds
-      # all the libraries for hours.
-      - name: Build output on D:.
+      # Everything has to stay on C: for real: prepare.py finds its root
+      # from the resolved path of its own script and keys every library by
+      # resolved paths, and tar replaces a junction with a plain folder when
+      # it restores the build cache. C: lacks room for the libraries and the
+      # build together, so the Android SDK (over 10 GB, unused) goes.
+      - name: Free disk space on C:.
+        shell: pwsh
         run: |
-          mkdir D:\out
-          mklink /J %TBUILD%\%REPO_NAME%\out D:\out
+          $before = (Get-PSDrive C).Free / 1GB
+          cmd /c "rmdir /s /q C:\Android" 2>$null
+          $after = (Get-PSDrive C).Free / 1GB
+          "C: free: {0:N1} GB -> {1:N1} GB" -f $before, $after
 
       - name: First set up.
         shell: bash
