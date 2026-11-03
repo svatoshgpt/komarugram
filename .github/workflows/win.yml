@@ -64,13 +64,41 @@ jobs:
       # from the resolved path of its own script and keys every library by
       # resolved paths, and tar replaces a junction with a plain folder when
       # it restores the build cache. C: lacks room for the libraries and the
-      # build together, so the Android SDK (over 10 GB, unused) goes.
+      # build together, so big preinstalled tools the build never uses go,
+      # all at once.
       - name: Free disk space on C:.
         shell: pwsh
         run: |
           $before = (Get-PSDrive C).Free / 1GB
-          cmd /c "rmdir /s /q C:\Android" 2>$null
+          $paths = @(
+            'C:\Android',
+            'C:\Program Files (x86)\Android',
+            'C:\ghcup',
+            'C:\Program Files\MongoDB',
+            'C:\Program Files\Microsoft SQL Server',
+            'C:\Program Files\PostgreSQL',
+            'C:\Program Files\R',
+            'C:\rtools45',
+            'C:\rtools44',
+            'C:\Strawberry',
+            'C:\Julia',
+            'C:\Miniconda',
+            'C:\SeleniumWebDrivers',
+            'C:\Program Files\Google\Chrome',
+            'C:\Program Files\Mozilla Firefox',
+            'C:\hostedtoolcache\windows\go',
+            'C:\hostedtoolcache\windows\PyPy',
+            'C:\hostedtoolcache\windows\Ruby',
+            'C:\hostedtoolcache\windows\node',
+            'C:\hostedtoolcache\windows\CodeQL',
+            'C:\hostedtoolcache\windows\stack'
+          ) | Where-Object { Test-Path $_ }
+          $jobs = $paths | ForEach-Object {
+            Start-Process cmd -ArgumentList '/c', "rmdir /s /q `"$_`"" -NoNewWindow -PassThru
+          }
+          $jobs | Wait-Process -Timeout 600 -ErrorAction SilentlyContinue
           $after = (Get-PSDrive C).Free / 1GB
+          "Removed: $($paths -join ', ')"
           "C: free: {0:N1} GB -> {1:N1} GB" -f $before, $after
 
       - name: First set up.
