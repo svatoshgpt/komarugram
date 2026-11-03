@@ -26,7 +26,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, x64_x86]
+        # Test builds need only x64; releases ship x86 as well.
+        arch: ${{ fromJSON((startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')) && '["x64", "x64_x86"]' || '["x64"]') }}
 
     env:
       UPLOAD_ARTIFACT: "true"
@@ -181,6 +182,50 @@ jobs:
             ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-
             ${{ runner.OS }}-${{ matrix.arch }}-build-
 
+      # Checkout gives every file a new date, so MSBuild rebuilt everything
+      # despite the cached objects. Files unchanged since the cached build
+      # get an old date and only the changed ones are compiled again.
+      - name: Keep file dates for the cached build.
+        if: env.ONLY_CACHE == 'false' && steps.cache-build.outputs.cache-matched-key != ''
+        shell: bash
+        env:
+          MATCHED: ${{ steps.cache-build.outputs.cache-matched-key }}
+        run: |
+          cd "$TBUILD/$REPO_NAME"
+          OLD="${MATCHED##*-}"
+          if [ "${#OLD}" != 40 ] || [ "$OLD" = "$GITHUB_SHA" ]; then
+            echo "Cache from $OLD, nothing to compare"
+            exit 0
+          fi
+          if ! git fetch -q --depth=1 origin "$OLD"; then
+            echo "::warning::Commit $OLD of the cached build is gone, full rebuild"
+            exit 0
+          fi
+          git diff --name-only "$OLD" HEAD > "$RUNNER_TEMP/changed.txt"
+          echo "Changed since the cached build: $(wc -l < "$RUNNER_TEMP/changed.txt") paths"
+          git ls-files --recurse-submodules > "$RUNNER_TEMP/tracked.txt"
+          python - "$RUNNER_TEMP/tracked.txt" "$RUNNER_TEMP/changed.txt" <<'EOF'
+          import os, sys, time
+          old = time.mktime((2020, 1, 1, 0, 0, 0, 0, 0, -1))
+          tracked = open(sys.argv[1], encoding='utf-8').read().splitlines()
+          changed = open(sys.argv[2], encoding='utf-8').read().splitlines()
+          for path in tracked:
+              try:
+                  os.utime(path, (old, old))
+              except OSError:
+                  pass
+          now = time.time()
+          for path in changed:
+              # A submodule path changes as a whole when its commit moves.
+              if os.path.isdir(path):
+                  for root, _, files in os.walk(path):
+                      for name in files:
+                          os.utime(os.path.join(root, name), (now, now))
+              elif os.path.exists(path):
+                  os.utime(path, (now, now))
+          print("dated %d files" % len(tracked))
+          EOF
+
       - name: Update signing setup.
         if: env.ONLY_CACHE == 'false'
         shell: bash
@@ -228,7 +273,7 @@ jobs:
           -D KOMARUGRAM_BUILD_PACKER=%BUILD_PACKER% ^
           %TDESKTOP_BUILD_DEFINE%
 
-          cmake --build ..\out --config MinSizeRel --parallel 1 -- /p:CL_MPCount=3 /p:UseMultiToolTask=true /p:EnforceProcessCountAcrossBuilds=true
+          cmake --build ..\out --config MinSizeRel --parallel 1 -- /p:CL_MPCount=4 /p:UseMultiToolTask=true /p:EnforceProcessCountAcrossBuilds=true
 
       - name: Pack update.
         if: env.ONLY_CACHE == 'false' && env.BUILD_PACKER == 'ON'
@@ -318,6 +363,8 @@ jobs:
 
   linux:
     name: Linux
+    # Releases only: test builds are Windows x64.
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     runs-on: ubuntu-latest
     env:
       IMAGE_TAG: komarugram:build
