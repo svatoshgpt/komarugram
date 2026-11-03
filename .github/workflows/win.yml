@@ -218,6 +218,17 @@ jobs:
             ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-
             ${{ runner.OS }}-${{ matrix.arch }}-build-
 
+      # Telegram/rust/komaru_tools: the helpers the steps below call.
+      - name: KomaruGram tools.
+        if: env.ONLY_CACHE == 'false'
+        shell: bash
+        run: |
+          cd "$TBUILD/$REPO_NAME"
+          cargo build -q --release --locked \
+            --manifest-path Telegram/rust/komaru_tools/Cargo.toml \
+            --target-dir "$RUNNER_TEMP/komaru_tools"
+          echo "KOMARU=$RUNNER_TEMP/komaru_tools/release/komaru" >> $GITHUB_ENV
+
       # Checkout gives every file a new date, so MSBuild rebuilt everything
       # despite the cached objects. Files unchanged since the cached build
       # get an old date and only the changed ones are compiled again.
@@ -227,40 +238,7 @@ jobs:
         env:
           MATCHED: ${{ steps.cache-build.outputs.cache-matched-key }}
         run: |
-          cd "$TBUILD/$REPO_NAME"
-          OLD="${MATCHED##*-}"
-          if [ "${#OLD}" != 40 ] || [ "$OLD" = "$GITHUB_SHA" ]; then
-            echo "Cache from $OLD, nothing to compare"
-            exit 0
-          fi
-          if ! git fetch -q --depth=1 origin "$OLD"; then
-            echo "::warning::Commit $OLD of the cached build is gone, full rebuild"
-            exit 0
-          fi
-          git diff --name-only "$OLD" HEAD > "$RUNNER_TEMP/changed.txt"
-          echo "Changed since the cached build: $(wc -l < "$RUNNER_TEMP/changed.txt") paths"
-          git ls-files --recurse-submodules > "$RUNNER_TEMP/tracked.txt"
-          python - "$RUNNER_TEMP/tracked.txt" "$RUNNER_TEMP/changed.txt" <<'EOF'
-          import os, sys, time
-          old = time.mktime((2020, 1, 1, 0, 0, 0, 0, 0, -1))
-          tracked = open(sys.argv[1], encoding='utf-8').read().splitlines()
-          changed = open(sys.argv[2], encoding='utf-8').read().splitlines()
-          for path in tracked:
-              try:
-                  os.utime(path, (old, old))
-              except OSError:
-                  pass
-          now = time.time()
-          for path in changed:
-              # A submodule path changes as a whole when its commit moves.
-              if os.path.isdir(path):
-                  for root, _, files in os.walk(path):
-                      for name in files:
-                          os.utime(os.path.join(root, name), (now, now))
-              elif os.path.exists(path):
-                  os.utime(path, (now, now))
-          print("dated %d files" % len(tracked))
-          EOF
+          "$KOMARU" ci keep-dates --repo "$TBUILD/$REPO_NAME" --old "${MATCHED##*-}"
 
       - name: Update signing setup.
         if: env.ONLY_CACHE == 'false'
@@ -280,19 +258,8 @@ jobs:
             exit 1
           fi
           echo "BUILD_PACKER=ON" >> $GITHUB_ENV
-          python - <<'EOF'
-          import json, os
-          key = os.environ['UPDATE_PRIVATE_KEY'].replace('\r\n', '\n').strip()
-          def lit(s):
-              return json.dumps(s + chr(10))
-          path = os.path.join(os.environ['TBUILD'], os.environ['REPO_NAME'],
-                              'Telegram', 'SourceFiles', '_other', 'packer_private.h')
-          with open(path, 'w', newline='\n') as f:
-              f.write('// Generated in CI from a secret. Never commit.\n')
-              f.write('const char *PrivateKey = ' + lit(key) + ';\n')
-              f.write('const char *PrivateBetaKey = "";\n')
-              f.write('static const char *AlphaPrivateKey = "";\n')
-          EOF
+          "$KOMARU" ci packer-key \
+            --out "$TBUILD/$REPO_NAME/Telegram/SourceFiles/_other/packer_private.h"
 
       # Telegram/rust/komaru_core. The runner has rustup with the x64 MSVC
       # toolchain; the 32-bit build needs its target too.
@@ -400,7 +367,7 @@ jobs:
 
           # Updater.exe must sit next to the client or updates cannot apply.
           ZIP="KomaruGram-$TAG-windows-$SUFFIX.zip"
-          python -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED); [z.write('artifact/'+n, n) for n in ('KomaruGram.exe','Updater.exe')]" "$ZIP"
+          (cd artifact && 7z a -tzip -mx=9 "../$ZIP" KomaruGram.exe Updater.exe >/dev/null)
 
           # Not marked latest yet: the update feed is served from the latest
           # release, so the feed job promotes it once current6 is in place.
@@ -495,18 +462,10 @@ jobs:
             exit 1
           fi
           echo "BUILD_PACKER=ON" >> $GITHUB_ENV
-          python3 - <<'EOF'
-          import json, os
-          key = os.environ['UPDATE_PRIVATE_KEY'].replace('\r\n', '\n').strip()
-          def lit(s):
-              return json.dumps(s + chr(10))
-          path = os.path.join('Telegram', 'SourceFiles', '_other', 'packer_private.h')
-          with open(path, 'w', newline='\n') as f:
-              f.write('// Generated in CI from a secret. Never commit.\n')
-              f.write('const char *PrivateKey = ' + lit(key) + ';\n')
-              f.write('const char *PrivateBetaKey = "";\n')
-              f.write('static const char *AlphaPrivateKey = "";\n')
-          EOF
+          cargo run -q --release --locked \
+            --manifest-path Telegram/rust/komaru_tools/Cargo.toml \
+            --target-dir "$RUNNER_TEMP/komaru_tools" -- \
+            ci packer-key --out Telegram/SourceFiles/_other/packer_private.h
 
       # The image has no Rust: the runner's rustup is mounted instead.
       - name: KomaruGram build.
@@ -566,7 +525,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           TAG="${RELEASE_TAG:-$GITHUB_REF_NAME}"
-          # Branch names like codex/foo would otherwise point into a folder.
+          # Branch names like claude/foo would otherwise point into a folder.
           TAG="${TAG//\//-}"
           mkdir -p dist
 
