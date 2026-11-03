@@ -329,6 +329,7 @@ public:
 	[[nodiscard]] bool showPluginsInDrawer() const { return _showPluginsInDrawer.current(); }
 	[[nodiscard]] bool disableSendAnimation() const { return _disableSendAnimation.current(); }
 	[[nodiscard]] bool disableDeleteAnimation() const { return _disableDeleteAnimation.current(); }
+	[[nodiscard]] bool smoothScroll() const { return _smoothScroll.current(); }
 	[[nodiscard]] bool showLReadToggleInDrawer() const { return _showLReadToggleInDrawer.current(); }
 	[[nodiscard]] bool showSReadToggleInDrawer() const { return _showSReadToggleInDrawer.current(); }
 	[[nodiscard]] bool showNightModeToggleInDrawer() const { return _showNightModeToggleInDrawer.current(); }
@@ -432,6 +433,7 @@ public:
 	void setShowPluginsInDrawer(bool val);
 	void setDisableSendAnimation(bool val);
 	void setDisableDeleteAnimation(bool val);
+	void setSmoothScroll(bool val);
 	void setShowLReadToggleInDrawer(bool val);
 	void setShowSReadToggleInDrawer(bool val);
 	void setShowNightModeToggleInDrawer(bool val);
@@ -713,6 +715,7 @@ private:
 	rpl::variable<bool> _showPluginsInDrawer = true;
 	rpl::variable<bool> _disableSendAnimation = false;
 	rpl::variable<bool> _disableDeleteAnimation = false;
+	rpl::variable<bool> _smoothScroll = true;
 	rpl::variable<bool> _showLReadToggleInDrawer = false;
 	rpl::variable<bool> _showSReadToggleInDrawer = true;
 	rpl::variable<bool> _showNightModeToggleInDrawer = true;

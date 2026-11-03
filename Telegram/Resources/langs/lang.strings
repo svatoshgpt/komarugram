@@ -9504,6 +9504,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_PluginsGetPython" = "Download Python";
 "ayu_DisableSendAnimation" = "Disable message sending animation";
 "ayu_DisableDeleteAnimation" = "Disable message deletion animation";
+"ayu_SmoothScroll" = "Smooth scrolling";
 "ayu_PluginsEnableAll" = "Enable plugins";
 "ayu_PluginsAllOff" = "Plugins are off and do not run at all. Your choice for each plugin stays.";
 "ayu_PluginsOpenScreen" = "All plugins";
