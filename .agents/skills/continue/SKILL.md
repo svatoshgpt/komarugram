@@ -5,9 +5,6 @@ description: Continue autonomous Telegram Desktop development from the shared ai
 
 # Continue AI Work
 
-When running in Grok Build, read `.grok/ai-workflow-adapter.md` completely
-before any other host-specific delegation rule and apply its substitutions.
-
 Before assigning workers, read [phase effort](../../shared/phase-effort.md)
 and apply its scope-based effort selection and host mappings. On Codex, also
 read [child completion and recovery](../../shared/codex-delegation.md) and

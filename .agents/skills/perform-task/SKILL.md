@@ -5,9 +5,6 @@ description: Resolve, start or resume, implement, review, test, and publish exac
 
 # Perform One AI Task
 
-When running in Grok Build, read `.grok/ai-workflow-adapter.md` completely
-before any other host-specific delegation rule and apply its substitutions.
-
 Own exactly one task through its retained change, or a proved
 `already-satisfied` outcome, and a canonical AI `Approve` or exceptional
 `Block`, or a canonical `Split-required` result. Do not process the inbox,
