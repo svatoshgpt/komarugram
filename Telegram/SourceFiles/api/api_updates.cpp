@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "api/api_updates.h"
 
+#include "ayu/features/plugins/komaru_plugins.h"
+
 #include "api/api_authorizations.h"
 #include "api/api_user_names.h"
 #include "api/api_chat_participants.h"
@@ -901,6 +903,7 @@ void Updates::mtpNewSessionCreated() {
 }
 
 void Updates::mtpUpdateReceived(const MTPUpdates &updates) {
+	KomaruPlugins::ForwardUpdates(_session, updates);
 	Core::App().checkAutoLock();
 	_lastUpdateTime = crl::now();
 	_noUpdatesTimer.callOnce(kNoUpdatesTimeout);

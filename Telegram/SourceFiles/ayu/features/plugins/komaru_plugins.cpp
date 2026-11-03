@@ -10,8 +10,6 @@
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "mtproto/mtp_instance.h"
-#include "mtproto/mtproto_auth_key.h"
-#include "mtproto/mtproto_dc_options.h"
 #include "ui/toast/toast.h"
 
 #include <QtCore/QDir>
@@ -27,7 +25,6 @@
 #include <QtCore/QTimer>
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
-#include <QtNetwork/QNetworkProxy>
 
 namespace KomaruPlugins {
 namespace {
@@ -360,6 +357,9 @@ void CopyHostScripts() {
 	return -1;
 }
 
+// What plugins know of an account. Its key stays here: the host sends
+// every request through this client (see RunPluginRequest), since Telegram
+// revokes a key it sees used from two places at once.
 [[nodiscard]] std::optional<QJsonObject> AccountEntry(
 		int index,
 		not_null<Main::Account*> account) {
@@ -367,96 +367,13 @@ void CopyHostScripts() {
 		return std::nullopt;
 	}
 	auto &mtp = account->mtp();
-	const auto dcId = mtp.mainDcId();
-	auto key = MTP::AuthKeyPtr();
-	for (const auto &candidate : mtp.getKeysForWrite()) {
-		if (candidate && candidate->dcId() == dcId) {
-			key = candidate;
-			break;
-		}
-	}
-	if (!key) {
-		return std::nullopt;
-	}
-	using Variants = MTP::DcOptions::Variants;
-	const auto variants = mtp.dcOptions().lookup(
-		dcId,
-		MTP::DcType::Regular,
-		false);
-	const auto &endpoints = variants.data[Variants::IPv4][Variants::Tcp];
-	if (endpoints.empty()) {
-		return std::nullopt;
-	}
-	const auto data = key->data();
 	auto result = QJsonObject();
 	result.insert(u"index"_q, index);
 	result.insert(
 		u"user_id"_q,
 		QString::number(account->session().userId().bare));
-	result.insert(u"dc_id"_q, dcId);
-	result.insert(u"ip"_q, QString::fromStdString(endpoints.front().ip));
-	result.insert(u"port"_q, endpoints.front().port);
-	result.insert(u"auth_key"_q, QString::fromLatin1(QByteArray(
-		reinterpret_cast<const char*>(data.data()),
-		data.size()).toHex()));
+	result.insert(u"dc_id"_q, mtp.mainDcId());
 	result.insert(u"test"_q, mtp.isTestMode());
-	return result;
-}
-
-// Plugins connect on their own, so they get the proxy the client uses:
-// the selected one, or the system one when the client follows the system.
-[[nodiscard]] QJsonValue SystemProxyEntry() {
-	const auto list = QNetworkProxyFactory::systemProxyForQuery(
-		QNetworkProxyQuery(u"149.154.167.50"_q, 443));
-	for (const auto &proxy : list) {
-		const auto type = (proxy.type() == QNetworkProxy::Socks5Proxy)
-			? u"socks5"_q
-			: (proxy.type() == QNetworkProxy::HttpProxy)
-			? u"http"_q
-			: QString();
-		if (type.isEmpty() || proxy.hostName().isEmpty()) {
-			continue;
-		}
-		auto result = QJsonObject();
-		result.insert(u"type"_q, type);
-		result.insert(u"host"_q, proxy.hostName());
-		result.insert(u"port"_q, int(proxy.port()));
-		result.insert(u"user"_q, proxy.user());
-		result.insert(u"password"_q, proxy.password());
-		result.insert(u"label"_q, u"system"_q);
-		return result;
-	}
-	return QJsonValue();
-}
-
-[[nodiscard]] QJsonValue ProxyEntry() {
-	const auto &settings = Core::App().settings().proxy();
-	if (settings.isSystem()) {
-		return SystemProxyEntry();
-	} else if (!settings.isEnabled()) {
-		return QJsonValue();
-	}
-	const auto &proxy = settings.selected();
-	using Type = MTP::ProxyData::Type;
-	const auto type = (proxy.type == Type::Socks5)
-		? u"socks5"_q
-		: (proxy.type == Type::Http)
-		? u"http"_q
-		: (proxy.type == Type::Mtproto)
-		? u"mtproto"_q
-		: QString();
-	auto result = QJsonObject();
-	if (type.isEmpty() || proxy.host.isEmpty() || !proxy.port) {
-		// Still a proxy: the host refuses to go direct.
-		result.insert(u"type"_q, u"unsupported"_q);
-		result.insert(u"label"_q, u"selected"_q);
-		return result;
-	}
-	result.insert(u"type"_q, type);
-	result.insert(u"host"_q, proxy.host);
-	result.insert(u"port"_q, int(proxy.port));
-	result.insert(u"user"_q, proxy.user);
-	result.insert(u"password"_q, proxy.password);
 	return result;
 }
 
@@ -484,7 +401,6 @@ void SendAccounts() {
 	command.insert(u"api_hash"_q, QString::fromLatin1(ApiHash));
 	command.insert(u"device"_q, device);
 	command.insert(u"accounts"_q, accounts);
-	command.insert(u"proxy"_q, ProxyEntry());
 	Request(command);
 }
 
@@ -562,6 +478,78 @@ void ParsePlugins(const QJsonValue &value) {
 	state.pluginsChanged.fire({});
 }
 
+[[nodiscard]] Main::Account *AccountByIndex(int index) {
+	for (const auto &[existing, account] : Core::App().domain().accounts()) {
+		if (existing == index) {
+			return account.get();
+		}
+	}
+	return nullptr;
+}
+
+void ReplyToPluginRequest(QJsonObject reply) {
+	reply.insert(u"cmd"_q, u"invoke_result"_q);
+	Request(std::move(reply));
+}
+
+// A request a plugin made, serialized by Telethon. It goes out on this
+// client's own connection like any request of ours, and the raw result or
+// error goes back.
+void RunPluginRequest(const QJsonObject &message) {
+	const auto requestId = message.value(u"request"_q).toInt();
+	const auto accountIndex = message.value(u"account"_q).toInt();
+	auto reply = QJsonObject();
+	reply.insert(u"request"_q, requestId);
+	reply.insert(u"account"_q, accountIndex);
+	const auto fail = [=](int code, const QString &type) mutable {
+		auto result = reply;
+		result.insert(u"ok"_q, false);
+		result.insert(u"code"_q, code);
+		result.insert(u"type"_q, type);
+		ReplyToPluginRequest(std::move(result));
+	};
+	const auto account = AccountByIndex(accountIndex);
+	const auto data = QByteArray::fromBase64(
+		message.value(u"data"_q).toString().toLatin1());
+	if (!account || !account->sessionExists()) {
+		fail(401, u"ACCOUNT_NOT_AVAILABLE"_q);
+		return;
+	} else if (data.isEmpty() || (data.size() % sizeof(mtpPrime))) {
+		fail(400, u"BAD_REQUEST_DATA"_q);
+		return;
+	}
+	const auto ints = uint32(data.size() / sizeof(mtpPrime));
+	auto request = MTP::details::SerializedRequest::Prepare(ints);
+	const auto offset = request->size();
+	request->resize(offset + ints);
+	memcpy(request->data() + offset, data.constData(), data.size());
+	account->mtp().sendSerialized(
+		MTP::details::GetNextRequestId(),
+		std::move(request),
+		MTP::ResponseHandler{
+			.done = [=](const MTP::Response &response) {
+				auto result = reply;
+				result.insert(u"ok"_q, true);
+				result.insert(u"data"_q, QString::fromLatin1(QByteArray(
+					reinterpret_cast<const char*>(response.reply.constData()),
+					response.reply.size() * sizeof(mtpPrime)).toBase64()));
+				ReplyToPluginRequest(std::move(result));
+				return true;
+			},
+			.fail = [=](const MTP::Error &error, const MTP::Response &) {
+				auto result = reply;
+				result.insert(u"ok"_q, false);
+				result.insert(u"code"_q, error.code());
+				result.insert(u"type"_q, error.type());
+				ReplyToPluginRequest(std::move(result));
+				return true;
+			},
+		},
+		0,
+		0,
+		0);
+}
+
 void HandleEvent(const QJsonObject &message) {
 	auto &state = Instance();
 	const auto event = message.value(u"event"_q).toString();
@@ -576,6 +564,8 @@ void HandleEvent(const QJsonObject &message) {
 		Refresh();
 	} else if (event == u"settings_changed"_q) {
 		state.settingsChanged.fire(message.value(u"plugin"_q).toString());
+	} else if (event == u"invoke"_q) {
+		RunPluginRequest(message);
 	} else if (event == u"proxy"_q) {
 		ApplyPluginProxy(message);
 	} else if (event == u"toast"_q) {
@@ -703,8 +693,7 @@ void Start() {
 		: RuntimeState::Missing;
 	rpl::merge(
 		Core::App().domain().accountsChanges(),
-		Core::App().domain().activeSessionValue() | rpl::to_empty,
-		Core::App().proxyChanges() | rpl::to_empty
+		Core::App().domain().activeSessionValue() | rpl::to_empty
 	) | rpl::on_next([] {
 		if (Instance().ready) {
 			SendAccounts();
@@ -856,6 +845,31 @@ void ClickMenuItem(
 			Ui::Toast::Show(error);
 		}
 	});
+}
+
+void ForwardUpdates(
+		not_null<Main::Session*> session,
+		const MTPUpdates &updates) {
+	auto &state = Instance();
+	if (!state.process || !state.ready) {
+		return;
+	}
+	auto loaded = false;
+	for (const auto &plugin : state.plugins) {
+		loaded |= plugin.loaded;
+	}
+	if (!loaded) {
+		return;
+	}
+	auto buffer = mtpBuffer();
+	updates.write(buffer);
+	auto command = QJsonObject();
+	command.insert(u"cmd"_q, u"updates"_q);
+	command.insert(u"account"_q, AccountIndex(&session->account()));
+	command.insert(u"data"_q, QString::fromLatin1(QByteArray(
+		reinterpret_cast<const char*>(buffer.constData()),
+		buffer.size() * sizeof(mtpPrime)).toBase64()));
+	Request(std::move(command));
 }
 
 const std::vector<PluginInfo> &Plugins() {

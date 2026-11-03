@@ -84,6 +84,11 @@ void Refresh();
 
 [[nodiscard]] QString LogPath();
 
+// Hands what the client receives to plugins that listen for updates.
+void ForwardUpdates(
+	not_null<Main::Session*> session,
+	const MTPUpdates &updates);
+
 // Runs a plugin menu item for a chat, as exteraGram does from the chat
 // action menu.
 void ClickMenuItem(

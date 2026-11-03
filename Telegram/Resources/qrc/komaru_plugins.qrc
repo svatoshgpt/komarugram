@@ -19,7 +19,6 @@
     <file alias="komaru_runtime/accounts.py">../komaru_plugins/komaru_runtime/accounts.py</file>
     <file alias="komaru_runtime/context.py">../komaru_plugins/komaru_runtime/context.py</file>
     <file alias="komaru_runtime/goplugin.py">../komaru_plugins/komaru_runtime/goplugin.py</file>
-    <file alias="komaru_runtime/faketls.py">../komaru_plugins/komaru_runtime/faketls.py</file>
     <file alias="tgws_proxy/__init__.py">../komaru_plugins/tgws_proxy/__init__.py</file>
     <file alias="tgws_proxy/_aes.py">../komaru_plugins/tgws_proxy/_aes.py</file>
     <file alias="tgws_proxy/balancer.py">../komaru_plugins/tgws_proxy/balancer.py</file>
@@ -38,6 +37,7 @@
     <file alias="tgws_proxy/LICENSE">../komaru_plugins/tgws_proxy/LICENSE</file>
     <file alias="komaru_runtime/tgws.py">../komaru_plugins/komaru_runtime/tgws.py</file>
     <file alias="compat/tgws.py">../komaru_plugins/compat/tgws.py</file>
+    <file alias="komaru_runtime/bridge.py">../komaru_plugins/komaru_runtime/bridge.py</file>
     <file alias="komaru_runtime/manager.py">../komaru_plugins/komaru_runtime/manager.py</file>
     <file alias="komaru_runtime/tl_bridge.py">../komaru_plugins/komaru_runtime/tl_bridge.py</file>
     <file alias="komaru_runtime/meta.py">../komaru_plugins/komaru_runtime/meta.py</file>

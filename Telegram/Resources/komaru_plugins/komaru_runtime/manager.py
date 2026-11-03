@@ -623,6 +623,12 @@ class Manager:
             return [r.describe() for r in self.records.values()]
         if command == "install":
             return self.install(message["path"]).describe()
+        if command == "invoke_result":
+            self.accounts.resolve(message)
+            return True
+        if command == "updates":
+            self.accounts.feed_updates(message)
+            return True
         if command == "accounts":
             await self.accounts.configure(message)
             self._update_clients.clear()

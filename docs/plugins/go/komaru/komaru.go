@@ -16,8 +16,9 @@
 //		plugin.Run()
 //	}
 //
-// Each Account carries the DC address and auth key, so a plugin can also
-// open its own MTProto connection with gotd/td instead of asking the host.
+// Requests go through the host and KomaruGram's own connection: the
+// account key never leaves the client, since Telegram revokes a key it sees
+// used from two places at once.
 package komaru
 
 import (
@@ -39,9 +40,6 @@ type Account struct {
 	Index   int    `json:"index"`
 	UserID  int64  `json:"user_id"`
 	DcID    int    `json:"dc_id"`
-	IP      string `json:"ip"`
-	Port    int    `json:"port"`
-	AuthKey string `json:"auth_key"` // 256 bytes, hex
 	Test    bool   `json:"test"`
 	APIID   int    `json:"api_id"`
 	APIHash string `json:"api_hash"`

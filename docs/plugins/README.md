@@ -7,21 +7,24 @@ Windows, from python.org with "Add python.exe to PATH" ticked). KomaruGram
 finds it and installs Telethon and Kurigram for it with pip into its own
 folder in tdata; nothing is added to that Python itself.
 
-Plugins use the proxy set in KomaruGram and never connect directly while
-one is set, fake TLS MTProto included for Telethon. Without a proxy in the
-client, Telethon goes through the built-in
-[tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy) by Flowseal (MIT).
-Plugins can use it too: `import tgws`, then `await tgws.start()` for
-`host`, `port`, `secret` and `link`, and `tgws.use_in_client()` to point
-KomaruGram itself at it.
+Plugins act in KomaruGram's own session: the host has no connection to
+Telegram, every request a plugin makes is sent by the client as its own
+and updates come back from it. The account key never leaves the client,
+because Telegram revokes a key it sees used from two places at once and
+logs the user out. So Telethon works and Kurigram, which needs a
+connection of its own, does not.
+
+The built-in [tg-ws-proxy](https://github.com/Flowseal/tg-ws-proxy) by
+Flowseal (MIT) is there for plugins: `import tgws`, then
+`await tgws.start()` for `host`, `port`, `secret` and `link`, and
+`tgws.use_in_client()` to point KomaruGram itself at it.
 
 A `.plugin`, `.elyx` or `.eaf` file opened in a chat shows an Install
 button, and so does a `.py` file that imports Telethon, Kurigram or the
 `komaru` SDK. A `.py` without `__id__` is named after its file.
 
-Every plugin acts as your account. KomaruGram hands each logged in account's
-DC address and auth key to the plugin host over a pipe, never writes it to
-disk, and asks before a plugin is enabled.
+Every plugin acts as your account, so KomaruGram asks before one is
+enabled.
 
 ## Formats
 
@@ -79,13 +82,13 @@ class Ping(Plugin):
         self.spawn(self.hello())
 
     async def hello(self):
-        app = await self.kurigram()          # a started Kurigram client
-        me = await app.get_me()
-        self.logger.info("Kurigram works as %s", me.first_name)
+        client = await self.telethon()
+        me = await client.get_me()
+        self.logger.info("Working as %s", me.first_name)
 ```
 
-`self.telethon(account)` and `self.kurigram(account)` return connected
-clients for the account (the first one by default). `self.on(...)` registers
+`self.telethon(account)` returns a Telethon client for the account (the
+first one by default). `self.on(...)` registers
 a Telethon handler and `self.spawn(...)` a coroutine; both are removed when
 the plugin is disabled.
 
@@ -110,4 +113,4 @@ settings:
 The host starts the binary for the current platform, or `go run .` when the
 archive carries source and Go is installed. The plugin talks JSON lines over
 stdin/stdout; the `komaru` package in [`go/komaru`](go/komaru/komaru.go)
-wraps the protocol, and every account's session data is there for gotd/td.
+wraps the protocol.
