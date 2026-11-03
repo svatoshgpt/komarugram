@@ -44,14 +44,8 @@ jobs:
         run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - name: Prepare directories.
-        # C: has about 30 GB free and D: about 150 GB. Libraries stay on C:
-        # for real: prepare.py keys them by their resolved path, so moving
-        # them would rebuild all of them. The sources and the build output
-        # go to D: through a junction.
         run: |
           mkdir %userprofile%\TBuild\Libraries
-          mkdir D:\%REPO_NAME%
-          mklink /J %userprofile%\TBuild\%REPO_NAME% D:\%REPO_NAME%
           mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
           echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
 
@@ -65,6 +59,16 @@ jobs:
         with:
           submodules: recursive
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+
+      # C: has about 30 GB free and D: about 150 GB, so the build output
+      # goes to D:. The sources and libraries must stay on C: for real:
+      # prepare.py finds its root from the resolved path of its own script
+      # and keys every library by resolved paths, so moving them rebuilds
+      # all the libraries for hours.
+      - name: Build output on D:.
+        run: |
+          mkdir D:\out
+          mklink /J %TBUILD%\%REPO_NAME%\out D:\out
 
       - name: First set up.
         shell: bash
