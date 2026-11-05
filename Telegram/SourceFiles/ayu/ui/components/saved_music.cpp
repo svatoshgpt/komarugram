@@ -26,6 +26,7 @@
 #include "window/themes/window_theme.h"
 
 #include <QSvgRenderer>
+#include <QtGui/QPainterPath>
 
 namespace Info::Profile {
 
@@ -223,6 +224,21 @@ void AyuMusicButton::updateData(MusicButtonData data) {
 	resizeToWidth(widthNoMargins());
 }
 
+void AyuMusicButton::setCornerRadius(int radius) {
+	_radius = radius;
+	update();
+}
+
+void AyuMusicButton::setPlayIconShown(bool shown) {
+	_playIcon = shown;
+	resizeToWidth(widthNoMargins());
+	update();
+}
+
+void AyuMusicButton::setExternalCover(QImage image) {
+	_externalCover = std::move(image);
+}
+
 void AyuMusicButton::downloadAndMakeCover(FullMsgId msgId) {
 	if (_mediaView && _mediaView->owner()->isSongWithCover() && !_mediaView->thumbnail()) {
 		const auto settings = &_mediaView->owner()->session().settings().autoDownload();
@@ -249,7 +265,7 @@ void AyuMusicButton::downloadAndMakeCover(FullMsgId msgId) {
 void AyuMusicButton::makeCover() {
 	const auto weak = base::make_weak(this);
 	crl::async(
-		[=, mediaView = _mediaView, performerText = _performerText, titleText = _titleText, overrideBg = _overrideBg]()
+		[=, mediaView = _mediaView, performerText = _performerText, titleText = _titleText, overrideBg = _overrideBg, external = _externalCover]()
 		{
 			const auto &settings = AyuSettings::getInstance();
 			const auto &font = st::infoMusicButtonTitle.style.font;
@@ -258,7 +274,16 @@ void AyuMusicButton::makeCover() {
 
 			auto cover = GetCurrentCover(mediaView, QSize(size, size));
 
-			if (cover.noCover) {
+			if (external && !external->isNull()) {
+				const auto img = Image(QImage(*external));
+				const auto args = Images::PrepareArgs{
+					.options = Images::Option::RoundSmall,
+					.outer = QSize(size, size),
+				};
+				cover.pixToDraw = img.pix(QSize(size, size), args);
+				cover.pixToBg = QPixmap::fromImage(*external);
+				cover.noCover = false;
+			} else if (cover.noCover && !external) {
 				const auto pix = Ayu::Ui::Itunes::FetchCover(performerText, titleText, size);
 				if (!pix.isNull()) {
 					const auto img = Image(pix.toImage());
@@ -330,6 +355,12 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 	const auto skip = st::normalFont->spacew / 2;
 	const auto size = font->height + skip + font->height;
 
+	if (_radius > 0) {
+		auto path = QPainterPath();
+		path.addRoundedRect(rect(), _radius, _radius);
+		p.setClipPath(path);
+	}
+
 	const auto &settings = AyuSettings::getInstance();
 	const auto cover = _currentCover.value();
 	if (cover.noCover || !settings.adaptiveCoverColor()) {
@@ -347,6 +378,31 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		const auto coverRect = QRect(st::infoMusicButtonPadding.left(), st::infoMusicButtonPadding.top(), size, size);
 		p.drawPixmap(coverRect, cover.pix);
 	}
+
+	if (_playIcon) {
+		auto hq = PainterHighQualityEnabler(p);
+		const auto adaptive = !cover.noCover && settings.adaptiveCoverColor();
+		const auto fg = adaptive ? QColor(Qt::white) : st::windowBoldFg->c;
+		auto bg = fg;
+		bg.setAlphaF(0.2);
+		const auto circle = QRect(
+			width() - st::infoMusicButtonPadding.left() - size,
+			(height() - size) / 2,
+			size,
+			size);
+		p.setPen(Qt::NoPen);
+		p.setBrush(bg);
+		p.drawEllipse(circle);
+		const auto side = size / 3.;
+		const auto center = QPointF(circle.center()) + QPointF(side / 8., 0.);
+		const auto triangle = QPolygonF({
+			center + QPointF(-side / 2., -side / 1.8),
+			center + QPointF(side / 1.6, 0.),
+			center + QPointF(-side / 2., side / 1.8),
+		});
+		p.setBrush(fg);
+		p.drawPolygon(triangle);
+	}
 }
 
 int AyuMusicButton::resizeGetHeight(int newWidth) {
@@ -358,7 +414,8 @@ int AyuMusicButton::resizeGetHeight(int newWidth) {
 
 	const auto coverSize = font->height + skip + font->height;
 
-	const auto available = newWidth - padding.left() - padding.right() - coverSize;
+	const auto available = newWidth - padding.left() - padding.right() - coverSize
+		- (_playIcon ? (coverSize + padding.left()) : 0);
 	_title->resizeToNaturalWidth(available);
 	_title->moveToLeft(st::infoMusicButtonPadding.left() + padding.left() + coverSize, top);
 	_performer->resizeToNaturalWidth(available);

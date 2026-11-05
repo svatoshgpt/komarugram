@@ -114,6 +114,29 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_ProfileRegistrationDate", u"Дата регистрации"_q },
 		std::pair{ "ayu_ProfileDatacenter", u"Сервер (DC)"_q },
 		std::pair{ "ayu_ProfileHiddenPhotos", u"Скрытые фото профиля"_q },
+		std::pair{ "ayu_NowPlaying", u"Сейчас играет"_q },
+		std::pair{ "ayu_NowPlayingServiceHeader", u"Выберите сервис"_q },
+		std::pair{ "ayu_NowPlayingNone", u"нет"_q },
+		std::pair{
+			"ayu_NowPlayingServiceAbout",
+			u"Отображает в профиле текущий трек из сервиса скробблинга в виде карточки."_q },
+		std::pair{ "ayu_NowPlayingUsernameHeader", u"Введите имя пользователя"_q },
+		std::pair{ "ayu_NowPlayingUsernamePlaceholder", u"Имя пользователя"_q },
+		std::pair{
+			"ayu_NowPlayingUsernameAbout",
+			u"Вы можете узнать ваше имя пользователя на {link}."_q },
+		std::pair{ "ayu_NowPlayingOfficialSite", u"официальном сайте"_q },
+		std::pair{ "ayu_NowPlayingApiKeyHeader", u"Ключ API Last.fm"_q },
+		std::pair{ "ayu_NowPlayingApiKeyPlaceholder", u"Ключ API"_q },
+		std::pair{
+			"ayu_NowPlayingApiKeyAbout",
+			u"Last.fm отвечает только приложениям с ключом. Бесплатный ключ можно создать на {link}."_q },
+		std::pair{ "ayu_NowPlayingPublicHeader", u"Показывать всем"_q },
+		std::pair{ "ayu_NowPlayingProfileMusic", u"Музыка профиля"_q },
+		std::pair{ "ayu_NowPlayingBio", u"О себе"_q },
+		std::pair{
+			"ayu_NowPlayingPublicAbout",
+			u"Видно в любом клиенте Telegram. Музыка профиля ставит трек первым в профиле: файл из ваших чатов, если он там есть, иначе беззвучную заглушку с названием и обложкой. «О себе» заменяет описание профиля на трек и возвращает прежний текст, когда музыка остановится."_q },
 		std::pair{
 			"ayu_DeveloperPopup",
 			u"**{item}** — участник команды разработки **exteraGram**."_q },
