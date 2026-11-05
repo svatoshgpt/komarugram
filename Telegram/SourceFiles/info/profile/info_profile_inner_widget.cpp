@@ -56,6 +56,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/komaru/now_playing.h"
+#include "ayu/ui/components/saved_music.h"
+#include "info/profile/info_profile_music_button.h"
+#include "styles/style_layers.h"
+#include "ui/basic_click_handlers.h"
 
 
 namespace Info {
@@ -64,6 +69,56 @@ namespace Profile {
 namespace {
 
 constexpr auto kMembersInlineMax = 5;
+
+using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
+
+[[nodiscard]] Section NowPlayingSection(not_null<Ui::RpWidget*> parent) {
+	auto result = object_ptr<Ui::VerticalLayout>(parent);
+	const auto url = std::make_shared<QString>();
+	const auto button = result->add(
+		object_ptr<AyuMusicButton>(
+			result.data(),
+			MusicButtonData{
+				.name = Ui::Text::FormatSongName(QString(), QString(), QString()),
+			},
+			std::nullopt,
+			[=] {
+				if (!url->isEmpty()) {
+					UrlClickHandler::Open(*url);
+				}
+			}),
+		QMargins(
+			st::boxRowPadding.left(),
+			st::infoProfileSkip,
+			st::boxRowPadding.right(),
+			st::infoProfileSkip));
+	button->setCornerRadius(st::roundRadiusLarge);
+	button->setPlayIconShown(true);
+	rpl::combine(
+		KomaruNowPlaying::Value(),
+		KomaruNowPlaying::CoverValue()
+	) | rpl::filter([](const NowPlayingTrack &track, const QImage &) {
+		return track.has_value();
+	}) | rpl::on_next([=](const NowPlayingTrack &track, QImage cover) {
+		*url = track->url;
+		button->setExternalCover(std::move(cover));
+		button->updateData({
+			.name = Ui::Text::FormatSongName(
+				QString(),
+				track->title,
+				track->artist),
+			.title = track->title,
+			.performer = track->artist,
+		});
+	}, button->lifetime());
+	return {
+		.widget = std::move(result),
+		.shown = KomaruNowPlaying::Value(
+		) | rpl::map([](const NowPlayingTrack &track) {
+			return track.has_value();
+		}),
+	};
+}
 
 [[nodiscard]] rpl::producer<bool> MembersInTabValue(not_null<PeerData*> peer) {
 	const auto channel = peer->asChannel();
@@ -177,6 +232,10 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 	if (_topic && _topic->creating()) {
 		stack.finalize();
 		return result;
+	}
+
+	if (!_savedMessages && _peer->isSelf() && !_topic && !_sublist) {
+		stack.add(NowPlayingSection(result.data()));
 	}
 
 	if (!_savedMessages) {

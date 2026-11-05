@@ -34,6 +34,9 @@ public:
 	~AyuMusicButton();
 
 	void updateData(MusicButtonData data);
+	void setCornerRadius(int radius);
+	void setPlayIconShown(bool shown);
+	void setExternalCover(QImage image);
 
 	rpl::producer<> onReady() const {
 		return _onReady.events();
@@ -56,6 +59,9 @@ private:
 	QString _titleText;
 
 	std::optional<QColor> _overrideBg;
+	std::optional<QImage> _externalCover;
+	int _radius = 0;
+	bool _playIcon = false;
 
 };
 

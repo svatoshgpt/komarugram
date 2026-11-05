@@ -45,6 +45,12 @@ enum class TranslationProvider {
 	Native = 3,
 };
 
+enum class NowPlayingService {
+	None = 0,
+	LastFm = 1,
+	StatsFm = 2,
+};
+
 enum class SendWithoutSoundOption {
 	Never = 0,
 	InGhostMode = 1,
@@ -74,6 +80,12 @@ NLOHMANN_JSON_SERIALIZE_ENUM(TranslationProvider, {
 	{TranslationProvider::Google, "google"},
 	{TranslationProvider::Yandex, "yandex"},
 	{TranslationProvider::Native, "native"},
+})
+
+NLOHMANN_JSON_SERIALIZE_ENUM(NowPlayingService, {
+	{NowPlayingService::None, 0},
+	{NowPlayingService::LastFm, 1},
+	{NowPlayingService::StatsFm, 2},
 })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SendWithoutSoundOption, {
@@ -369,6 +381,11 @@ public:
 	[[nodiscard]] bool crashReporting() const { return _crashReporting.current(); }
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
+	[[nodiscard]] NowPlayingService nowPlayingService() const { return _nowPlayingService.current(); }
+	[[nodiscard]] const QString &nowPlayingUsername() const { return _nowPlayingUsername.current(); }
+	[[nodiscard]] const QString &nowPlayingLastFmKey() const { return _nowPlayingLastFmKey.current(); }
+	[[nodiscard]] bool nowPlayingProfileMusic() const { return _nowPlayingProfileMusic.current(); }
+	[[nodiscard]] bool nowPlayingBio() const { return _nowPlayingBio.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
 
 	void setSaveDeletedMessages(bool val);
@@ -465,6 +482,11 @@ public:
 	void setCrashReporting(bool val);
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
+	void setNowPlayingService(NowPlayingService val);
+	void setNowPlayingUsername(const QString &val);
+	void setNowPlayingLastFmKey(const QString &val);
+	void setNowPlayingProfileMusic(bool val);
+	void setNowPlayingBio(bool val);
 	void setStreamerMode(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
@@ -643,6 +665,11 @@ public:
 	[[nodiscard]] rpl::producer<int> avatarCornersChanges() const { return _avatarCorners.changes(); }
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusValue() const { return _singleCornerRadius.value(); }
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
+	[[nodiscard]] rpl::producer<NowPlayingService> nowPlayingServiceValue() const { return _nowPlayingService.value(); }
+	[[nodiscard]] rpl::producer<QString> nowPlayingUsernameValue() const { return _nowPlayingUsername.value(); }
+	[[nodiscard]] rpl::producer<QString> nowPlayingLastFmKeyValue() const { return _nowPlayingLastFmKey.value(); }
+	[[nodiscard]] rpl::producer<bool> nowPlayingProfileMusicValue() const { return _nowPlayingProfileMusic.value(); }
+	[[nodiscard]] rpl::producer<bool> nowPlayingBioValue() const { return _nowPlayingBio.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
 
@@ -749,6 +776,11 @@ private:
 	rpl::variable<bool> _crashReporting = true;
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
+	rpl::variable<NowPlayingService> _nowPlayingService = NowPlayingService::None;
+	rpl::variable<QString> _nowPlayingUsername;
+	rpl::variable<QString> _nowPlayingLastFmKey;
+	rpl::variable<bool> _nowPlayingProfileMusic = true;
+	rpl::variable<bool> _nowPlayingBio = false;
 	rpl::variable<bool> _streamerMode = false;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;

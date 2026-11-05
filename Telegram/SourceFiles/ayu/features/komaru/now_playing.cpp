@@ -1,0 +1,908 @@
+// This file is part of KomaruGram for Desktop, see https://github.com/svatoshgpt/komarugram
+#include "ayu/features/komaru/now_playing.h"
+
+#include "apiwrap.h"
+#include "ayu/ayu_settings.h"
+#include "base/random.h"
+#include "base/timer.h"
+#include "base/weak_ptr.h"
+#include "core/application.h"
+#include "data/data_document.h"
+#include "data/data_file_origin.h"
+#include "data/data_media_types.h"
+#include "data/data_premium_limits.h"
+#include "data/data_saved_music.h"
+#include "data/data_search_controller.h"
+#include "data/data_session.h"
+#include "data/data_user.h"
+#include "history/history_item.h"
+#include "main/main_account.h"
+#include "main/main_domain.h"
+#include "main/main_session.h"
+#include "settings.h"
+
+#include <QtCore/QBuffer>
+#include <QtCore/QCoreApplication>
+#include <QtCore/QCryptographicHash>
+#include <QtCore/QFile>
+#include <QtCore/QJsonArray>
+#include <QtCore/QJsonDocument>
+#include <QtCore/QJsonObject>
+#include <QtCore/QPointer>
+#include <QtCore/QUrlQuery>
+#include <QtGui/QImage>
+#include <QtNetwork/QNetworkAccessManager>
+#include <QtNetwork/QNetworkReply>
+#include <QtNetwork/QNetworkRequest>
+
+namespace KomaruNowPlaying {
+namespace {
+
+constexpr auto kPollInterval = 30 * crl::time(1000);
+constexpr auto kMaxBackoff = 10 * 60 * crl::time(1000);
+constexpr auto kRestartDelay = 2 * crl::time(1000);
+constexpr auto kIdlePolls = 2;
+constexpr auto kFetchTimeout = 15000;
+constexpr auto kSearchLimit = 20;
+constexpr auto kMaxSilence = 480;
+constexpr auto kThumbSize = 320;
+constexpr auto kFrameBytes = 36;
+constexpr auto kFrameSamples = 576;
+constexpr auto kSampleRate = 16000;
+
+struct Applied {
+	DocumentId music = 0;
+	QString musicKey;
+	QString bioBackup;
+	QString bioText;
+	bool bioSaved = false;
+};
+
+[[nodiscard]] QNetworkAccessManager &Network() {
+	static const auto result = new QNetworkAccessManager(
+		QCoreApplication::instance());
+	return *result;
+}
+
+[[nodiscard]] QNetworkReply *Get(const QUrl &url) {
+	auto request = QNetworkRequest(url);
+	request.setTransferTimeout(kFetchTimeout);
+	request.setHeader(QNetworkRequest::UserAgentHeader, u"KomaruGram"_q);
+	return Network().get(request);
+}
+
+[[nodiscard]] QString StatePath() {
+	return cWorkingDir() + u"tdata/komaru_now_playing.json"_q;
+}
+
+[[nodiscard]] bool Enabled() {
+	const auto &settings = AyuSettings::getInstance();
+	switch (settings.nowPlayingService()) {
+	case NowPlayingService::None: return false;
+	case NowPlayingService::LastFm:
+		if (settings.nowPlayingLastFmKey().trimmed().isEmpty()) {
+			return false;
+		}
+		break;
+	case NowPlayingService::StatsFm: break;
+	}
+	return !settings.nowPlayingUsername().trimmed().isEmpty();
+}
+
+[[nodiscard]] QString Normalize(const QString &text) {
+	auto result = QString();
+	result.reserve(text.size());
+	for (const auto &ch : text.toLower()) {
+		if (ch.isLetterOrNumber()) {
+			result.append(ch);
+		}
+	}
+	return result;
+}
+
+[[nodiscard]] bool Matches(
+		not_null<DocumentData*> document,
+		const Track &track) {
+	const auto song = document->song();
+	if (!song) {
+		return false;
+	}
+	const auto title = Normalize(song->title);
+	const auto wanted = Normalize(track.title);
+	const auto performer = Normalize(song->performer);
+	const auto artist = Normalize(track.artist);
+	if (title.isEmpty() || wanted.isEmpty() || performer.isEmpty()) {
+		return false;
+	}
+	return title.startsWith(wanted)
+		&& (performer.contains(artist) || artist.contains(performer));
+}
+
+[[nodiscard]] QByteArray Silence(int seconds) {
+	const auto frames = (seconds * kSampleRate + kFrameSamples - 1)
+		/ kFrameSamples;
+	auto result = QByteArray(frames * kFrameBytes, char(0));
+	for (auto i = 0; i != frames; ++i) {
+		const auto frame = result.data() + i * kFrameBytes;
+		frame[0] = char(0xFF);
+		frame[1] = char(0xF3);
+		frame[2] = char(0x18);
+		frame[3] = char(0xC0);
+	}
+	return result;
+}
+
+[[nodiscard]] QByteArray Thumbnail(const QByteArray &bytes) {
+	auto image = QImage::fromData(bytes);
+	if (image.isNull()) {
+		return QByteArray();
+	}
+	image = image.scaled(
+		kThumbSize,
+		kThumbSize,
+		Qt::KeepAspectRatio,
+		Qt::SmoothTransformation).convertToFormat(QImage::Format_RGB32);
+	auto result = QByteArray();
+	auto buffer = QBuffer(&result);
+	buffer.open(QIODevice::WriteOnly);
+	image.save(&buffer, "JPG", 87);
+	return result;
+}
+
+[[nodiscard]] MTPInputFile InputFile(
+		uint64 id,
+		const QString &name,
+		const QByteArray &bytes) {
+	const auto md5 = QCryptographicHash::hash(
+		bytes,
+		QCryptographicHash::Md5).toHex();
+	return MTP_inputFile(
+		MTP_long(id),
+		MTP_int(1),
+		MTP_string(name),
+		MTP_string(QString::fromLatin1(md5)));
+}
+
+[[nodiscard]] QString BioText(
+		not_null<Main::Session*> session,
+		const Track &track) {
+	const auto limits = Data::PremiumLimits(session);
+	const auto limit = session->user()->isPremium()
+		? limits.aboutLengthPremium()
+		: limits.aboutLengthDefault();
+	auto result = u"🎧 "_q + track.artist + u" — "_q + track.title;
+	if (result.size() > limit) {
+		result = result.left(limit - 1).trimmed() + QChar(0x2026);
+	}
+	return result;
+}
+
+[[nodiscard]] std::optional<Track> ParseLastFm(const QJsonObject &root) {
+	const auto tracks = root.value(u"recenttracks"_q).toObject()
+		.value(u"track"_q);
+	const auto first = tracks.isArray()
+		? tracks.toArray().at(0).toObject()
+		: tracks.toObject();
+	const auto playing = first.value(u"@attr"_q).toObject()
+		.value(u"nowplaying"_q).toString() == u"true"_q;
+	if (!playing) {
+		return std::nullopt;
+	}
+	auto result = Track{
+		.title = first.value(u"name"_q).toString().trimmed(),
+		.artist = first.value(u"artist"_q).toObject()
+			.value(u"#text"_q).toString().trimmed(),
+		.url = first.value(u"url"_q).toString(),
+	};
+	for (const auto image : first.value(u"image"_q).toArray()) {
+		const auto url = image.toObject().value(u"#text"_q).toString();
+		if (!url.isEmpty()) {
+			result.cover = url;
+		}
+	}
+	if (result.title.isEmpty() || result.artist.isEmpty()) {
+		return std::nullopt;
+	}
+	return result;
+}
+
+[[nodiscard]] std::optional<Track> ParseStatsFm(const QJsonObject &root) {
+	const auto item = root.value(u"item"_q).toObject();
+	if (!item.value(u"isPlaying"_q).toBool()) {
+		return std::nullopt;
+	}
+	const auto track = item.value(u"track"_q).toObject();
+	auto artists = QStringList();
+	for (const auto artist : track.value(u"artists"_q).toArray()) {
+		const auto name = artist.toObject().value(u"name"_q).toString();
+		if (!name.trimmed().isEmpty()) {
+			artists.push_back(name.trimmed());
+		}
+	}
+	const auto albums = track.value(u"albums"_q).toArray();
+	const auto spotify = track.value(u"externalIds"_q).toObject()
+		.value(u"spotify"_q).toArray().at(0).toString();
+	auto result = Track{
+		.title = track.value(u"name"_q).toString().trimmed(),
+		.artist = artists.join(u", "_q),
+		.url = (spotify.isEmpty()
+			? (u"https://stats.fm/track/"_q
+				+ QString::number(track.value(u"id"_q).toInteger()))
+			: (u"https://open.spotify.com/track/"_q + spotify)),
+		.cover = albums.at(0).toObject().value(u"image"_q).toString(),
+		.duration = int(track.value(u"durationMs"_q).toInteger() / 1000),
+	};
+	if (result.title.isEmpty() || result.artist.isEmpty()) {
+		return std::nullopt;
+	}
+	return result;
+}
+
+class Manager final : public base::has_weak_ptr {
+public:
+	Manager();
+
+	[[nodiscard]] std::optional<Track> current() const;
+	[[nodiscard]] rpl::producer<std::optional<Track>> value() const;
+	[[nodiscard]] rpl::producer<QImage> cover() const;
+
+private:
+	using Done = Fn<void(DocumentData*)>;
+
+	void restart();
+	void poll();
+	void finish(std::optional<Track> track);
+	void fail();
+	void requestDuration(Track track);
+	void setCurrent(std::optional<Track> track);
+	void loadCover(const QString &url, Fn<void(QByteArray)> done);
+
+	void sync();
+	void sync(not_null<Main::Session*> session, bool active);
+	void syncMusic(
+		not_null<Main::Session*> session,
+		const std::optional<Track> &track);
+	void syncBio(
+		not_null<Main::Session*> session,
+		const std::optional<Track> &track);
+	void findMusic(
+		not_null<Main::Session*> session,
+		const Track &track,
+		Done done);
+	void uploadMusic(
+		not_null<Main::Session*> session,
+		const Track &track,
+		Done done);
+	void uploadMusic(
+		not_null<Main::Session*> session,
+		const Track &track,
+		const QByteArray &thumb,
+		Done done);
+	void removeMusic(not_null<Main::Session*> session, DocumentId id);
+
+	void load();
+	void save() const;
+
+	rpl::variable<std::optional<Track>> _current;
+	rpl::variable<QImage> _cover;
+	QString _coverUrl;
+	QByteArray _coverBytes;
+	std::vector<Fn<void(QByteArray)>> _coverWaiters;
+	base::Timer _timer;
+	QPointer<QNetworkReply> _reply;
+	uint64 _generation = 0;
+	int _failures = 0;
+	int _idle = 0;
+	bool _known = false;
+	base::weak_ptr<Main::Session> _session;
+	base::weak_ptr<Main::Session> _active;
+	std::map<uint64, Applied> _applied;
+	base::flat_map<uint64, QString> _musicPending;
+	base::flat_set<uint64> _bioLoading;
+	rpl::lifetime _lifetime;
+
+};
+
+Manager::Manager()
+: _timer([=] { poll(); }) {
+	load();
+	const auto &settings = AyuSettings::getInstance();
+	rpl::merge(
+		settings.nowPlayingServiceValue() | rpl::to_empty,
+		settings.nowPlayingUsernameValue() | rpl::to_empty,
+		settings.nowPlayingLastFmKeyValue() | rpl::to_empty
+	) | rpl::on_next([=] {
+		restart();
+	}, _lifetime);
+	Core::App().domain().activeSessionValue(
+	) | rpl::on_next([=](Main::Session *session) {
+		_active = session
+			? base::make_weak(session)
+			: base::weak_ptr<Main::Session>();
+		sync();
+	}, _lifetime);
+	rpl::merge(
+		settings.nowPlayingProfileMusicValue() | rpl::to_empty,
+		settings.nowPlayingBioValue() | rpl::to_empty
+	) | rpl::on_next([=] {
+		sync();
+	}, _lifetime);
+}
+
+std::optional<Track> Manager::current() const {
+	return _current.current();
+}
+
+rpl::producer<std::optional<Track>> Manager::value() const {
+	return _current.value();
+}
+
+rpl::producer<QImage> Manager::cover() const {
+	return _cover.value();
+}
+
+void Manager::loadCover(const QString &url, Fn<void(QByteArray)> done) {
+	if (url.isEmpty()) {
+		done(QByteArray());
+		return;
+	} else if (_coverUrl == url) {
+		if (_coverWaiters.empty()) {
+			done(_coverBytes);
+		} else {
+			_coverWaiters.push_back(std::move(done));
+		}
+		return;
+	}
+	_coverUrl = url;
+	_coverBytes = QByteArray();
+	for (const auto &waiter : base::take(_coverWaiters)) {
+		waiter(QByteArray());
+	}
+	_coverWaiters.push_back(std::move(done));
+	const auto reply = Get(QUrl(url));
+	QObject::connect(reply, &QNetworkReply::finished, [=] {
+		reply->deleteLater();
+		if (_coverUrl != url) {
+			return;
+		}
+		_coverBytes = (reply->error() == QNetworkReply::NoError)
+			? reply->readAll()
+			: QByteArray();
+		for (const auto &waiter : base::take(_coverWaiters)) {
+			waiter(_coverBytes);
+		}
+	});
+}
+
+void Manager::restart() {
+	++_generation;
+	if (_reply) {
+		_reply->abort();
+	}
+	_failures = _idle = 0;
+	_known = false;
+	_current = std::nullopt;
+	if (Enabled()) {
+		_timer.callOnce(kRestartDelay);
+	} else {
+		_timer.cancel();
+	}
+	sync();
+}
+
+void Manager::poll() {
+	if (!Enabled()) {
+		return;
+	}
+	const auto &settings = AyuSettings::getInstance();
+	const auto user = settings.nowPlayingUsername().trimmed();
+	auto url = QUrl();
+	if (settings.nowPlayingService() == NowPlayingService::LastFm) {
+		url = QUrl(u"https://ws.audioscrobbler.com/2.0/"_q);
+		auto query = QUrlQuery();
+		query.addQueryItem(u"method"_q, u"user.getrecenttracks"_q);
+		query.addQueryItem(u"user"_q, user);
+		query.addQueryItem(u"api_key"_q, settings.nowPlayingLastFmKey().trimmed());
+		query.addQueryItem(u"format"_q, u"json"_q);
+		query.addQueryItem(u"limit"_q, u"1"_q);
+		url.setQuery(query);
+	} else {
+		url = QUrl(u"https://api.stats.fm/api/v1/users/"_q
+			+ QString::fromUtf8(QUrl::toPercentEncoding(user))
+			+ u"/streams/current"_q);
+	}
+	const auto generation = _generation;
+	const auto lastFm = (settings.nowPlayingService()
+		== NowPlayingService::LastFm);
+	_reply = Get(url);
+	QObject::connect(_reply, &QNetworkReply::finished, [=, reply = _reply] {
+		reply->deleteLater();
+		if (generation != _generation) {
+			return;
+		}
+		const auto status = reply->attribute(
+			QNetworkRequest::HttpStatusCodeAttribute).toInt();
+		const auto bytes = reply->readAll();
+		const auto root = QJsonDocument::fromJson(bytes).object();
+		if (!lastFm && (status == 404 || status == 204)) {
+			finish(std::nullopt);
+		} else if (reply->error() != QNetworkReply::NoError
+			|| root.isEmpty()
+			|| root.contains(u"error"_q)) {
+			fail();
+		} else {
+			finish(lastFm ? ParseLastFm(root) : ParseStatsFm(root));
+		}
+	});
+}
+
+void Manager::fail() {
+	++_failures;
+	const auto delay = std::min(
+		kPollInterval << std::min(_failures, 5),
+		kMaxBackoff);
+	_timer.callOnce(delay);
+}
+
+void Manager::finish(std::optional<Track> track) {
+	_failures = 0;
+	_timer.callOnce(kPollInterval);
+	if (!track) {
+		if (++_idle < kIdlePolls && _known) {
+			return;
+		}
+		_known = true;
+		setCurrent(std::nullopt);
+		return;
+	}
+	_idle = 0;
+	_known = true;
+	const auto now = _current.current();
+	if (now
+		&& now->title == track->title
+		&& now->artist == track->artist) {
+		return;
+	}
+	if (!track->duration
+		&& AyuSettings::getInstance().nowPlayingService()
+			== NowPlayingService::LastFm) {
+		requestDuration(std::move(*track));
+	} else {
+		setCurrent(std::move(track));
+	}
+}
+
+void Manager::requestDuration(Track track) {
+	auto url = QUrl(u"https://ws.audioscrobbler.com/2.0/"_q);
+	auto query = QUrlQuery();
+	query.addQueryItem(u"method"_q, u"track.getInfo"_q);
+	query.addQueryItem(u"artist"_q, track.artist);
+	query.addQueryItem(u"track"_q, track.title);
+	query.addQueryItem(
+		u"api_key"_q,
+		AyuSettings::getInstance().nowPlayingLastFmKey());
+	query.addQueryItem(u"format"_q, u"json"_q);
+	url.setQuery(query);
+	const auto generation = _generation;
+	const auto reply = Get(url);
+	QObject::connect(reply, &QNetworkReply::finished, [=]() mutable {
+		reply->deleteLater();
+		if (generation != _generation) {
+			return;
+		}
+		const auto root = QJsonDocument::fromJson(reply->readAll()).object();
+		const auto ms = root.value(u"track"_q).toObject()
+			.value(u"duration"_q).toString().toLongLong();
+		track.duration = int(ms / 1000);
+		setCurrent(std::move(track));
+	});
+}
+
+void Manager::setCurrent(std::optional<Track> track) {
+	if (_current.current() == track) {
+		return;
+	}
+	_cover = QImage();
+	const auto url = track ? track->cover : QString();
+	_current = std::move(track);
+	if (!url.isEmpty()) {
+		loadCover(url, crl::guard(this, [=](QByteArray bytes) {
+			const auto now = _current.current();
+			if (now && now->cover == url) {
+				_cover = QImage::fromData(bytes);
+			}
+		}));
+	}
+	sync();
+}
+
+void Manager::sync() {
+	const auto active = _active.get();
+	if (const auto previous = _session.get(); previous && previous != active) {
+		sync(previous, false);
+	}
+	_session = active
+		? base::make_weak(active)
+		: base::weak_ptr<Main::Session>();
+	for (const auto &entry : Core::App().domain().accounts()) {
+		const auto session = entry.account->maybeSession();
+		if (session && session != active) {
+			if (_applied.contains(session->userId().bare)) {
+				sync(session, false);
+			}
+		}
+	}
+	if (active) {
+		sync(active, true);
+	}
+}
+
+void Manager::sync(not_null<Main::Session*> session, bool active) {
+	if (active && Enabled() && !_known) {
+		return;
+	}
+	const auto track = (active && Enabled())
+		? _current.current()
+		: std::nullopt;
+	const auto &settings = AyuSettings::getInstance();
+	syncMusic(
+		session,
+		settings.nowPlayingProfileMusic() ? track : std::nullopt);
+	syncBio(session, settings.nowPlayingBio() ? track : std::nullopt);
+	const auto i = _applied.find(session->userId().bare);
+	if (i != end(_applied)
+		&& !i->second.music
+		&& i->second.musicKey.isEmpty()
+		&& !i->second.bioSaved) {
+		_applied.erase(i);
+		save();
+	}
+}
+
+void Manager::syncMusic(
+		not_null<Main::Session*> session,
+		const std::optional<Track> &track) {
+	const auto userId = session->userId().bare;
+	const auto key = track
+		? (track->artist + QChar('\n') + track->title)
+		: QString();
+	auto &applied = _applied[userId];
+	const auto pending = _musicPending.find(userId);
+	if (pending != end(_musicPending)) {
+		if (pending->second == key) {
+			return;
+		}
+		_musicPending.erase(pending);
+	}
+	if (applied.musicKey == key) {
+		return;
+	}
+	if (!track) {
+		if (const auto old = base::take(applied.music)) {
+			removeMusic(session, old);
+		}
+		applied.musicKey = QString();
+		save();
+		return;
+	}
+	_musicPending[userId] = key;
+	const auto weak = base::make_weak(session);
+	findMusic(session, *track, crl::guard(this, [=](DocumentData *found) {
+		const auto strong = weak.get();
+		const auto i = _musicPending.find(userId);
+		if (!strong || i == end(_musicPending) || i->second != key) {
+			return;
+		}
+		_musicPending.erase(i);
+		auto &applied = _applied[userId];
+		const auto old = base::take(applied.music);
+		applied.musicKey = key;
+		auto &music = strong->data().savedMusic();
+		if (found && found->id == old) {
+			applied.music = old;
+		} else if (found && !music.has(found)) {
+			music.save(found, Data::FileOrigin());
+			applied.music = found->id;
+		}
+		if (old && old != applied.music) {
+			removeMusic(strong, old);
+		}
+		save();
+	}));
+}
+
+void Manager::findMusic(
+		not_null<Main::Session*> session,
+		const Track &track,
+		Done done) {
+	session->data().savedMusic().loadIds();
+	const auto weak = base::make_weak(session);
+	session->api().request(MTPmessages_SearchGlobal(
+		MTP_flags(0),
+		MTPint(),
+		MTPInputChannel(),
+		MTP_string(track.artist + QChar(' ') + track.title),
+		MTP_inputMessagesFilterMusic(),
+		MTP_int(0),
+		MTP_int(0),
+		MTP_int(0),
+		MTP_inputPeerEmpty(),
+		MTP_int(0),
+		MTP_int(kSearchLimit)
+	)).done([=](const MTPmessages_Messages &result) {
+		const auto strong = weak.get();
+		if (!strong) {
+			return;
+		}
+		const auto parsed = Api::ParseGlobalMediaResult(strong, result, false);
+		for (const auto &position : parsed.messageIds) {
+			const auto item = strong->data().message(position.fullId);
+			const auto media = item ? item->media() : nullptr;
+			const auto document = media ? media->document() : nullptr;
+			if (document && Matches(document, track)) {
+				done(document);
+				return;
+			}
+		}
+		uploadMusic(strong, track, done);
+	}).fail([=] {
+		if (const auto strong = weak.get()) {
+			uploadMusic(strong, track, done);
+		}
+	}).send();
+}
+
+void Manager::uploadMusic(
+		not_null<Main::Session*> session,
+		const Track &track,
+		Done done) {
+	const auto weak = base::make_weak(session);
+	loadCover(track.cover, crl::guard(this, [=](QByteArray bytes) {
+		if (const auto strong = weak.get()) {
+			uploadMusic(strong, track, Thumbnail(bytes), done);
+		}
+	}));
+}
+
+void Manager::uploadMusic(
+		not_null<Main::Session*> session,
+		const Track &track,
+		const QByteArray &thumb,
+		Done done) {
+	const auto seconds = std::clamp(track.duration, 1, kMaxSilence);
+	const auto audio = Silence(seconds);
+	const auto audioId = base::RandomValue<uint64>();
+	const auto thumbId = thumb.isEmpty() ? 0 : base::RandomValue<uint64>();
+	const auto weak = base::make_weak(session);
+	const auto media = [=] {
+		using Flag = MTPDinputMediaUploadedDocument::Flag;
+		using AudioFlag = MTPDdocumentAttributeAudio::Flag;
+		const auto name = track.artist + u" - "_q + track.title + u".mp3"_q;
+		auto attributes = QVector<MTPDocumentAttribute>{
+			MTP_documentAttributeAudio(
+				MTP_flags(AudioFlag::f_title | AudioFlag::f_performer),
+				MTP_int(std::max(track.duration, seconds)),
+				MTP_string(track.title),
+				MTP_string(track.artist),
+				MTPbytes()),
+			MTP_documentAttributeFilename(MTP_string(name)),
+		};
+		return MTP_inputMediaUploadedDocument(
+			MTP_flags(thumbId ? Flag::f_thumb : Flag(0)),
+			InputFile(audioId, name, audio),
+			(thumbId
+				? InputFile(thumbId, u"thumb.jpg"_q, thumb)
+				: MTPInputFile()),
+			MTP_string("audio/mpeg"),
+			MTP_vector<MTPDocumentAttribute>(std::move(attributes)),
+			MTPVector<MTPInputDocument>(),
+			MTPInputPhoto(),
+			MTPint(),
+			MTPint());
+	};
+	const auto send = [=] {
+		const auto strong = weak.get();
+		if (!strong) {
+			return;
+		}
+		strong->api().request(MTPmessages_UploadMedia(
+			MTP_flags(0),
+			MTPstring(),
+			MTP_inputPeerSelf(),
+			media()
+		)).done([=](const MTPMessageMedia &result) {
+			const auto strong = weak.get();
+			if (!strong) {
+				return;
+			}
+			auto document = (DocumentData*)nullptr;
+			result.match([&](const MTPDmessageMediaDocument &data) {
+				if (const auto received = data.vdocument()) {
+					document = strong->data().processDocument(*received);
+				}
+			}, [](const auto &) {});
+			done(document);
+		}).fail([=] {
+			done(nullptr);
+		}).send();
+	};
+	const auto part = [=](uint64 id, QByteArray bytes, Fn<void()> next) {
+		const auto strong = weak.get();
+		if (!strong) {
+			return;
+		}
+		strong->api().request(MTPupload_SaveFilePart(
+			MTP_long(id),
+			MTP_int(0),
+			MTP_bytes(bytes)
+		)).done(next).fail([=] {
+			done(nullptr);
+		}).send();
+	};
+	part(audioId, audio, thumbId ? Fn<void()>([=] {
+		part(thumbId, thumb, send);
+	}) : Fn<void()>(send));
+}
+
+void Manager::removeMusic(not_null<Main::Session*> session, DocumentId id) {
+	const auto document = session->data().document(id);
+	if (document->hasRemoteLocation()) {
+		session->data().savedMusic().remove(document);
+		return;
+	}
+	const auto weak = base::make_weak(session);
+	session->api().request(MTPusers_GetSavedMusic(
+		MTP_inputUserSelf(),
+		MTP_int(0),
+		MTP_int(kSearchLimit),
+		MTP_long(0)
+	)).done([=](const MTPusers_SavedMusic &result) {
+		const auto strong = weak.get();
+		if (!strong) {
+			return;
+		}
+		result.match([&](const MTPDusers_savedMusic &data) {
+			for (const auto &received : data.vdocuments().v) {
+				const auto document = strong->data().processDocument(received);
+				if (document->id == id) {
+					strong->data().savedMusic().remove(document);
+				}
+			}
+		}, [](const auto &) {});
+	}).send();
+}
+
+void Manager::syncBio(
+		not_null<Main::Session*> session,
+		const std::optional<Track> &track) {
+	const auto userId = session->userId().bare;
+	const auto self = session->user();
+	auto &applied = _applied[userId];
+	if (!track) {
+		if (applied.bioSaved) {
+			const auto about = self->about();
+			if (about.isEmpty() || about == applied.bioText) {
+				session->api().saveSelfBio(applied.bioBackup);
+			}
+			applied = Applied{
+				.music = applied.music,
+				.musicKey = applied.musicKey,
+			};
+			save();
+		}
+		return;
+	}
+	if (!applied.bioSaved) {
+		if (_bioLoading.contains(userId)) {
+			return;
+		}
+		_bioLoading.emplace(userId);
+		const auto weak = base::make_weak(session);
+		session->api().request(MTPusers_GetFullUser(
+			MTP_inputUserSelf()
+		)).done(crl::guard(this, [=](const MTPusers_UserFull &result) {
+			_bioLoading.remove(userId);
+			const auto strong = weak.get();
+			if (!strong) {
+				return;
+			}
+			auto &applied = _applied[userId];
+			const auto about = result.data().vfull_user().data().vabout();
+			applied.bioBackup = about ? qs(*about) : QString();
+			applied.bioSaved = true;
+			save();
+			sync();
+		})).fail(crl::guard(this, [=] {
+			_bioLoading.remove(userId);
+		})).send();
+		return;
+	}
+	const auto text = BioText(session, *track);
+	const auto about = self->about();
+	if (!about.isEmpty()
+		&& !applied.bioText.isEmpty()
+		&& about != applied.bioText
+		&& about != text) {
+		applied.bioBackup = about;
+	}
+	if (applied.bioText != text) {
+		applied.bioText = text;
+		save();
+	}
+	if (about != text) {
+		session->api().saveSelfBio(text);
+	}
+}
+
+void Manager::load() {
+	auto file = QFile(StatePath());
+	if (!file.open(QIODevice::ReadOnly)) {
+		return;
+	}
+	const auto root = QJsonDocument::fromJson(file.readAll()).object();
+	for (auto i = root.begin(); i != root.end(); ++i) {
+		const auto userId = i.key().toULongLong();
+		const auto value = i.value().toObject();
+		if (!userId) {
+			continue;
+		}
+		_applied[userId] = Applied{
+			.music = value.value(u"music"_q).toString().toULongLong(),
+			.musicKey = value.value(u"musicKey"_q).toString(),
+			.bioBackup = value.value(u"bioBackup"_q).toString(),
+			.bioText = value.value(u"bioText"_q).toString(),
+			.bioSaved = value.value(u"bioSaved"_q).toBool(),
+		};
+	}
+}
+
+void Manager::save() const {
+	auto root = QJsonObject();
+	for (const auto &[userId, applied] : _applied) {
+		root.insert(QString::number(userId), QJsonObject{
+			{ u"music"_q, QString::number(applied.music) },
+			{ u"musicKey"_q, applied.musicKey },
+			{ u"bioBackup"_q, applied.bioBackup },
+			{ u"bioText"_q, applied.bioText },
+			{ u"bioSaved"_q, applied.bioSaved },
+		});
+	}
+	auto file = QFile(StatePath());
+	if (root.isEmpty()) {
+		file.remove();
+	} else if (file.open(QIODevice::WriteOnly)) {
+		file.write(QJsonDocument(root).toJson(QJsonDocument::Compact));
+	}
+}
+
+Manager *Instance = nullptr;
+
+}
+
+void Start() {
+	if (!Instance) {
+		Instance = new Manager();
+	}
+}
+
+std::optional<Track> Current() {
+	return Instance ? Instance->current() : std::nullopt;
+}
+
+rpl::producer<std::optional<Track>> Value() {
+	return Instance
+		? Instance->value()
+		: rpl::single(std::optional<Track>());
+}
+
+rpl::producer<QImage> CoverValue() {
+	return Instance ? Instance->cover() : rpl::single(QImage());
+}
+
+QString SiteUrl(NowPlayingService service) {
+	return (service == NowPlayingService::StatsFm)
+		? u"https://stats.fm/"_q
+		: u"https://www.last.fm/"_q;
+}
+
+}
