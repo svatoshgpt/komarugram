@@ -2071,8 +2071,24 @@ win_mac:
 # revisions ride in the version for that, and the counter in front of them
 # flushes a cache whose generated source the CI prune had already deleted.
 # The wallet-engine patch rewrites those sources, so it is a dependency here.
+# KomaruGram's own crate joins them from this repository, so a hash of its
+# sources rides in the version too.
+komaruCorePath = os.path.realpath(
+    os.path.join(scriptPath, '..', '..', 'rust', 'komaru_core'))
+def komaruCoreHash():
+    sha1 = hashlib.sha1()
+    for folder, dirs, files in sorted(os.walk(komaruCorePath)):
+        dirs[:] = sorted(d for d in dirs if d != 'target')
+        for name in sorted(files):
+            path = os.path.join(folder, name)
+            relative = os.path.relpath(path, komaruCorePath)
+            sha1.update(relative.replace(os.sep, '/').encode())
+            with open(path, 'rb') as f:
+                sha1.update(f.read().replace(b'\r\n', b'\n'))
+    return sha1.hexdigest()[:16]
+
 stage('tdesktop_rust', """
-version: 2.""" + tlottieRevision + '.' + walletEngineRevision + """
+version: 3.""" + tlottieRevision + '.' + walletEngineRevision + '.' + komaruCoreHash() + """
 depends:patches/wallet-engine.patch
 win:
     SET "RUSTUP_HOME=%THIRDPARTY_DIR%\\rust\\rustup"
@@ -2095,8 +2111,10 @@ win:
     cd tdesktop_rust
     echo pub use ::tlottie;> src\\lib.rs
     echo pub use ::wallet_engine;>> src\\lib.rs
+    echo pub use ::komaru_core;>> src\\lib.rs
     cargo add --path ..\\tlottie --features c-api
     cargo add --path ..\\wallet-engine
+    cargo add --path """ + komaruCorePath + """
     cargo rustc --lib --release ^
         --crate-type staticlib --crate-type cdylib ^
         %RUST_BUILD_STD% ^
@@ -2122,9 +2140,10 @@ mac:
     export PATH=$CARGO_HOME/bin:$PATH
     cargo new --lib --vcs none tdesktop_rust
     cd tdesktop_rust
-    printf 'pub use ::tlottie;\\npub use ::wallet_engine;\\n' > src/lib.rs
+    printf 'pub use ::tlottie;\\npub use ::wallet_engine;\\npub use ::komaru_core;\\n' > src/lib.rs
     cargo add --path ../tlottie --features c-api
     cargo add --path ../wallet-engine
+    cargo add --path """ + komaruCorePath + """
     buildOneArch() {
         cargo rustc --lib --release \\
             --crate-type staticlib --crate-type cdylib \\

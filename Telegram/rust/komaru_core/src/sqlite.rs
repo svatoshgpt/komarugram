@@ -1,12 +1,15 @@
 //! A small safe wrapper over the SQLite C API.
 //!
 //! The functions come from `ayu/libs/sqlite/sqlite3.c`, which the client
-//! compiles anyway, so the final link resolves them. Tests link the system
-//! library instead.
+//! compiles anyway, handed over as a table by `komaru_set_sqlite`. The crate
+//! is linked into a library that is also built as a DLL, so it must not
+//! leave SQLite symbols for the final link to resolve. Tests take the
+//! system library instead.
 
 use std::ffi::{c_char, c_int, c_void, CStr, CString};
 use std::fmt;
 use std::ptr;
+use std::sync::OnceLock;
 
 #[repr(C)]
 struct RawDb {
@@ -28,54 +31,96 @@ const SQLITE_OPEN_CREATE: c_int = 0x0000_0004;
 // Makes SQLite copy the bound data before the call returns.
 const SQLITE_TRANSIENT: isize = -1;
 
-#[cfg_attr(test, link(name = "sqlite3"))]
-extern "C" {
-    fn sqlite3_initialize() -> c_int;
-    fn sqlite3_open_v2(
+/// Declares the table `Api`, laid out as `KomaruSqlite` in the header, and
+/// a wrapper of each function under its SQLite name.
+macro_rules! sqlite_api {
+    ($($name:ident($($arg:ident: $type:ty),*) $(-> $result:ty)?;)*) => {
+        #[repr(C)]
+        #[derive(Clone, Copy)]
+        pub struct Api {
+            $($name: unsafe extern "C" fn($($type),*) $(-> $result)?,)*
+        }
+
+        $(unsafe fn $name($($arg: $type),*) $(-> $result)? {
+            (api().$name)($($arg),*)
+        })*
+
+        #[cfg(test)]
+        mod system {
+            use super::*;
+
+            #[link(name = "sqlite3")]
+            extern "C" {
+                $(pub fn $name($($arg: $type),*) $(-> $result)?;)*
+            }
+
+            pub fn table() -> Api {
+                Api { $($name,)* }
+            }
+        }
+    };
+}
+
+sqlite_api! {
+    sqlite3_initialize() -> c_int;
+    sqlite3_open_v2(
         filename: *const c_char,
         db: *mut *mut RawDb,
         flags: c_int,
-        vfs: *const c_char,
+        vfs: *const c_char
     ) -> c_int;
-    fn sqlite3_close_v2(db: *mut RawDb) -> c_int;
-    fn sqlite3_errmsg(db: *mut RawDb) -> *const c_char;
-    fn sqlite3_exec(
+    sqlite3_close_v2(db: *mut RawDb) -> c_int;
+    sqlite3_errmsg(db: *mut RawDb) -> *const c_char;
+    sqlite3_exec(
         db: *mut RawDb,
         sql: *const c_char,
         callback: *const c_void,
         argument: *mut c_void,
-        error: *mut *mut c_char,
+        error: *mut *mut c_char
     ) -> c_int;
-    fn sqlite3_prepare_v2(
+    sqlite3_prepare_v2(
         db: *mut RawDb,
         sql: *const c_char,
         size: c_int,
         stmt: *mut *mut RawStmt,
-        tail: *mut *const c_char,
+        tail: *mut *const c_char
     ) -> c_int;
-    fn sqlite3_finalize(stmt: *mut RawStmt) -> c_int;
-    fn sqlite3_step(stmt: *mut RawStmt) -> c_int;
-    fn sqlite3_bind_int64(stmt: *mut RawStmt, index: c_int, value: i64) -> c_int;
-    fn sqlite3_bind_null(stmt: *mut RawStmt, index: c_int) -> c_int;
-    fn sqlite3_bind_text(
+    sqlite3_finalize(stmt: *mut RawStmt) -> c_int;
+    sqlite3_step(stmt: *mut RawStmt) -> c_int;
+    sqlite3_bind_int64(stmt: *mut RawStmt, index: c_int, value: i64) -> c_int;
+    sqlite3_bind_null(stmt: *mut RawStmt, index: c_int) -> c_int;
+    sqlite3_bind_text(
         stmt: *mut RawStmt,
         index: c_int,
         data: *const c_char,
         size: c_int,
-        destructor: isize,
+        destructor: isize
     ) -> c_int;
-    fn sqlite3_bind_blob(
+    sqlite3_bind_blob(
         stmt: *mut RawStmt,
         index: c_int,
         data: *const c_void,
         size: c_int,
-        destructor: isize,
+        destructor: isize
     ) -> c_int;
-    fn sqlite3_column_type(stmt: *mut RawStmt, column: c_int) -> c_int;
-    fn sqlite3_column_int64(stmt: *mut RawStmt, column: c_int) -> i64;
-    fn sqlite3_column_blob(stmt: *mut RawStmt, column: c_int) -> *const c_void;
-    fn sqlite3_column_bytes(stmt: *mut RawStmt, column: c_int) -> c_int;
-    fn sqlite3_free(pointer: *mut c_void);
+    sqlite3_column_type(stmt: *mut RawStmt, column: c_int) -> c_int;
+    sqlite3_column_int64(stmt: *mut RawStmt, column: c_int) -> i64;
+    sqlite3_column_blob(stmt: *mut RawStmt, column: c_int) -> *const c_void;
+    sqlite3_column_bytes(stmt: *mut RawStmt, column: c_int) -> c_int;
+    sqlite3_free(pointer: *mut c_void);
+}
+
+static API: OnceLock<Api> = OnceLock::new();
+
+/// Takes the functions to call; only the first table counts.
+pub fn set_api(api: Api) {
+    let _ = API.set(api);
+}
+
+fn api() -> &'static Api {
+    #[cfg(test)]
+    let _ = API.set(system::table());
+    API.get().expect("komaru_set_sqlite was not called")
 }
 
 #[derive(Debug, Clone)]

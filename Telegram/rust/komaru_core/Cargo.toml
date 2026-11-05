@@ -6,10 +6,11 @@ publish = false
 description = "Native parts of KomaruGram written in Rust"
 
 # No dependencies on purpose: the crate builds offline in seconds and talks
-# to the sqlite3.c that the client already compiles.
+# to the sqlite3.c that the client already compiles, through komaru_set_sqlite.
 
 [lib]
-crate-type = ["staticlib"]
+# rlib: prepare.py builds the crate into tdesktop_rust on Windows and macOS.
+crate-type = ["staticlib", "rlib"]
 
 [profile.release]
 opt-level = "s"
