@@ -26,7 +26,7 @@ struct ChatPaintContext;
 
 struct MessageSendingReveal {
 	crl::time duration = 0;
-	anim::transition transition = anim::linear;
+	Fn<int(int height, int lift, float64 progress)> height;
 };
 
 class MessageSendingAnimationController final {

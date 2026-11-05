@@ -274,9 +274,13 @@ is in `.agents/skills/code-health/SKILL.md`.
 
 ## Coding Style
 
-**Do NOT write comments in code:**
+**Comments:**
 
-This is important! Do not write single-line comments that describe what the next line does - they are bloat. Comments are allowed ONLY to describe complex algorithms in detail, when the explanation requires at least 4-5 lines. Self-documenting code with clear variable and function names is preferred.
+Add no comments. A one-line comment carrying a reason is acceptable, at most two such lines per commit; anything longer only to carry a reference URL. `Telegram/SourceFiles/test/` is exempt.
+
+Do not remove existing comments just to satisfy this rule. Preserve comments unless your change makes them incorrect or truly obsolete; when moving or refactoring code, move the useful comment with it. Inline comments that label positional arguments for generated or schema-driven APIs (for example TL/MTP constructors) are useful because the field names are not visible in the call itself.
+
+**Never cite line numbers** in comments, `README.md` files or other checked-in text. Name the function, member, constant or type, and its file when that helps: write `Runner::finish()` in `test_runner.cpp`, not `test_runner.cpp:NNN` or `:NNN-MMM`. Line numbers drift with every edit and nothing updates them. This covers submodule, Qt and other third-party sources too. Quoted log or crash text stays verbatim.
 
 ```cpp
 // BAD - don't do this:
@@ -289,12 +293,12 @@ if (user->isPremium()) {
 auto name = user->name();
 if (user->isPremium()) {
 
-// ACCEPTABLE - complex algorithm explanation (4+ lines):
-// The algorithm works by first collecting all visible messages
-// in the viewport, then calculating their intersection with
-// the clip rectangle. Messages are grouped by date headers,
-// and we need to account for sticky headers that may overlap
-// with the first message in each group.
+// ACCEPTABLE - one line, and it carries a reason:
+_limit = kDefaultLimit; // the server rejects anything larger
+
+// ACCEPTABLE - longer, and it carries a reference URL:
+// The flag is ignored until the server rolls out the scheme
+// described at https://core.telegram.org/api/updates
 ```
 
 **Style and formatting rules** are in `REVIEW.md` — see that file for empty-line-before-closing-brace, operator placement in multi-line expressions, if-with-initializer, and other mechanical style rules.
