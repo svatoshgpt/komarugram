@@ -9501,7 +9501,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_DisableDeleteAnimation" = "Disable message deletion animation";
 "ayu_PluginsEnableAll" = "Enable plugins";
 "ayu_PluginsAllOff" = "Plugins are off and do not run at all. Your choice for each plugin stays.";
-"ayu_PluginsOpenScreen" = "All plugins";
 "ayu_PluginsPythonMissing" = "Python 3.9 or newer was not found. Install it from python.org with \"Add python.exe to PATH\" ticked, then press Retry.";
 "ayu_PluginsRuntimeAboutSystem" = "Plugins run with the system python3. KomaruGram will install Telethon and Kurigram for it with pip.";
 "ayu_PluginsRuntimeInstall" = "Install plugin runtime";

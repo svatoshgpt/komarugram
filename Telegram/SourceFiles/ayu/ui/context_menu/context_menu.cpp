@@ -15,7 +15,6 @@
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
 #include "ayu/features/plugins/komaru_plugins.h"
-#include "ayu/ui/settings/settings_plugins.h"
 #include "ayu/features/forward/ayu_forward.h"
 #include "ayu/features/forward/ayu_forward_rich.h"
 #include "ayu/ui/context_menu/menu_item_subtext.h"
@@ -347,6 +346,9 @@ void AddPluginsAction(PeerData *peerData,
 			}
 		}
 	}
+	if (entries.empty()) {
+		return;
+	}
 	const auto session = &sessionController->session();
 	addCallback(Window::PeerMenuCallback::Args{
 		.text = tr::ayu_PluginsTitle(tr::now),
@@ -368,16 +370,6 @@ void AddPluginsAction(PeerData *peerData,
 					},
 					&st::menuIconCustomize);
 			}
-			if (!entries.empty()) {
-				addAction({ .isSeparator = true });
-			}
-			addAction(
-				tr::ayu_PluginsOpenScreen(tr::now),
-				[=] {
-					sessionController->showSettings(
-						Settings::KomaruPluginsId());
-				},
-				&st::ayuPluginsIcon);
 		},
 	});
 }
