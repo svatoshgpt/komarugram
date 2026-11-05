@@ -8,6 +8,7 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use crate::db::{self, Bytes, Exclusion, Filter, FilterQuery, Message, MessageKind};
 use crate::log::{self, log, Logger};
+use crate::filter::Pattern;
 use crate::sqlite;
 
 type MessageSink = unsafe extern "C" fn(context: *mut c_void, row: *const Message);
@@ -229,4 +230,44 @@ pub extern "C" fn komaru_db_has_filters() -> u8 {
 #[no_mangle]
 pub extern "C" fn komaru_db_has_per_dialog_filters() -> u8 {
     guard(0, || u8::from(db::has_per_dialog_filters()))
+}
+
+/// # Safety
+/// `pattern` must point to `size` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn komaru_filter_compile(
+    pattern: *const u8,
+    size: usize,
+    case_insensitive: u8,
+) -> *mut Pattern {
+    let pattern = String::from_utf8_lossy(text(pattern, size)).into_owned();
+    guard(std::ptr::null_mut(), || {
+        Pattern::compile(&pattern, case_insensitive != 0)
+            .map_or(std::ptr::null_mut(), |p| Box::into_raw(Box::new(p)))
+    })
+}
+
+/// # Safety
+/// `pattern` comes from komaru_filter_compile, `text` points to `size`
+/// bytes of UTF-8.
+#[no_mangle]
+pub unsafe extern "C" fn komaru_filter_find(
+    pattern: *const Pattern,
+    text_data: *const u8,
+    size: usize,
+) -> u8 {
+    let Some(pattern) = pattern.as_ref() else {
+        return 0;
+    };
+    let text = text(text_data, size);
+    guard(0, || u8::from(pattern.find(text)))
+}
+
+/// # Safety
+/// `pattern` comes from komaru_filter_compile and is not used afterwards.
+#[no_mangle]
+pub unsafe extern "C" fn komaru_filter_free(pattern: *mut Pattern) {
+    if !pattern.is_null() {
+        drop(Box::from_raw(pattern));
+    }
 }

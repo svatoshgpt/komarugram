@@ -197,6 +197,19 @@ void komaru_db_delete_all_exclusions();
 uint8_t komaru_db_has_filters();
 uint8_t komaru_db_has_per_dialog_filters();
 
+// A message filter pattern, matched in linear time. Compiling gives null
+// when the pattern needs ICU, like lookaround or backreferences.
+typedef struct KomaruFilter KomaruFilter;
+KomaruFilter *komaru_filter_compile(
+	const char *pattern,
+	size_t size,
+	uint8_t caseInsensitive);
+uint8_t komaru_filter_find(
+	const KomaruFilter *filter,
+	const char *text,
+	size_t size);
+void komaru_filter_free(KomaruFilter *filter);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

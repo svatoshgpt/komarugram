@@ -5,7 +5,7 @@ edition = "2021"
 publish = false
 description = "Native parts of KomaruGram written in Rust"
 
-# No dependencies on purpose: the crate builds offline in seconds and talks
+# Only the regex crate, for the message filters. The database talks
 # to the sqlite3.c that the client already compiles, through komaru_set_sqlite.
 
 [lib]
@@ -16,3 +16,6 @@ crate-type = ["staticlib", "rlib"]
 opt-level = "s"
 codegen-units = 1
 debug = false
+
+[dependencies]
+regex = "1"

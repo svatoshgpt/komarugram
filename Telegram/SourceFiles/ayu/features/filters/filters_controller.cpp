@@ -50,9 +50,16 @@ std::optional<bool> isFiltered(
 	}
 
 	const auto icuStr = icu::UnicodeString(reinterpret_cast<const UChar*>(str.constData()), str.length());
+	const auto utf8 = str.toUtf8();
 
-	const auto matches = [&](const ReversiblePattern &pattern)
+	const auto find = [&](const ReversiblePattern &pattern)
 	{
+		if (pattern.fast) {
+			return komaru_filter_find(
+				pattern.fast.get(),
+				utf8.constData(),
+				size_t(utf8.size())) != 0;
+		}
 		UErrorCode status = U_ZERO_ERROR;
 
 		const auto matcher = std::unique_ptr<icu::RegexMatcher>(pattern.pattern->matcher(icuStr, status));
@@ -60,8 +67,12 @@ std::optional<bool> isFiltered(
 			LOG(("FILTER FAILED: %1").arg(u_errorName(status)));
 			return false;
 		}
+		return bool(matcher->find());
+	};
 
-		const auto match = matcher->find();
+	const auto matches = [&](const ReversiblePattern &pattern)
+	{
+		const auto match = find(pattern);
 		const auto reversed = pattern.reversed;
 
 		if ((!reversed && match) || (reversed && !match)) {
