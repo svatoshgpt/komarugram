@@ -4825,22 +4825,29 @@ void ApiWrap::sendRichMessage(
 void ApiWrap::sendMessage(
 		MessageToSend &&message,
 		std::optional<MsgId> localMessageId) {
-	if (KomaruPlugins::HasSendHooks()) {
+	if (!_sendHooksPassed && KomaruPlugins::HasSendHooks()) {
 		const auto peer = message.action.history->peer->id;
 		const auto marked = peerIsUser(peer)
 			? int64(peerToUser(peer).bare)
 			: peerIsChat(peer)
 			? -int64(peerToChat(peer).bare)
 			: -(int64(1000000000000) + int64(peerToChannel(peer).bare));
-		const auto outgoing = KomaruPlugins::TransformOutgoing(
-			&session(),
-			marked,
-			message.textWithTags.text);
-		if (outgoing.cancel) {
-			return;
-		} else if (outgoing.text != message.textWithTags.text) {
-			message.textWithTags = { outgoing.text, {} };
-		}
+		const auto text = message.textWithTags.text;
+		const auto weak = base::make_weak(&session());
+		KomaruPlugins::TransformOutgoing(&session(), marked, text, [=](
+				KomaruPlugins::Outgoing outgoing) {
+			if (!weak || outgoing.cancel) {
+				return;
+			}
+			auto copy = message;
+			if (outgoing.text != text) {
+				copy.textWithTags = { outgoing.text, {} };
+			}
+			_sendHooksPassed = true;
+			sendMessage(std::move(copy), localMessageId);
+			_sendHooksPassed = false;
+		});
+		return;
 	}
 	applyGhostScheduling(message.action, message.textWithTags.text);
 	const auto clearReplyTo = prependPseudoReply(message);

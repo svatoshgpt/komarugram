@@ -10,11 +10,11 @@
 #include "main/main_domain.h"
 #include "main/main_session.h"
 #include "mtproto/mtp_instance.h"
+#include "base/call_delayed.h"
 #include "ui/toast/toast.h"
 
 #include <QtCore/QDir>
 #include <QtCore/QDirIterator>
-#include <QtCore/QElapsedTimer>
 #include <QtCore/QFile>
 #include <QtCore/QFileInfo>
 #include <QtCore/QJsonDocument>
@@ -25,6 +25,8 @@
 #include <QtCore/QTimer>
 #include <QtGui/QClipboard>
 #include <QtGui/QGuiApplication>
+
+#include <deque>
 
 namespace KomaruPlugins {
 namespace {
@@ -908,42 +910,85 @@ bool HasSendHooks() {
 	return false;
 }
 
-Outgoing TransformOutgoing(
+namespace {
+
+struct OutgoingJob {
+	QJsonObject command;
+	QString text;
+	Fn<void(Outgoing)> done;
+};
+
+struct OutgoingQueue {
+	std::deque<OutgoingJob> jobs;
+	bool busy = false;
+	uint64 serial = 0;
+};
+
+OutgoingQueue &Queue() {
+	static auto result = OutgoingQueue();
+	return result;
+}
+
+void RunNextOutgoing() {
+	auto &queue = Queue();
+	if (queue.busy || queue.jobs.empty()) {
+		return;
+	}
+	queue.busy = true;
+	const auto serial = ++queue.serial;
+	const auto job = std::make_shared<OutgoingJob>(
+		std::move(queue.jobs.front()));
+	queue.jobs.pop_front();
+	const auto finish = [=](std::optional<QJsonObject> reply) {
+		auto &queue = Queue();
+		if (!queue.busy || queue.serial != serial) {
+			return;
+		}
+		queue.busy = false;
+		++queue.serial;
+		auto result = Outgoing{ .text = job->text };
+		if (reply) {
+			const auto action = reply->value(u"action"_q).toString();
+			if (action == u"cancel"_q) {
+				result.cancel = true;
+			} else if (action == u"modify"_q) {
+				result.text = reply->value(u"text"_q).toString(job->text);
+			}
+		}
+		job->done(std::move(result));
+		RunNextOutgoing();
+	};
+	Request(job->command, [=](QJsonValue value, QString error) {
+		finish(error.isEmpty()
+			? std::optional<QJsonObject>(value.toObject())
+			: std::nullopt);
+	});
+	base::call_delayed(kSendHookTimeout, [=] { finish(std::nullopt); });
+}
+
+} // namespace
+
+void TransformOutgoing(
 		not_null<Main::Session*> session,
 		int64 peer,
-		const QString &text) {
-	auto result = Outgoing{ .text = text };
+		const QString &text,
+		Fn<void(Outgoing)> done) {
 	auto &state = Instance();
 	if (text.isEmpty() || !state.ready || !state.process || !HasSendHooks()) {
-		return result;
+		done({ .text = text });
+		return;
 	}
 	auto command = QJsonObject();
 	command.insert(u"cmd"_q, u"transform_outgoing"_q);
 	command.insert(u"account"_q, AccountIndex(&session->account()));
 	command.insert(u"peer"_q, QString::number(peer));
 	command.insert(u"text"_q, text);
-	const auto reply = std::make_shared<std::optional<QJsonObject>>();
-	Request(command, [=](QJsonValue value, QString error) {
-		*reply = error.isEmpty() ? value.toObject() : QJsonObject();
+	Queue().jobs.push_back({
+		.command = std::move(command),
+		.text = text,
+		.done = std::move(done),
 	});
-	auto timer = QElapsedTimer();
-	timer.start();
-	while (!reply->has_value()
-		&& Instance().process
-		&& timer.elapsed() < kSendHookTimeout) {
-		Instance().process->waitForReadyRead(50);
-	}
-	if (!reply->has_value()) {
-		return result;
-	}
-	const auto &object = **reply;
-	const auto action = object.value(u"action"_q).toString();
-	if (action == u"cancel"_q) {
-		result.cancel = true;
-	} else if (action == u"modify"_q) {
-		result.text = object.value(u"text"_q).toString(text);
-	}
-	return result;
+	RunNextOutgoing();
 }
 
 } // namespace KomaruPlugins

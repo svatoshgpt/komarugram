@@ -883,4 +883,6 @@ private:
 	base::flat_map<FullMsgId, QString> _unlikelyMessageLinks;
 	base::flat_map<FullStoryId, QString> _unlikelyStoryLinks;
 
+	bool _sendHooksPassed = false;
+
 };

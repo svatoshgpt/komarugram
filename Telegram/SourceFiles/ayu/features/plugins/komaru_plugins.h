@@ -105,11 +105,11 @@ struct Outgoing {
 
 [[nodiscard]] bool HasSendHooks();
 
-// Asks the plugins with a send hook about outgoing text, waiting at most a
-// second and a half; on a timeout the text goes out unchanged.
-[[nodiscard]] Outgoing TransformOutgoing(
+// Asks the send hooks in sending order without blocking; a late answer sends the text as is.
+void TransformOutgoing(
 	not_null<Main::Session*> session,
 	int64 peer,
-	const QString &text);
+	const QString &text,
+	Fn<void(Outgoing)> done);
 
 } // namespace KomaruPlugins
