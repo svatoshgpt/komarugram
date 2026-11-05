@@ -52,29 +52,34 @@ std::shared_ptr<const Cache> buildCache() {
 			continue;
 		}
 
-		int flags = UREGEX_MULTILINE;
-		if (filter.caseInsensitive) flags |= UREGEX_CASE_INSENSITIVE;
+		auto compiled = ReversiblePattern{
+			.reversed = filter.reversed,
+			.fast = std::shared_ptr<KomaruFilter>(
+				komaru_filter_compile(
+					filter.text.data(),
+					filter.text.size(),
+					filter.caseInsensitive ? 1 : 0),
+				komaru_filter_free),
+		};
+		if (!compiled.fast) {
+			int flags = UREGEX_MULTILINE;
+			if (filter.caseInsensitive) flags |= UREGEX_CASE_INSENSITIVE;
 
-		auto status = U_ZERO_ERROR;
-		auto pattern = icu::RegexPattern::compile(icu::UnicodeString::fromUTF8(filter.text), flags, status);
-
-		if (!pattern) {
-			continue;
+			auto status = U_ZERO_ERROR;
+			compiled.pattern.reset(icu::RegexPattern::compile(
+				icu::UnicodeString::fromUTF8(filter.text),
+				flags,
+				status));
+			if (!compiled.pattern) {
+				continue;
+			}
 		}
 
 		if (filter.dialogId.has_value()) {
-			byDialogId[filter.dialogId.value()].push_back({
-				std::shared_ptr<icu::RegexPattern>(pattern),
-				filter.reversed,
-			});
+			byDialogId[filter.dialogId.value()].push_back(
+				std::move(compiled));
 		} else {
-			shared.push_back({
-				filter.id,
-				{
-					std::shared_ptr<icu::RegexPattern>(pattern),
-					filter.reversed,
-				},
-			});
+			shared.push_back({ filter.id, std::move(compiled) });
 		}
 	}
 

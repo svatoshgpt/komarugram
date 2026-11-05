@@ -4,6 +4,7 @@
 //! `include/komaru_core.h`.
 
 mod db;
+mod filter;
 mod ffi;
 mod log;
 mod sqlite;
