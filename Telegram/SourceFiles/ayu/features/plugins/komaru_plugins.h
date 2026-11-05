@@ -48,6 +48,7 @@ struct PluginInfo {
 	bool loaded = false;
 	bool hasSettings = false;
 	bool sendHook = false;
+	bool wantsUpdates = false;
 	std::vector<PluginMenuItem> menu;
 };
 

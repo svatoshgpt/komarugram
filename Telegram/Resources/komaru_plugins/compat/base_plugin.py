@@ -133,6 +133,7 @@ class BasePlugin:
     def add_hook(self, name: str, match_substring: bool = False, priority: int = 0):
         self._komaru_record.update_hooks.append((name, match_substring))
         context.manager().ensure_update_listener(self._komaru_record)
+        context.manager().notify_changed()
 
     def remove_hook(self, name: str):
         hooks = self._komaru_record.update_hooks

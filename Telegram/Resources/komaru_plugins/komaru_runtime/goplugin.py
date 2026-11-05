@@ -152,6 +152,7 @@ class GoPlugin:
         elif call == "subscribe" and message.get("what") == "updates":
             self.wants_updates = True
             self.manager.ensure_update_listener(self.record)
+            self.manager.notify_changed()
         elif call == "send_message":
             await self._send_message(message)
 

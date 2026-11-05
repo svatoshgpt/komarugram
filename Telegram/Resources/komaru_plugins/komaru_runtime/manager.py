@@ -123,6 +123,8 @@ class Record:
             "error": self.error,
             "has_settings": self.has_settings(),
             "send_hook": self.send_hook or bool(self.go and self.go.send_hook),
+            "wants_updates": bool(self.update_hooks)
+                or bool(self.go and self.go.wants_updates),
             "menu": self.describe_menu(),
         }
 

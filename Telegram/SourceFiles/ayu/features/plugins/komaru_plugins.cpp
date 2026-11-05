@@ -472,6 +472,7 @@ void ParsePlugins(const QJsonValue &value) {
 			.loaded = object.value(u"loaded"_q).toBool(),
 			.hasSettings = object.value(u"has_settings"_q).toBool(),
 			.sendHook = object.value(u"send_hook"_q).toBool(),
+			.wantsUpdates = object.value(u"wants_updates"_q).toBool(),
 			.menu = ParseMenu(object.value(u"menu"_q)),
 		});
 	}
@@ -854,11 +855,11 @@ void ForwardUpdates(
 	if (!state.process || !state.ready) {
 		return;
 	}
-	auto loaded = false;
-	for (const auto &plugin : state.plugins) {
-		loaded |= plugin.loaded;
-	}
-	if (!loaded) {
+	// Telethon catches up on every gap it sees through the client, so only subscribers get updates.
+	const auto wanted = ranges::any_of(state.plugins, [](const PluginInfo &p) {
+		return p.loaded && p.wantsUpdates;
+	});
+	if (!wanted) {
 		return;
 	}
 	auto buffer = mtpBuffer();
