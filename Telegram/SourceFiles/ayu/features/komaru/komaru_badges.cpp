@@ -48,20 +48,29 @@ constexpr auto kParticles = 4;
 constexpr auto kOrbitPeriod = 6000.;
 constexpr auto kTwinklePeriod = 1400.;
 
-// An emoji status from statuses.txt: either a custom emoji id, or a
-// 1-based position in an emoji pack that is looked up once per pack.
+// A custom emoji id, or a 1-based position in a pack like EmojiKomaru/1.
 struct StatusRef {
 	QString set;
 	int index = 0;
 	DocumentId id = 0;
+};
+
+// A person's statuses: all in a row, or one at a time when a period is set.
+struct StatusLine {
+	std::vector<StatusRef> refs;
+	crl::time period = 0;
 	QString text;
 };
+
+// How often a rotating status line is checked for its next status.
+constexpr auto kRotationCheck = crl::time(1000);
 
 struct State {
 	std::unordered_map<uint64, Entry> developers;
 	std::unordered_map<uint64, Entry> supporters;
 	std::map<Kind, QByteArray> raw;
-	std::unordered_map<uint64, StatusRef> statuses;
+	std::unordered_map<uint64, StatusLine> statuses;
+	crl::time rotationStep = -1;
 	QByteArray statusesRaw;
 	base::flat_map<QString, std::vector<DocumentId>> sets;
 	base::flat_set<QString> requestedSets;
@@ -160,9 +169,18 @@ struct State {
 		: StatusRef();
 }
 
-[[nodiscard]] std::unordered_map<uint64, StatusRef> ParseStatuses(
+// A rotation period like "10s", 0 for anything else.
+[[nodiscard]] crl::time ParsePeriod(const QString &text) {
+	static const auto expression = QRegularExpression(u"^(\\d+)s$"_q);
+	const auto match = expression.match(text.trimmed());
+	return match.hasMatch()
+		? crl::time(match.captured(1).toInt()) * 1000
+		: crl::time();
+}
+
+[[nodiscard]] std::unordered_map<uint64, StatusLine> ParseStatuses(
 		const QByteArray &data) {
-	auto result = std::unordered_map<uint64, StatusRef>();
+	auto result = std::unordered_map<uint64, StatusLine>();
 	for (const auto &raw : QString::fromUtf8(data).split('\n')) {
 		const auto line = raw.trimmed();
 		if (line.isEmpty() || line.startsWith('#')) {
@@ -173,14 +191,46 @@ struct State {
 		if (!id || parts.size() < 2) {
 			continue;
 		}
-		auto status = ParseStatusRef(parts[1].trimmed());
-		if (!status.id && !status.index) {
+		auto status = StatusLine();
+		for (const auto &text : parts[1].split('|')) {
+			const auto ref = ParseStatusRef(text.trimmed());
+			if ((ref.id || ref.index) && status.refs.size() < kMaxStatuses) {
+				status.refs.push_back(ref);
+			}
+		}
+		if (status.refs.empty()) {
 			continue;
 		}
-		if (parts.size() > 2) {
-			status.text = parts.mid(2).join(',').trimmed();
+		auto rest = parts.mid(2);
+		if (!rest.isEmpty() && ParsePeriod(rest.front())) {
+			status.period = ParsePeriod(rest.takeFirst());
+		} else if (!rest.isEmpty() && ParsePeriod(rest.back())) {
+			status.period = ParsePeriod(rest.takeLast());
 		}
+		status.text = rest.join(',').trimmed();
 		result.emplace(id, std::move(status));
+	}
+	return result;
+}
+
+[[nodiscard]] DocumentId Resolve(const State &state, const StatusRef &ref) {
+	if (ref.id) {
+		return ref.id;
+	}
+	const auto i = state.sets.find(ref.set);
+	return (i != end(state.sets) && ref.index <= int(i->second.size()))
+		? i->second[ref.index - 1]
+		: DocumentId();
+}
+
+// Which status of every rotating line shows now, to notice a change.
+[[nodiscard]] crl::time RotationStep(const State &state) {
+	auto result = crl::time();
+	const auto now = crl::now();
+	for (const auto &[peerId, line] : state.statuses) {
+		if (line.period > 0 && line.refs.size() > 1) {
+			result = result * 31 + now / line.period;
+		}
 	}
 	return result;
 }
@@ -260,9 +310,11 @@ void ResolveStatusSets() {
 	if (!state.session) {
 		return;
 	}
-	for (const auto &[peerId, status] : state.statuses) {
-		if (!status.set.isEmpty()) {
-			RequestSet(state.session, status.set);
+	for (const auto &[peerId, line] : state.statuses) {
+		for (const auto &ref : line.refs) {
+			if (!ref.set.isEmpty()) {
+				RequestSet(state.session, ref.set);
+			}
 		}
 	}
 }
@@ -507,6 +559,18 @@ void Start() {
 	const auto timer = new QTimer(QCoreApplication::instance());
 	QObject::connect(timer, &QTimer::timeout, [] { Refresh(); });
 	timer->start(kRefreshInterval);
+
+	const auto rotation = new QTimer(QCoreApplication::instance());
+	QObject::connect(rotation, &QTimer::timeout, [] {
+		auto &state = Instance();
+		const auto step = RotationStep(state);
+		if (state.rotationStep != step) {
+			state.rotationStep = step;
+			state.updated.fire({});
+			RepaintAll();
+		}
+	});
+	rotation->start(kRotationCheck);
 }
 
 const Entry *Developer(uint64 peerId) {
@@ -521,19 +585,24 @@ const Entry *Supporter(uint64 peerId) {
 	return (i != end(list)) ? &i->second : nullptr;
 }
 
-uint64 Status(uint64 peerId) {
+std::vector<uint64> Statuses(uint64 peerId) {
 	const auto &state = Instance();
 	const auto i = state.statuses.find(peerId);
 	if (i == end(state.statuses)) {
-		return 0;
-	} else if (i->second.id) {
-		return i->second.id;
+		return {};
 	}
-	const auto j = state.sets.find(i->second.set);
-	if (j == end(state.sets) || i->second.index > int(j->second.size())) {
-		return 0;
+	auto result = std::vector<uint64>();
+	for (const auto &ref : i->second.refs) {
+		if (const auto id = Resolve(state, ref)) {
+			result.push_back(id);
+		}
 	}
-	return j->second[i->second.index - 1];
+	const auto period = i->second.period;
+	if (period > 0 && result.size() > 1) {
+		const auto index = (crl::now() / period) % int64(result.size());
+		return { result[index] };
+	}
+	return result;
 }
 
 QString StatusText(uint64 peerId) {
