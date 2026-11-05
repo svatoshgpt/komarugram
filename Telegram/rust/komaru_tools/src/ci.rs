@@ -69,17 +69,49 @@ fn keep_dates(args: &Args) -> Result<u8, String> {
         dated += 1;
     }
     let now = SystemTime::now();
-    for path in changed.lines() {
-        let path = repo.join(path);
-        // A submodule path changes as a whole when its commit moves.
-        if path.is_dir() {
-            touch_tree(&path, now);
-        } else if path.exists() {
-            set_time(&path, now);
+    for relative in changed.lines() {
+        let path = repo.join(relative);
+        if !path.is_dir() {
+            if path.exists() {
+                set_time(&path, now);
+            }
+            continue;
+        }
+        // A moved submodule gets only its own changed files touched, not the whole tree.
+        match submodule_changes(repo, old, relative) {
+            Some(files) => {
+                println!("{relative}: {} files changed", files.len());
+                for file in files {
+                    let file = path.join(file);
+                    if file.is_dir() {
+                        touch_tree(&file, now);
+                    } else if file.exists() {
+                        set_time(&file, now);
+                    }
+                }
+            }
+            None => touch_tree(&path, now),
         }
     }
     println!("dated {dated} files");
     Ok(0)
+}
+
+/// Files that differ in the submodule at `path` between its commit in `old` and its checkout.
+fn submodule_changes(repo: &Path, old: &str, path: &str) -> Option<Vec<String>> {
+    let entry = git::run(repo, &["ls-tree", old, "--", path]).ok()?;
+    let mut fields = entry.split_whitespace();
+    if fields.next()? != "160000" {
+        return None;
+    }
+    let commit = fields.nth(1)?;
+    let submodule = repo.join(path);
+    let object = format!("{commit}^{{commit}}");
+    if git::run(&submodule, &["cat-file", "-e", &object]).is_err() {
+        git::run(&submodule, &["fetch", "-q", "--depth=1", "origin", commit]).ok()?;
+    }
+    let files = git::run(&submodule, &["diff", "--name-only", commit, "HEAD"]).ok()?;
+    Some(files.lines().map(str::to_string).collect())
 }
 
 /// A C string literal of `text` with a trailing newline.
