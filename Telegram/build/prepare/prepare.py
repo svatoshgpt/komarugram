@@ -1166,12 +1166,16 @@ mac:
     lipo -create build.arm64/liblcms2.a build/liblcms2.a -output ${USED_PREFIX}/lib/liblcms2.a
 """)
 
+# Version 2 of these source-only stages re-clones them once over a cache the
+# CI prune had stripped; the prune keeps their trees from now on.
 stage('nv-codec-headers', """
+version: 2
 win:
     git clone -b n12.1.14.0 https://github.com/FFmpeg/nv-codec-headers.git
 """)
 
 stage('regex', """
+version: 2
     git clone -b boost-1.83.0 https://github.com/boostorg/regex.git
 """)
 
@@ -1594,6 +1598,7 @@ release:
 if win and qt >= '6':
     # Windows 7 and 8 support for qtbase, and the ANGLE backend Qt 6 dropped.
     stage('qt6_windows7', """
+version: 2
 win32_win64:
     git clone https://github.com/desktop-app/qt6_windows7_patches.git qt6_windows7
     cd qt6_windows7
