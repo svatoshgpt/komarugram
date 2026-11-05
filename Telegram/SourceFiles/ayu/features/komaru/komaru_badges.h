@@ -9,7 +9,7 @@
 // at paint time, including selection and theme changes. Channels are listed
 // by their bare id, without -100.
 //
-// statuses.txt lines are "id,status|status|...[,10s][,popup text]".
+// statuses.txt lines are "id,status|Pack/3|Pack/random...[,10s][,popup text]".
 #pragma once
 
 #include <crl/crl_time.h>
