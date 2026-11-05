@@ -52,6 +52,7 @@ ThanosEffectController::~ThanosEffectController() {
 void ThanosEffectController::captureItemsBatch(
 		const std::vector<not_null<HistoryItem*>> &items) {
 	if (!ThanosEffect::Supported()
+		|| AyuSettings::getInstance().disableDeleteAnimation()
 		|| !ThanosEffect::WindowVisible(_delegate.window())) {
 		return;
 	}
