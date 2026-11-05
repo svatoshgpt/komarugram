@@ -1,21 +1,24 @@
 //! Steps of .github/workflows/win.yml that need more than a shell line.
 
 use std::fs;
-use std::path::Path;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::path::{Path, PathBuf};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::args::Args;
 use crate::git;
+use crate::sweep;
 
 pub fn run(list: &[String]) -> Result<u8, String> {
     let Some((command, rest)) = list.split_first() else {
-        return Err("expected keep-dates, packer-key or dockerfile".into());
+        return Err("expected keep-dates, packer-key, dockerfile, free-disk or prune-libs".into());
     };
     let args = Args::parse(rest)?;
     match command.as_str() {
         "keep-dates" => keep_dates(&args),
         "packer-key" => packer_key(&args),
         "dockerfile" => dockerfile(&args),
+        "free-disk" => free_disk(&args),
+        "prune-libs" => prune_libs(&args),
         _ => Err(format!("unknown command {command}")),
     }
 }
@@ -144,8 +147,101 @@ fn dockerfile(args: &Args) -> Result<u8, String> {
     Ok(0)
 }
 
+fn gigabytes(bytes: Option<u64>) -> String {
+    bytes.map_or("?".into(), |b| format!("{:.1}", b as f64 / (1u64 << 30) as f64))
+}
+
+/// Deletes the preinstalled tools the build never uses, every file of them
+/// at once, so the biggest folder no longer decides how long it takes.
+fn free_disk(args: &Args) -> Result<u8, String> {
+    let roots: Vec<PathBuf> =
+        args.all("path").iter().map(PathBuf::from).filter(|p| p.exists()).collect();
+    let Some(first) = roots.first() else {
+        println!("Nothing to remove");
+        return Ok(0);
+    };
+    let volume: PathBuf = first.components().take(2).collect();
+    let before = sweep::free_space(&volume);
+    let deadline = args.number("timeout")?.map(|s| Instant::now() + Duration::from_secs(s as u64));
+    let started = Instant::now();
+    let outcome = sweep::sweep(&roots, &|_: &Path, _: &fs::Metadata| true, false, deadline);
+    let names: Vec<String> = roots.iter().map(|r| r.display().to_string()).collect();
+    println!("Removed: {}", names.join(", "));
+    println!(
+        "{} files in {:.0} s, {} could not go{}",
+        outcome.files,
+        started.elapsed().as_secs_f64(),
+        outcome.failed,
+        if outcome.timed_out { ", stopped at the timeout" } else { "" }
+    );
+    println!(
+        "{} free: {} GB -> {} GB",
+        volume.display(),
+        gigabytes(before),
+        gigabytes(sweep::free_space(&volume))
+    );
+    Ok(0)
+}
+
+/// What the libraries cache keeps: what the client links and includes, the
+/// stage keys, and the sources tdesktop_rust compiles again whenever one of
+/// its crates changes.
+fn kept_library(relative: &str, size: u64) -> bool {
+    const KEPT_TREES: &[&str] = &["tlottie/", "wallet-engine/"];
+    const KEPT_PARTS: &[&str] =
+        &["/include/", "/src/wallet_engine/", "/objects-", "/cache_keys/", "/patches/"];
+    const KEPT_EXTENSIONS: &[&str] = &["lib", "a", "exe", "h", "hpp", "inc", "cmake", "pc"];
+    if size == 0 {
+        return false;
+    }
+    let path = format!("/{relative}");
+    let name = relative.rsplit('/').next().unwrap_or(relative);
+    let extension = name.rsplit_once('.').map(|(_, e)| e);
+    (KEPT_TREES.iter().any(|t| relative.starts_with(t)) && !path.contains("/target/"))
+        || KEPT_PARTS.iter().any(|p| path.contains(p))
+        || name == "Makefile"
+        || extension.is_some_and(|e| KEPT_EXTENSIONS.contains(&e))
+}
+
+/// Shrinks the libraries folder before it is cached.
+fn prune_libs(args: &Args) -> Result<u8, String> {
+    let root = PathBuf::from(args.required("dir")?);
+    let doomed = |path: &Path, meta: &fs::Metadata| {
+        if meta.file_type().is_symlink() {
+            return false;
+        }
+        let relative = path.strip_prefix(&root).unwrap_or(path);
+        let relative = relative.to_string_lossy().replace('\\', "/");
+        !kept_library(&relative, meta.len())
+    };
+    let started = Instant::now();
+    let outcome = sweep::sweep(&[root.clone()], &doomed, true, None);
+    println!(
+        "Pruned {} files in {:.0} s, {} could not go",
+        outcome.files,
+        started.elapsed().as_secs_f64(),
+        outcome.failed
+    );
+    Ok(0)
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn kept_libraries() {
+        use super::kept_library as kept;
+        assert!(kept("qt_6/out/lib/Qt6Core.lib", 1));
+        assert!(kept("openssl/include/openssl/ssl.h", 1));
+        assert!(kept("tlottie/src/lib.rs", 1));
+        assert!(kept("wallet-engine/Cargo.toml", 1));
+        assert!(kept("cache_keys/qt_6", 1));
+        assert!(kept("ffmpeg/Makefile", 1));
+        assert!(!kept("qt_6/src/corelib/global.cpp", 1));
+        assert!(!kept("tdesktop_rust/target/release/deps/x.rlib", 1));
+        assert!(!kept("wallet-engine/bindgen/cpp/bindgen/target/release/x.rlib", 1));
+        assert!(!kept("openssl/include/empty.h", 0));
+    }
+
     #[test]
     fn literal() {
         assert_eq!(super::c_literal("a\"b\\c\nd"), "\"a\\\"b\\\\c\\nd\\n\"");

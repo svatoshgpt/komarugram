@@ -6,6 +6,8 @@
 //!   komaru ci packer-key --out FILE
 //!   komaru rules [--staged]   (an edit hook reading JSON from stdin)
 //!   komaru ci dockerfile --template FILE
+//!   komaru ci free-disk --path DIR... [--timeout SECONDS]
+//!   komaru ci prune-libs --dir LIBRARIES
 //!   komaru tidy compile-db [BUILD]
 
 mod args;
@@ -13,13 +15,14 @@ mod ci;
 mod git;
 mod review;
 mod rules;
+mod sweep;
 mod tidy;
 
 use std::process::ExitCode;
 
 fn usage() -> ExitCode {
     eprintln!("usage: komaru review <init|snapshot> ...");
-    eprintln!("       komaru ci <keep-dates|packer-key|dockerfile> ...");
+    eprintln!("       komaru ci <keep-dates|packer-key|dockerfile|free-disk|prune-libs> ...");
     eprintln!("       komaru rules [--staged]");
     eprintln!("       komaru tidy compile-db [BUILD]");
     ExitCode::from(2)
