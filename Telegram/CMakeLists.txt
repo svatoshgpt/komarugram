@@ -72,6 +72,8 @@ if (DESKTOP_APP_TEST_APPS OR TDESKTOP_BUILD_UPDATE_TESTS)
         endif()
     endif()
 endif()
+include(cmake/test_iv_editor_table_grid.cmake)
+include(cmake/test_wallet_phrase_shares.cmake)
 
 set_target_properties(Telegram PROPERTIES AUTOMOC ON)
 
@@ -1289,6 +1291,7 @@ PRIVATE
     history/view/history_view_chat_preview.h
     history/view/history_view_chat_section.cpp
     history/view/history_view_chat_section.h
+    history/view/history_view_chat_section_monoforum.cpp
     history/view/history_view_contact_status.cpp
     history/view/history_view_contact_status.h
     history/view/history_view_context_menu.cpp
@@ -1951,7 +1954,6 @@ PRIVATE
     platform/linux/tray_linux.h
     platform/linux/update_install_linux.cpp
     platform/linux/update_install_linux.h
-    platform/linux/webauthn_linux.cpp
     platform/mac/file_utilities_mac.mm
     platform/mac/file_utilities_mac.h
     platform/mac/global_menu_mac.h
@@ -2104,7 +2106,6 @@ PRIVATE
     settings/sections/settings_calls.h
     settings/settings_codes.cpp
     settings/settings_codes.h
-    settings/settings_common_session.cpp
     settings/settings_common_session.h
     settings/detailed_settings_button.cpp
     settings/detailed_settings_button.h
@@ -2150,6 +2151,7 @@ PRIVATE
     settings/settings_power_saving.h
     settings/sections/settings_premium.cpp
     settings/sections/settings_premium.h
+    settings/sections/settings_premium_common.h
     settings/settings_privacy_controllers.cpp
     settings/settings_privacy_controllers.h
     settings/settings_scale_preview.cpp
@@ -2379,6 +2381,8 @@ PRIVATE
     ui/effects/message_sending_animation_common.h
     ui/effects/message_sending_animation_controller.cpp
     ui/effects/message_sending_animation_controller.h
+    ui/effects/message_sending_history.cpp
+    ui/effects/message_sending_history.h
     ui/effects/message_sending_text_flight.cpp
     ui/effects/message_sending_text_flight.h
     ui/effects/peer_qr_colors_panel.cpp
@@ -2617,6 +2621,7 @@ PRIVATE
     window/session/window_session_media.cpp
     window/window_session_controller.cpp
     window/window_session_controller.h
+    window/window_session_controller_bot_forum.cpp
     window/window_session_controller_contact.cpp
     window/window_session_controller_link_info.h
     window/window_setup_email.cpp
