@@ -2,6 +2,7 @@
 #include "ayu/features/komaru/komaru_badges.h"
 
 #include "apiwrap.h"
+#include "base/random.h"
 #include "core/application.h"
 #include "data/data_types.h"
 #include "main/main_domain.h"
@@ -53,6 +54,7 @@ struct StatusRef {
 	QString set;
 	int index = 0;
 	DocumentId id = 0;
+	bool random = false;
 };
 
 // A person's statuses: all in a row, or one at a time when a period is set.
@@ -161,9 +163,14 @@ struct State {
 	}
 	static const auto expression = QRegularExpression(
 		u"^(?:(?:https?://)?(?:t|telegram)\\.me/addemoji/)?"
-		"([A-Za-z0-9_]+)/(\\d+)/?$"_q);
+		"([A-Za-z0-9_]+)/(\\d+|random)/?$"_q);
 	const auto match = expression.match(text);
-	const auto index = match.hasMatch() ? match.captured(2).toInt() : 0;
+	if (!match.hasMatch()) {
+		return {};
+	} else if (match.captured(2) == u"random"_q) {
+		return { .set = match.captured(1), .index = 1, .random = true };
+	}
+	const auto index = match.captured(2).toInt();
 	return (index > 0)
 		? StatusRef{ .set = match.captured(1), .index = index }
 		: StatusRef();
@@ -593,8 +600,29 @@ std::vector<uint64> Statuses(uint64 peerId) {
 	}
 	auto result = std::vector<uint64>();
 	for (const auto &ref : i->second.refs) {
-		if (const auto id = Resolve(state, ref)) {
-			result.push_back(id);
+		if (!ref.random) {
+			if (const auto id = Resolve(state, ref)) {
+				result.push_back(id);
+			}
+			continue;
+		}
+		const auto j = state.sets.find(ref.set);
+		if (j == end(state.sets) || j->second.empty()) {
+			continue;
+		}
+		// Fixed for the session and different for every slot, no repeats.
+		static const auto seed = base::RandomValue<uint64>();
+		const auto &ids = j->second;
+		const auto size = ids.size();
+		auto mixed = seed ^ (peerId * 0x9E3779B97F4A7C15ULL);
+		mixed ^= uint64(result.size() + 1) * 0xBF58476D1CE4E5B9ULL;
+		const auto start = (mixed ^ (mixed >> 31)) % size;
+		for (auto k = size_t(); k != size; ++k) {
+			const auto id = ids[(start + k) % size];
+			if (id && !ranges::contains(result, id)) {
+				result.push_back(id);
+				break;
+			}
 		}
 	}
 	const auto period = i->second.period;
