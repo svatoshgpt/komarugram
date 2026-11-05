@@ -11,6 +11,7 @@
 #include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/features/komaru/komaru_badges.h"
+#include "ayu/features/komaru/now_playing.h"
 #include "ayu/features/plugins/komaru_plugins.h"
 #include "ayu/data/ayu_database.h"
 #include "ayu/ui/ayu_logo.h"
@@ -94,6 +95,7 @@ void init() {
 	initWorker();
 	initRCManager();
 	KomaruBadges::Start();
+	KomaruNowPlaying::Start();
 	KomaruPlugins::Start();
 	initTranslator();
 	QDir(cWorkingDir() + u"tdata/komaru_analytics"_q).removeRecursively();

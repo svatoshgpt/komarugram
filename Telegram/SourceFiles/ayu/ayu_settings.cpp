@@ -1265,6 +1265,36 @@ void AyuSettings::setAvatarCorners(int val) {
 	save();
 }
 
+void AyuSettings::setNowPlayingService(NowPlayingService val) {
+	if (_nowPlayingService.current() == val) return;
+	_nowPlayingService = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingUsername(const QString &val) {
+	if (_nowPlayingUsername.current() == val) return;
+	_nowPlayingUsername = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingLastFmKey(const QString &val) {
+	if (_nowPlayingLastFmKey.current() == val) return;
+	_nowPlayingLastFmKey = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingProfileMusic(bool val) {
+	if (_nowPlayingProfileMusic.current() == val) return;
+	_nowPlayingProfileMusic = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingBio(bool val) {
+	if (_nowPlayingBio.current() == val) return;
+	_nowPlayingBio = val;
+	save();
+}
+
 void AyuSettings::setSingleCornerRadius(bool val) {
 	if (_singleCornerRadius.current() == val) return;
 	_singleCornerRadius = val;
@@ -1383,6 +1413,11 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"crashReporting", s._crashReporting.current()},
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
+		{"nowPlayingService", s._nowPlayingService.current()},
+		{"nowPlayingUsername", s._nowPlayingUsername.current()},
+		{"nowPlayingLastFmKey", s._nowPlayingLastFmKey.current()},
+		{"nowPlayingProfileMusic", s._nowPlayingProfileMusic.current()},
+		{"nowPlayingBio", s._nowPlayingBio.current()},
 		{"streamerMode", s._streamerMode.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
@@ -1496,6 +1531,11 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._crashReporting = j.value("crashReporting", defaults._crashReporting.current());
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
+	s._nowPlayingService = j.value("nowPlayingService", defaults._nowPlayingService.current());
+	s._nowPlayingUsername = j.value("nowPlayingUsername", defaults._nowPlayingUsername.current());
+	s._nowPlayingLastFmKey = j.value("nowPlayingLastFmKey", defaults._nowPlayingLastFmKey.current());
+	s._nowPlayingProfileMusic = j.value("nowPlayingProfileMusic", defaults._nowPlayingProfileMusic.current());
+	s._nowPlayingBio = j.value("nowPlayingBio", defaults._nowPlayingBio.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {

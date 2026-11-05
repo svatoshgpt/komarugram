@@ -126,6 +126,8 @@ set(ayugram_files
         ayu/ayu_worker.h
         ayu/features/komaru/komaru_badges.cpp
         ayu/features/komaru/komaru_badges.h
+        ayu/features/komaru/now_playing.cpp
+        ayu/features/komaru/now_playing.h
         ayu/ayu_url_handlers.cpp
         ayu/ayu_url_handlers.h
         ayu/ayu_state.cpp
@@ -179,6 +181,8 @@ set(ayugram_files
         ayu/ui/settings/settings_main.h
         ayu/ui/settings/settings_other.cpp
         ayu/ui/settings/settings_other.h
+        ayu/ui/settings/settings_now_playing.cpp
+        ayu/ui/settings/settings_now_playing.h
         ayu/ui/settings/filters/settings_filters_list.cpp
         ayu/ui/settings/filters/settings_filters_list.h
         ayu/ui/settings/filters/per_dialog_filter.cpp
