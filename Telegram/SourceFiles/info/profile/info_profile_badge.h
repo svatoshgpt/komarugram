@@ -64,7 +64,7 @@ public:
 		uint64 komaruPeer = 0;
 		bool komaruDeveloper = false;
 		bool komaruSupporter = false;
-		uint64 komaruStatus = 0;
+		std::vector<uint64> komaruStatuses;
 
 		friend inline bool operator==(Content, Content) = default;
 	};
@@ -106,8 +106,9 @@ private:
 	const int _customStatusLoopsLimit = 0;
 	std::unique_ptr<Ui::Text::CustomEmoji> _emojiStatus;
 	std::unique_ptr<base::Timer> _komaruTimer;
-	std::unique_ptr<Ui::Text::CustomEmoji> _komaruStatus;
+	std::vector<std::unique_ptr<Ui::Text::CustomEmoji>> _komaruStatuses;
 	int _komaruStatusWidth = 0;
+	int _komaruStatusesWidth = 0;
 	base::flags<BadgeType> _allowed;
 	Content _content;
 	Fn<void()> _premiumClickCallback;

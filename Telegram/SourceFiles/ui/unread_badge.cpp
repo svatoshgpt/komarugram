@@ -321,16 +321,17 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 	const auto komaruSupporter = hideExteraBadges
 		? nullptr
 		: KomaruBadges::Supporter(getBareID(peer));
-	const auto komaruStatus = hideExteraBadges
-		? uint64()
-		: KomaruBadges::Status(getBareID(peer));
+	const auto komaruStatuses = hideExteraBadges
+		? std::vector<uint64>()
+		: KomaruBadges::Statuses(getBareID(peer));
 	const auto customEmojiSkip = (st::emojiSize
 		- Ui::Text::AdjustCustomEmojiSize(st::emojiSize)) / 2;
 	const auto customEmojiWidth = descriptor.premium->width()
 		- 4 * customEmojiSkip;
 	const auto exteraCustomWidth = paintExteraCustom ? customEmojiWidth : 0;
 	const auto komaruSize = descriptor.exteraSupporter->width();
-	const auto komaruStatusWidth = komaruStatus ? customEmojiWidth : 0;
+	const auto komaruStatusWidth = customEmojiWidth
+		* int(komaruStatuses.size());
 	const auto komaruWidth = (komaruDeveloper ? komaruSize : 0)
 		+ (komaruSupporter ? komaruSize : 0)
 		+ komaruStatusWidth;
@@ -399,13 +400,15 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 				return drawKomaru(p, descriptor, *komaruSupporter);
 			});
 		}
-		if (komaruStatus) {
-			drawKeeping(afterKomaru, [&] {
+		_komaruStatuses.resize(komaruStatuses.size());
+		for (auto i = 0; i != int(komaruStatuses.size()); ++i) {
+			const auto later = int(komaruStatuses.size()) - i - 1;
+			drawKeeping(later * customEmojiWidth + afterKomaru, [&] {
 				return drawCustomStatus(
 					p,
 					descriptor,
-					EmojiStatusId{ .documentId = komaruStatus },
-					_komaruStatus);
+					EmojiStatusId{ .documentId = komaruStatuses[i] },
+					_komaruStatuses[i]);
 			});
 		}
 		if (paintExteraCustom) {

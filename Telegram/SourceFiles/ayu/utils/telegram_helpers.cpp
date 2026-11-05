@@ -218,10 +218,10 @@ CustomBadge getCustomBadge(ID peerId) {
 	// KomaruGram faces go in front of the arrow, or stand alone.
 	result.komaruDeveloper = (KomaruBadges::Developer(id) != nullptr);
 	result.komaruSupporter = (KomaruBadges::Supporter(id) != nullptr);
-	result.komaruStatus = KomaruBadges::Status(id);
+	result.komaruStatuses = KomaruBadges::Statuses(id);
 	if (result.komaruDeveloper
 		|| result.komaruSupporter
-		|| result.komaruStatus) {
+		|| !result.komaruStatuses.empty()) {
 		result.komaruPeer = id;
 		if (result.badge == BadgeType::None) {
 			result.badge = BadgeType::Komaru;
@@ -280,7 +280,7 @@ Fn<void()> badgeClickHandler(
 				lt_item,
 				TextWithEntities{peer->name()},
 				tr::rich);
-		} else if (badge.komaruStatus
+		} else if (!badge.komaruStatuses.empty()
 			&& badge.badge == Info::Profile::BadgeType::Komaru) {
 			const auto custom = KomaruBadges::StatusText(getBareID(peer));
 			text = !custom.isEmpty()
