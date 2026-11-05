@@ -2032,18 +2032,20 @@ release:
 # down to their headers while their stage keys stayed valid, leaving a cache
 # that skips them and cannot rebuild tdesktop_rust. The version re-clones
 # them once over such a cache. The revisions are named here because the
-# umbrella stage has to see them, see there.
+# umbrella stage has to see them, see there. Version 3 re-clones them once
+# more: the prune had stripped them again, and komaru_core now rebuilds the
+# umbrella whenever it changes, so the CI prune keeps both trees from now on.
 tlottieRevision = '92df98dc20'
 walletEngineRevision = 'e59e0d89d7ee90c388bf36e3334c5b276f396697'
 stage('tlottie', """
-version: 2
+version: 3
     git clone https://github.com/dkaraush/tlottie.git
     cd tlottie
     git checkout """ + tlottieRevision + """
 """)
 
 stage('wallet-engine', """
-version: 2
+version: 3
 depends:patches/wallet-engine.patch
 win:
     SET "GIT_LFS_SKIP_SMUDGE=1"

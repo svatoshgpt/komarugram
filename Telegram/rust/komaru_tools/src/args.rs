@@ -33,6 +33,11 @@ impl Args {
         self.values.get(name).and_then(|v| v.last()).map(String::as_str)
     }
 
+    /// Every value of an option that may repeat.
+    pub fn all(&self, name: &str) -> &[String] {
+        self.values.get(name).map_or(&[], Vec::as_slice)
+    }
+
     pub fn required(&self, name: &str) -> Result<&str, String> {
         self.get(name).ok_or(format!("--{name} is required"))
     }
