@@ -184,10 +184,16 @@ fn free_disk(args: &Args) -> Result<u8, String> {
 }
 
 /// What the libraries cache keeps: what the client links and includes, the
-/// stage keys, and the sources tdesktop_rust compiles again whenever one of
-/// its crates changes.
+/// stage keys, and the source-only stages that later stages build from, such
+/// as the Rust crates tdesktop_rust compiles or the headers ffmpeg installs.
 fn kept_library(relative: &str, size: u64) -> bool {
-    const KEPT_TREES: &[&str] = &["tlottie/", "wallet-engine/"];
+    const KEPT_TREES: &[&str] = &[
+        "tlottie/",
+        "wallet-engine/",
+        "nv-codec-headers/",
+        "regex/",
+        "qt6_windows7/",
+    ];
     const KEPT_PARTS: &[&str] =
         &["/include/", "/src/wallet_engine/", "/objects-", "/cache_keys/", "/patches/"];
     const KEPT_EXTENSIONS: &[&str] = &["lib", "a", "exe", "h", "hpp", "inc", "cmake", "pc"];
@@ -234,6 +240,7 @@ mod tests {
         assert!(kept("openssl/include/openssl/ssl.h", 1));
         assert!(kept("tlottie/src/lib.rs", 1));
         assert!(kept("wallet-engine/Cargo.toml", 1));
+        assert!(kept("nv-codec-headers/ffnvcodec.pc.in", 1));
         assert!(kept("cache_keys/qt_6", 1));
         assert!(kept("ffmpeg/Makefile", 1));
         assert!(!kept("qt_6/src/corelib/global.cpp", 1));
