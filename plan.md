@@ -54,9 +54,10 @@ Rust-код. После двух-трёх версий клиент отстан
    никакой генерации кода при сборке. Через границу идут только числа и
    байты; строки отдаются в обратных вызовах и копируются на стороне C++.
    Паники ловятся на каждой функции.
-3. Код лежит в `Telegram/rust/`. Внешних crate нет: SQLite берётся из
-   `sqlite3.c`, который клиент и так собирает, поэтому cargo собирает всё
-   за секунды и без сети. Тесты: `cargo test` со системной SQLite.
+3. Код лежит в `Telegram/rust/`. Внешние crate: `regex` для фильтров и
+   `libsqlite3-sys` с встроенной SQLite, поэтому `sqlite3.c` в репозитории
+   больше нет. На Windows и macOS crate входит в `tdesktop_rust` из
+   prepare.py (одна копия std на клиент), на Linux его собирает Corrosion.
 4. CI:
    - Windows x64 и x86: `rustup target add x86_64-pc-windows-msvc
      i686-pc-windows-msvc`, кэш `~/.cargo` и `target/`;

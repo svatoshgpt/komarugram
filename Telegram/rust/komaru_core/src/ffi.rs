@@ -9,7 +9,6 @@ use std::panic::{catch_unwind, AssertUnwindSafe};
 use crate::db::{self, Bytes, Exclusion, Filter, FilterQuery, Message, MessageKind};
 use crate::log::{self, log, Logger};
 use crate::filter::Pattern;
-use crate::sqlite;
 
 type MessageSink = unsafe extern "C" fn(context: *mut c_void, row: *const Message);
 type FilterSink = unsafe extern "C" fn(context: *mut c_void, row: *const Filter);
@@ -30,15 +29,6 @@ unsafe fn text<'a>(data: *const u8, size: usize) -> &'a [u8] {
 #[no_mangle]
 pub extern "C" fn komaru_set_logger(logger: Option<Logger>) {
     log::set(logger);
-}
-
-/// # Safety
-/// `api` must point to a full table of valid SQLite functions.
-#[no_mangle]
-pub unsafe extern "C" fn komaru_set_sqlite(api: *const sqlite::Api) {
-    if let Some(api) = api.as_ref() {
-        sqlite::set_api(*api);
-    }
 }
 
 /// # Safety
