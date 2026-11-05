@@ -5,8 +5,8 @@ edition = "2021"
 publish = false
 description = "Native parts of KomaruGram written in Rust"
 
-# Only the regex crate, for the message filters. The database talks
-# to the sqlite3.c that the client already compiles, through komaru_set_sqlite.
+# regex runs the message filters; libsqlite3-sys builds the SQLite the
+# database uses from its bundled amalgamation.
 
 [lib]
 # rlib: prepare.py builds the crate into tdesktop_rust on Windows and macOS.
@@ -18,4 +18,5 @@ codegen-units = 1
 debug = false
 
 [dependencies]
+libsqlite3-sys = { version = "0.39.1", features = ["bundled"] }
 regex = "1"

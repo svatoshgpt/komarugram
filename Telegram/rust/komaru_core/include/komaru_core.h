@@ -84,54 +84,7 @@ enum {
 	KomaruFiltersExcludedForDialog = 3,
 };
 
-struct sqlite3;
-struct sqlite3_stmt;
-
-// The SQLite functions the crate calls, in the order of src/sqlite.rs.
-typedef struct KomaruSqlite {
-	int (*initialize)(void);
-	int (*open_v2)(const char*, struct sqlite3**, int, const char*);
-	int (*close_v2)(struct sqlite3*);
-	const char *(*errmsg)(struct sqlite3*);
-	int (*exec)(
-		struct sqlite3*,
-		const char*,
-		int (*)(void*, int, char**, char**),
-		void*,
-		char**);
-	int (*prepare_v2)(
-		struct sqlite3*,
-		const char*,
-		int,
-		struct sqlite3_stmt**,
-		const char**);
-	int (*finalize)(struct sqlite3_stmt*);
-	int (*step)(struct sqlite3_stmt*);
-	int (*bind_int64)(struct sqlite3_stmt*, int, long long);
-	int (*bind_null)(struct sqlite3_stmt*, int);
-	int (*bind_text)(
-		struct sqlite3_stmt*,
-		int,
-		const char*,
-		int,
-		void (*)(void*));
-	int (*bind_blob)(
-		struct sqlite3_stmt*,
-		int,
-		const void*,
-		int,
-		void (*)(void*));
-	int (*column_type)(struct sqlite3_stmt*, int);
-	long long (*column_int64)(struct sqlite3_stmt*, int);
-	const void *(*column_blob)(struct sqlite3_stmt*, int);
-	int (*column_bytes)(struct sqlite3_stmt*, int);
-	void (*freeMemory)(void*);
-} KomaruSqlite;
-
 void komaru_set_logger(KomaruLogger logger);
-
-// Before anything that opens the database.
-void komaru_set_sqlite(const KomaruSqlite *api);
 
 void komaru_db_initialize(const char *path, size_t size);
 

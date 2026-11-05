@@ -9,7 +9,6 @@
 #include "ayu/data/entities.h"
 
 #include <komaru_core.h>
-#include "ayu/libs/sqlite/sqlite3.h"
 
 // The storage itself is Rust code in Telegram/rust/komaru_core.
 
@@ -163,26 +162,6 @@ void Log(const char *text, size_t size) {
 } // namespace
 
 void initialize() {
-	static const auto sqlite = KomaruSqlite{
-		.initialize = sqlite3_initialize,
-		.open_v2 = sqlite3_open_v2,
-		.close_v2 = sqlite3_close_v2,
-		.errmsg = sqlite3_errmsg,
-		.exec = sqlite3_exec,
-		.prepare_v2 = sqlite3_prepare_v2,
-		.finalize = sqlite3_finalize,
-		.step = sqlite3_step,
-		.bind_int64 = sqlite3_bind_int64,
-		.bind_null = sqlite3_bind_null,
-		.bind_text = sqlite3_bind_text,
-		.bind_blob = sqlite3_bind_blob,
-		.column_type = sqlite3_column_type,
-		.column_int64 = sqlite3_column_int64,
-		.column_blob = sqlite3_column_blob,
-		.column_bytes = sqlite3_column_bytes,
-		.freeMemory = sqlite3_free,
-	};
-	komaru_set_sqlite(&sqlite);
 	komaru_set_logger(Log);
 	const auto path = std::string("./tdata/ayudata.db");
 	komaru_db_initialize(path.data(), path.size());
