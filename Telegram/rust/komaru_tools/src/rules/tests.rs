@@ -40,16 +40,14 @@ fn two_line_comment_fails() {
     let (code, why) = edit("// the server rejects more,\n// so we stop\nf();\n");
     assert_eq!(code, 2);
     assert!(why.contains("2-line comment: a comment is one line"));
-    assert!(why.contains("// WHY:"));
+    assert!(why.contains("reference URL"));
 }
 
 #[test]
-fn why_blocks() {
-    assert_eq!(edit("// WHY: a\n// b\n// c\nf();\n").0, 0);
-    let (code, why) = edit("// WHY: a\n// b\n// c\n// d\nf();\n");
-    assert_eq!(code, 2);
-    assert!(why.contains("4-line comment: a // WHY: block runs 3 lines"));
-    assert_eq!(edit("// a\n// WHY: b\nf();\n").0, 2);
+fn url_blocks() {
+    assert_eq!(edit("// the scheme, see\n// https://core.telegram.org\nf();\n").0, 0);
+    assert_eq!(edit("// a\n// b\n// https://core.telegram.org\n// c\n// d\nf();\n").0, 0);
+    assert_eq!(edit("// WHY: a\n// b\nf();\n").0, 2);
 }
 
 #[test]
@@ -120,6 +118,9 @@ impl Repository {
         repo.git(&["config", "user.email", "t@t"]);
         repo.git(&["config", "user.name", "t"]);
         repo.git(&["config", "core.autocrlf", "false"]);
+        // Machine-wide hooks have no say in this disposable repository.
+        std::fs::create_dir_all(repo.0.join("hooks")).unwrap();
+        repo.git(&["config", "core.hooksPath", "hooks"]);
         repo.commit(&[("a.cpp", "int a() {\n\treturn 1;\n}\n")]);
         repo
     }
@@ -208,25 +209,19 @@ fn staged_edited_line_keeps_its_trailing_comment() {
 }
 
 #[test]
-fn staged_why_blocks() {
-    let repo = Repository::new("why");
+fn staged_url_block_is_free() {
+    let repo = Repository::new("url");
     let (code, why) = repo.stage(&[(
         "a.cpp",
-        "// one\n\n// two\n\n// three\n\n// WHY: a\n// b\n// c\nint a() {\n\treturn 1;\n}\n",
-    )]);
-    assert_eq!(code, 1);
-    assert!(why.contains("adds 3 comment lines"));
-    let (code, why) = repo.stage(&[(
-        "a.cpp",
-        "// one\n\n// two\n\n// WHY: a\n// b\n// c\nint a() {\n\treturn 1;\n}\n",
+        "// one\n\n// two\n\n// the docs\n// https://core.telegram.org\nint a() {\n\treturn 1;\n}\n",
     )]);
     assert_eq!(code, 0, "{why}");
     let (code, why) = repo.stage(&[(
         "a.cpp",
-        "// WHY: a\n// b\nint a() {\n\treturn 1;\n}\n// WHY: c\n// d\n",
+        "// WHY: a\n// b\nint a() {\n\treturn 1;\n}\n",
     )]);
     assert_eq!(code, 1);
-    assert!(why.contains("takes 2 // WHY: exceptions; 1 is the budget"));
+    assert!(why.contains("a.cpp:1: a comment is one line"));
 }
 
 #[test]
