@@ -16,3 +16,22 @@ Telegram/Resources/zxcvbn/*.txt text eol=lf
 *.otf binary
 # Raw float tables, such as the 3D diamond model data
 *.bin binary
+
+# The GitHub language bar counts the client's own code only: tooling, CI,
+# build scripts, docs, the test harness and vendored libraries stay out.
+.agents/** linguist-vendored
+.claude/** linguist-vendored
+.github/** linguist-vendored
+tools/** linguist-vendored
+tasks/** linguist-vendored
+lib/** linguist-vendored
+docs/** linguist-documentation
+Telegram/build/** linguist-vendored
+Telegram/cmake/** linguist-vendored
+Telegram/configure.py linguist-vendored
+Telegram/Resources/langs/*.py linguist-vendored
+Telegram/SourceFiles/codegen/** linguist-vendored
+Telegram/SourceFiles/test/** linguist-vendored
+Telegram/SourceFiles/ayu/libs/** linguist-vendored
+CMakeLists.txt linguist-detectable=false
+*.cmake linguist-detectable=false
