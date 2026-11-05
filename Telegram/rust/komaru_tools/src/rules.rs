@@ -11,10 +11,11 @@ use serde_json::Value;
 const SOURCES: &[&str] = &[".cpp", ".h", ".mm", ".cxx"];
 const LICENSE: &str = "This file is part of ";
 const HARNESS: &str = "/SourceFiles/test/";
-const MARKER: &str = "// WHY:";
-const MARKED_LINES: usize = 3;
 const PLAIN_LINES: usize = 2;
-const MARKED_BLOCKS: usize = 1;
+
+fn has_url(line: &str) -> bool {
+    line.contains("http://") || line.contains("https://")
+}
 
 pub fn run(list: &[String]) -> Result<u8, String> {
     let mut out = vec![];
@@ -159,13 +160,10 @@ fn fault(block: &[String]) -> Option<String> {
     if block.iter().any(|l| l.contains(LICENSE)) {
         return None;
     }
-    if block[0].trim().starts_with(MARKER) {
-        return (block.len() > MARKED_LINES)
-            .then(|| format!("a {MARKER} block runs {MARKED_LINES} lines at most"));
+    if block.iter().any(|l| has_url(l)) {
+        return None;
     }
-    (block.len() > 1).then(|| {
-        format!("a comment is one line; up to {MARKED_LINES} only when it opens with {MARKER}")
-    })
+    (block.len() > 1).then(|| "a comment is one line; longer only to carry a reference URL".into())
 }
 
 fn strings(tool: &Value, key: &str) -> Vec<String> {
@@ -267,7 +265,7 @@ fn staged(dir: Option<&Path>, out: &mut Vec<String>) -> Result<u8, String> {
         }
     }
     let banned = banned();
-    let (mut bad, mut plain, mut marked) = (0, 0, 0);
+    let (mut bad, mut plain) = (0, 0);
     for (path, lines) in &added {
         for (name, into) in &banned {
             let calls = calls(name);
@@ -291,23 +289,14 @@ fn staged(dir: Option<&Path>, out: &mut Vec<String>) -> Result<u8, String> {
             if let Some(why) = fault(&block) {
                 out.push(format!("{path}:{number}: {why}."));
                 bad += 1;
-            } else if block[0].trim().starts_with(MARKER) {
-                marked += 1;
-            } else {
-                plain += block.len();
+            } else if block.len() == 1 {
+                plain += 1;
             }
         }
     }
     if plain > PLAIN_LINES {
         out.push(format!(
-            "this commit adds {plain} comment lines; {PLAIN_LINES} is the budget, \
-             and one marked block on top of it."
-        ));
-        bad += 1;
-    }
-    if marked > MARKED_BLOCKS {
-        out.push(format!(
-            "this commit takes {marked} {MARKER} exceptions; {MARKED_BLOCKS} is the budget."
+            "this commit adds {plain} comment lines; {PLAIN_LINES} is the budget."
         ));
         bad += 1;
     }
