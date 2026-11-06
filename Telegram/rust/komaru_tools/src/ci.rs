@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::args::Args;
@@ -185,6 +186,7 @@ fn gigabytes(bytes: Option<u64>) -> String {
 
 /// Deletes the preinstalled tools the build never uses, every file of them
 /// at once, so the biggest folder no longer decides how long it takes.
+/// `--timeout` stops it only once `--min-free` GB are free.
 fn free_disk(args: &Args) -> Result<u8, String> {
     let roots: Vec<PathBuf> =
         args.all("path").iter().map(PathBuf::from).filter(|p| p.exists()).collect();
@@ -195,8 +197,25 @@ fn free_disk(args: &Args) -> Result<u8, String> {
     let volume: PathBuf = first.components().take(2).collect();
     let before = sweep::free_space(&volume);
     let deadline = args.number("timeout")?.map(|s| Instant::now() + Duration::from_secs(s as u64));
+    let wanted = args.number("min-free")?.map(|gb| gb.max(0) as u64 * (1u64 << 30));
+    let checked = Mutex::new((Instant::now(), false));
+    let stop = || {
+        if !deadline.is_some_and(|d| Instant::now() > d) {
+            return false;
+        }
+        let Some(wanted) = wanted else {
+            return true;
+        };
+        let mut state = checked.lock().unwrap();
+        let (last, enough) = &mut *state;
+        if !*enough && last.elapsed() >= Duration::from_secs(1) {
+            *last = Instant::now();
+            *enough = sweep::free_space(&volume).is_none_or(|free| free >= wanted);
+        }
+        *enough
+    };
     let started = Instant::now();
-    let outcome = sweep::sweep(&roots, &|_: &Path, _: &fs::Metadata| true, false, deadline);
+    let outcome = sweep::sweep(&roots, &|_: &Path, _: &fs::Metadata| true, false, Some(&stop));
     let names: Vec<String> = roots.iter().map(|r| r.display().to_string()).collect();
     println!("Removed: {}", names.join(", "));
     println!(
@@ -204,14 +223,21 @@ fn free_disk(args: &Args) -> Result<u8, String> {
         outcome.files,
         started.elapsed().as_secs_f64(),
         outcome.failed,
-        if outcome.timed_out { ", stopped at the timeout" } else { "" }
+        if outcome.stopped { ", stopped at the timeout" } else { "" }
     );
-    println!(
-        "{} free: {} GB -> {} GB",
-        volume.display(),
-        gigabytes(before),
-        gigabytes(sweep::free_space(&volume))
-    );
+    let after = sweep::free_space(&volume);
+    println!("{} free: {} GB -> {} GB", volume.display(), gigabytes(before), gigabytes(after));
+    if let (Some(wanted), Some(after)) = (wanted, after) {
+        if after < wanted {
+            println!(
+                "::warning::Only {} GB free on {}, less than the {} GB --min-free asks for: \
+                 a build that has to compile Qt again may run out of room",
+                gigabytes(Some(after)),
+                volume.display(),
+                gigabytes(Some(wanted))
+            );
+        }
+    }
     Ok(0)
 }
 

@@ -77,10 +77,11 @@ jobs:
       # resolved paths, and tar replaces a junction with a plain folder when
       # it restores the build cache. C: lacks room for the libraries and the
       # build together, so big preinstalled tools the build never uses go.
+      # A full Qt rebuild did not fit in 36.6 GB; the whole list frees ~51.
       - name: Free disk space on C:.
         shell: bash
         run: |
-          "$KOMARU" ci free-disk --timeout 600 \
+          "$KOMARU" ci free-disk --timeout 600 --min-free 48 \
             --path 'C:\Android' \
             --path 'C:\Program Files (x86)\Android' \
             --path 'C:\ghcup' \

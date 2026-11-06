@@ -5,12 +5,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex};
-use std::time::Instant;
 
 pub struct Outcome {
     pub files: usize,
     pub failed: usize,
-    pub timed_out: bool,
+    pub stopped: bool,
 }
 
 struct Queue {
@@ -43,18 +42,19 @@ fn depth(path: &Path) -> usize {
 
 /// Walks `roots` on all cores and deletes every file `doomed` picks, then
 /// every folder left empty, deepest first; `keep_roots` spares the roots.
-/// Links are deleted when picked, never followed.
+/// Links are deleted when picked, never followed. Once `stop` says so, no
+/// further folder is opened.
 pub fn sweep(
     roots: &[PathBuf],
     doomed: &(dyn Fn(&Path, &fs::Metadata) -> bool + Sync),
     keep_roots: bool,
-    deadline: Option<Instant>,
+    stop: Option<&(dyn Fn() -> bool + Sync)>,
 ) -> Outcome {
     let queue = Mutex::new(Queue { folders: roots.to_vec(), busy: 0 });
     let wake = Condvar::new();
     let folders = Mutex::new(Vec::new());
     let (files, failed) = (AtomicUsize::new(0), AtomicUsize::new(0));
-    let late = || deadline.is_some_and(|d| Instant::now() > d);
+    let late = || stop.is_some_and(|stop| stop());
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get() * 2);
 
     std::thread::scope(|scope| {
@@ -121,7 +121,7 @@ pub fn sweep(
     Outcome {
         files: files.into_inner(),
         failed: failed.into_inner(),
-        timed_out: late(),
+        stopped: late(),
     }
 }
 
@@ -183,5 +183,19 @@ mod tests {
         let outcome = sweep(&[root.clone()], &|_: &Path, _: &fs::Metadata| true, false, None);
         assert_eq!(outcome.files, 20);
         assert!(!root.exists());
+    }
+
+    #[test]
+    fn stops_when_told() {
+        let root = std::env::temp_dir().join(format!("komaru_stop_{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        fs::create_dir_all(root.join("a")).unwrap();
+        fs::write(root.join("a/drop.obj"), "x").unwrap();
+        let all = |_: &Path, _: &fs::Metadata| true;
+        let outcome = sweep(std::slice::from_ref(&root), &all, true, Some(&|| true));
+        assert_eq!(outcome.files, 0);
+        assert!(outcome.stopped);
+        assert!(root.join("a/drop.obj").exists());
+        fs::remove_dir_all(&root).unwrap();
     }
 }
