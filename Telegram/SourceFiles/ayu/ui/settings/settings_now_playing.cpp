@@ -15,6 +15,7 @@
 #include "styles/style_menu_icons.h"
 #include "styles/style_settings.h"
 #include "ui/text/text_utilities.h"
+#include "ui/ui_utility.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
@@ -76,7 +77,7 @@ not_null<Ui::InputField*> AddField(
 			geometry.y() + style->textMargins.top());
 	}, countdown->lifetime());
 
-	const auto generation = Ui::CreateChild<int>(field);
+	const auto generation = Ui::AttachAsChild(field, 0);
 	const auto commit = [=] {
 		*generation = 0;
 		save(field->getLastText().trimmed());
