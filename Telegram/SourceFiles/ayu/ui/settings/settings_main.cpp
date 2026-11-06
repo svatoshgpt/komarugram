@@ -18,6 +18,7 @@
 #include "ayu/ui/settings/settings_now_playing.h"
 #include "ayu/ui/settings/settings_other.h"
 #include "core/version.h"
+#include "data/data_chat_participant_status.h"
 #include "settings/settings_builder.h"
 #include "settings/settings_common.h"
 #include "styles/style_ayu_icons.h"
