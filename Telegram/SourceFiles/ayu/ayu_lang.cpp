@@ -126,7 +126,7 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_NowPlayingNone", u"нет"_q },
 		std::pair{
 			"ayu_NowPlayingServiceAbout",
-			u"Отображает в профиле текущий трек из сервиса скробблинга в виде карточки."_q },
+			u"Текущий трек карточкой в профиле."_q },
 		std::pair{ "ayu_NowPlayingUsernameHeader", u"Введите имя пользователя"_q },
 		std::pair{ "ayu_NowPlayingUsernamePlaceholder", u"Имя пользователя"_q },
 		std::pair{
@@ -137,14 +137,14 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_NowPlayingApiKeyPlaceholder", u"Ключ API"_q },
 		std::pair{
 			"ayu_NowPlayingApiKeyAbout",
-			u"Last.fm отвечает только приложениям с ключом. Бесплатный ключ можно создать на {link}."_q },
+			u"Нужен бесплатный ключ с {link}."_q },
 		std::pair{ "ayu_NowPlayingPublicHeader", u"Показывать всем"_q },
 		std::pair{ "ayu_NowPlayingProfileMusic", u"Музыка профиля"_q },
 		std::pair{ "ayu_NowPlayingKeepMusic", u"Не удалять из истории"_q },
 		std::pair{ "ayu_NowPlayingBio", u"О себе"_q },
 		std::pair{
 			"ayu_NowPlayingPublicAbout",
-			u"Видно в любом клиенте Telegram. Музыка профиля ставит трек первым в профиле: файл из ваших чатов, если он там есть, иначе беззвучную заглушку с названием и обложкой. «О себе» заменяет описание профиля на трек и возвращает прежний текст, когда музыка остановится."_q },
+			u"Видно во всех клиентах. Трек ставится в музыку профиля и в «О себе»; после остановки всё возвращается."_q },
 		std::pair{
 			"ayu_DeveloperPopup",
 			u"**{item}** — участник команды разработки **exteraGram**."_q },
