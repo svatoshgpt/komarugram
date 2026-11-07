@@ -29,6 +29,7 @@
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 #include <QtCore/QPointer>
+#include <QtCore/QRegularExpression>
 #include <QtCore/QUrlQuery>
 #include <QtGui/QImage>
 #include <QtNetwork/QNetworkAccessManager>
@@ -74,6 +75,64 @@ struct Applied {
 
 [[nodiscard]] QString StatePath() {
 	return cWorkingDir() + u"tdata/komaru_now_playing.json"_q;
+}
+
+// The bio as it was before Now Playing, readable and kept across restarts.
+[[nodiscard]] QString BioBackupPath() {
+	return cWorkingDir() + u"tdata/komaru_bio_backup.md"_q;
+}
+
+[[nodiscard]] bool IsNowPlayingBio(const QString &text) {
+	return text.startsWith(u"🎧 "_q);
+}
+
+[[nodiscard]] std::map<uint64, QString> ReadBioBackups() {
+	auto result = std::map<uint64, QString>();
+	auto file = QFile(BioBackupPath());
+	if (!file.open(QIODevice::ReadOnly)) {
+		return result;
+	}
+	const auto text = QString::fromUtf8(file.readAll());
+	static const auto re = QRegularExpression(
+		u"<!-- user (\\d+) -->\n(.*?)\n<!-- end -->"_q,
+		QRegularExpression::DotMatchesEverythingOption);
+	auto i = re.globalMatch(text);
+	while (i.hasNext()) {
+		const auto match = i.next();
+		result[match.captured(1).toULongLong()] = match.captured(2);
+	}
+	return result;
+}
+
+void WriteBioBackup(uint64 userId, const QString &bio) {
+	if (IsNowPlayingBio(bio)) {
+		return;
+	}
+	auto all = ReadBioBackups();
+	const auto i = all.find(userId);
+	if (i != end(all) && i->second == bio) {
+		return;
+	}
+	all[userId] = bio;
+	auto text = u"# KomaruGram bio backup\n\n"_q
+		+ u"The profile bio saved before Now Playing replaced it.\n\n"_q;
+	for (const auto &[id, about] : all) {
+		text += u"<!-- user "_q + QString::number(id) + u" -->\n"_q
+			+ about + u"\n<!-- end -->\n\n"_q;
+	}
+	auto file = QFile(BioBackupPath());
+	if (file.open(QIODevice::WriteOnly)) {
+		file.write(text.toUtf8());
+	}
+}
+
+[[nodiscard]] QString BioToRestore(uint64 userId, const QString &backup) {
+	if (!IsNowPlayingBio(backup)) {
+		return backup;
+	}
+	const auto all = ReadBioBackups();
+	const auto i = all.find(userId);
+	return (i != end(all)) ? i->second : QString();
 }
 
 [[nodiscard]] bool Enabled() {
@@ -788,8 +847,11 @@ void Manager::syncBio(
 	if (!track) {
 		if (applied.bioSaved) {
 			const auto about = self->about();
-			if (about.isEmpty() || about == applied.bioText) {
-				session->api().saveSelfBio(applied.bioBackup);
+			if (about.isEmpty()
+				|| about == applied.bioText
+				|| IsNowPlayingBio(about)) {
+				session->api().saveSelfBio(
+					BioToRestore(userId, applied.bioBackup));
 			}
 			applied = Applied{
 				.music = applied.music,
@@ -815,8 +877,12 @@ void Manager::syncBio(
 			}
 			auto &applied = _applied[userId];
 			const auto about = result.data().vfull_user().data().vabout();
-			applied.bioBackup = about ? qs(*about) : QString();
+			const auto bio = about ? qs(*about) : QString();
+			applied.bioBackup = IsNowPlayingBio(bio)
+				? BioToRestore(userId, bio)
+				: bio;
 			applied.bioSaved = true;
+			WriteBioBackup(userId, applied.bioBackup);
 			save();
 			sync();
 		})).fail(crl::guard(this, [=] {
@@ -829,8 +895,10 @@ void Manager::syncBio(
 	if (!about.isEmpty()
 		&& !applied.bioText.isEmpty()
 		&& about != applied.bioText
-		&& about != text) {
+		&& about != text
+		&& !IsNowPlayingBio(about)) {
 		applied.bioBackup = about;
+		WriteBioBackup(userId, about);
 	}
 	if (applied.bioText != text) {
 		applied.bioText = text;
