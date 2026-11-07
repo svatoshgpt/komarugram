@@ -9,10 +9,12 @@
 //!   komaru ci free-disk --path DIR... [--timeout SECONDS]
 //!   komaru ci prune-libs --dir LIBRARIES
 //!   komaru tidy compile-db [BUILD]
+//!   komaru tl-permissions --scheme api.tl --out table.cpp
 
 mod args;
 mod ci;
 mod git;
+mod permissions;
 mod review;
 mod rules;
 mod sweep;
@@ -25,6 +27,7 @@ fn usage() -> ExitCode {
     eprintln!("       komaru ci <keep-dates|packer-key|dockerfile|free-disk|prune-libs> ...");
     eprintln!("       komaru rules [--staged]");
     eprintln!("       komaru tidy compile-db [BUILD]");
+    eprintln!("       komaru tl-permissions --scheme FILE --out FILE");
     ExitCode::from(2)
 }
 
@@ -38,6 +41,7 @@ fn main() -> ExitCode {
         "ci" => ci::run(rest),
         "rules" => rules::run(rest),
         "tidy" => tidy::run(rest),
+        "tl-permissions" => permissions::run(rest),
         _ => return usage(),
     };
     match result {

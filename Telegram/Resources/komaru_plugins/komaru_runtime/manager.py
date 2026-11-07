@@ -126,6 +126,7 @@ class Record:
             "wants_updates": bool(self.update_hooks)
                 or bool(self.go and self.go.wants_updates),
             "menu": self.describe_menu(),
+            "permissions": [str(p) for p in (self.meta.get("permissions") or [])],
         }
 
     def describe_menu(self):
@@ -156,6 +157,9 @@ class Manager:
         self.state = {"enabled": {}, "settings": {}}
         self._update_clients = set()
         self._changed_pending = False
+        # Plugins the user let read and change messages, from the client.
+        self.allowed_updates = set()
+        self.allowed_send_hook = set()
         os.makedirs(self.installed_dir, exist_ok=True)
         os.makedirs(self.libs_dir, exist_ok=True)
 
@@ -550,6 +554,8 @@ class Manager:
     async def transform_outgoing(self, account, peer, text, reply_to):
         from base_plugin import HookStrategy
         for record in list(self.records.values()):
+            if record.id not in self.allowed_send_hook:
+                continue
             if record.go is not None and record.go.send_hook:
                 action, text = await record.go.transform(account, peer, text)
                 if action == "cancel":
@@ -595,6 +601,8 @@ class Manager:
     def dispatch_update(self, account, update):
         name = "TL_" + _lower_first(type(update).__name__)
         for record in list(self.records.values()):
+            if record.id not in self.allowed_updates:
+                continue
             if record.go is not None and record.go.wants_updates:
                 if name in ("TL_updateNewMessage", "TL_updateNewChannelMessage"):
                     record.go.forward_update(account, update)
@@ -627,6 +635,10 @@ class Manager:
             return self.install(message["path"]).describe()
         if command == "invoke_result":
             self.accounts.resolve(message)
+            return True
+        if command == "permissions":
+            self.allowed_updates = set(message.get("updates") or [])
+            self.allowed_send_hook = set(message.get("send_hook") or [])
             return True
         if command == "updates":
             self.accounts.feed_updates(message)

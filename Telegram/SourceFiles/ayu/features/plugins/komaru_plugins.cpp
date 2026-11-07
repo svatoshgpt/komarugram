@@ -1,6 +1,7 @@
 // This is the source code of KomaruGram for Desktop.
 #include "ayu/features/plugins/komaru_plugins.h"
 
+#include "ayu/features/plugins/plugin_permissions.h"
 #include "config.h"
 #include "core/application.h"
 #include "core/core_settings.h"
@@ -457,6 +458,40 @@ void ApplyPluginProxy(const QJsonObject &message) {
 	Core::App().saveSettingsDelayed();
 }
 
+[[nodiscard]] bool Allowed(const PluginInfo &plugin, PluginAction action) {
+	return Permission(plugin.id, action).value_or(false);
+}
+
+// Updates and the send hook reach only plugins allowed to read and change messages.
+void SyncHookPermissions() {
+	auto &state = Instance();
+	auto updates = QJsonArray();
+	auto hooks = QJsonArray();
+	for (const auto &plugin : state.plugins) {
+		if (!plugin.loaded) {
+			continue;
+		}
+		const auto check = [&](bool wanted, PluginAction action, QJsonArray &list) {
+			if (!wanted) {
+				return;
+			} else if (const auto known = Permission(plugin.id, action)) {
+				if (*known) {
+					list.push_back(plugin.id);
+				}
+			} else {
+				CheckPermission(plugin.id, plugin.name, action, [](bool) {});
+			}
+		};
+		check(plugin.wantsUpdates, PluginAction::MessagesRead, updates);
+		check(plugin.sendHook, PluginAction::MessagesOutgoing, hooks);
+	}
+	auto command = QJsonObject();
+	command.insert(u"cmd"_q, u"permissions"_q);
+	command.insert(u"updates"_q, updates);
+	command.insert(u"send_hook"_q, hooks);
+	Request(std::move(command));
+}
+
 void ParsePlugins(const QJsonValue &value) {
 	auto &state = Instance();
 	state.plugins.clear();
@@ -477,9 +512,12 @@ void ParsePlugins(const QJsonValue &value) {
 			.sendHook = object.value(u"send_hook"_q).toBool(),
 			.wantsUpdates = object.value(u"wants_updates"_q).toBool(),
 			.menu = ParseMenu(object.value(u"menu"_q)),
+			.permissions = object.value(u"permissions"_q).toVariant()
+				.toStringList(),
 		});
 	}
 	state.pluginsChanged.fire({});
+	SyncHookPermissions();
 }
 
 [[nodiscard]] Main::Account *AccountByIndex(int index) {
@@ -495,6 +533,40 @@ void ReplyToPluginRequest(QJsonObject reply) {
 	reply.insert(u"cmd"_q, u"invoke_result"_q);
 	Request(std::move(reply));
 }
+
+[[nodiscard]] QString PluginName(const QString &id) {
+	for (const auto &plugin : Instance().plugins) {
+		if (plugin.id == id) {
+			return plugin.name;
+		}
+	}
+	return id;
+}
+
+// The method under the invokeWith* wrappers, by its constructor id.
+[[nodiscard]] MethodInfo RequestMethod(const QByteArray &data) {
+	const auto ints = reinterpret_cast<const mtpPrime*>(data.constData());
+	const auto count = int(data.size() / sizeof(mtpPrime));
+	auto offset = 0;
+	while (offset < count) {
+		const auto id = uint32(ints[offset]);
+		if (id == mtpc_invokeWithLayer) {
+			offset += 2;
+		} else if (id == mtpc_invokeWithoutUpdates) {
+			offset += 1;
+		} else if (id == mtpc_invokeAfterMsg) {
+			offset += 3;
+		} else {
+			return LookupMethod(id);
+		}
+	}
+	return { nullptr, PluginAction::Forbidden };
+}
+
+void SendPluginRequest(
+	not_null<Main::Account*> account,
+	const QByteArray &data,
+	const QJsonObject &reply);
 
 // A request a plugin made, serialized by Telethon. It goes out on this
 // client's own connection like any request of ours, and the raw result or
@@ -522,6 +594,32 @@ void RunPluginRequest(const QJsonObject &message) {
 		fail(400, u"BAD_REQUEST_DATA"_q);
 		return;
 	}
+	const auto plugin = message.value(u"plugin"_q).toString();
+	const auto method = RequestMethod(data);
+	const auto name = method.name
+		? QString::fromLatin1(method.name)
+		: u"unknown"_q;
+	CheckPermission(plugin, PluginName(plugin), method.action, [=](
+			bool allowed) {
+		if (method.action != PluginAction::Base) {
+			LogPermission(plugin, name, allowed);
+		}
+		// The user may answer late, after the account is gone.
+		const auto account = AccountByIndex(accountIndex);
+		if (!allowed) {
+			fail(403, u"PLUGIN_PERMISSION_DENIED"_q);
+		} else if (!account || !account->sessionExists()) {
+			fail(401, u"ACCOUNT_NOT_AVAILABLE"_q);
+		} else {
+			SendPluginRequest(account, data, reply);
+		}
+	});
+}
+
+void SendPluginRequest(
+		not_null<Main::Account*> account,
+		const QByteArray &data,
+		const QJsonObject &reply) {
 	const auto ints = uint32(data.size() / sizeof(mtpPrime));
 	auto request = MTP::details::SerializedRequest::Prepare(ints);
 	const auto offset = request->size();
@@ -722,6 +820,11 @@ void Start() {
 		return;
 	}
 	state.started = true;
+	PermissionsChanged() | rpl::on_next([](const QString &) {
+		if (Instance().ready) {
+			SyncHookPermissions();
+		}
+	}, state.lifetime);
 	// Test builds downloaded their own Python here.
 	QDir(RuntimeDir() + u"python"_q).removeRecursively();
 	QFile::remove(RuntimeDir() + u"pip.whl"_q);
@@ -893,7 +996,9 @@ void ForwardUpdates(
 	}
 	// Telethon catches up on every gap it sees through the client, so only subscribers get updates.
 	const auto wanted = ranges::any_of(state.plugins, [](const PluginInfo &p) {
-		return p.loaded && p.wantsUpdates;
+		return p.loaded
+			&& p.wantsUpdates
+			&& Allowed(p, PluginAction::MessagesRead);
 	});
 	if (!wanted) {
 		return;
@@ -937,7 +1042,9 @@ QString LogPath() {
 
 bool HasSendHooks() {
 	for (const auto &plugin : Instance().plugins) {
-		if (plugin.loaded && plugin.sendHook) {
+		if (plugin.loaded
+			&& plugin.sendHook
+			&& Allowed(plugin, PluginAction::MessagesOutgoing)) {
 			return true;
 		}
 	}

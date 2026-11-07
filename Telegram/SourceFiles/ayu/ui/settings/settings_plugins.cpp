@@ -2,6 +2,8 @@
 #include "ayu/ui/settings/settings_plugins.h"
 
 #include "ayu/features/plugins/komaru_plugins.h"
+#include "ayu/features/plugins/plugin_permissions.h"
+#include "base/unixtime.h"
 #include "core/file_utilities.h"
 #include "lang_auto.h"
 #include "mainwindow.h"
@@ -16,6 +18,7 @@
 #include "ui/ui_utility.h"
 #include "ui/vertical_list.h"
 #include "ui/widgets/buttons.h"
+#include "ui/widgets/checkbox.h"
 #include "ui/widgets/fields/input_field.h"
 #include "ui/widgets/labels.h"
 #include "ui/wrap/vertical_layout.h"
@@ -294,6 +297,17 @@ void ShowPluginBox(
 			}, toggle->lifetime());
 		}
 
+		if (page.isEmpty() && plugin) {
+			const auto permissions = content->add(
+				object_ptr<Ui::SettingsButton>(
+					content,
+					tr::ayu_PluginPermissions(),
+					st::settingsButtonNoIcon));
+			permissions->setClickedCallback([=] {
+				ShowPermissionsBox(controller, id);
+			});
+		}
+
 		const auto settings = content->add(
 			object_ptr<Ui::VerticalLayout>(content));
 		const auto refill = std::make_shared<Fn<void(QJsonArray)>>();
@@ -340,6 +354,153 @@ void ShowPluginBox(
 			});
 		}
 		box->addButton(tr::lng_close(), [=] {
+			box->closeBox();
+		});
+	}));
+}
+
+void ShowPermissionsBox(
+		not_null<Window::SessionController*> controller,
+		const QString &id) {
+	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		const auto plugin = FindPlugin(id);
+		box->setTitle(tr::ayu_PluginPermissions());
+		box->setWidth(st::boxWideWidth);
+		const auto content = box->verticalLayout();
+		Ui::AddDividerText(
+			content,
+			tr::ayu_PluginPermissionsAbout(
+				lt_name,
+				rpl::single(plugin ? plugin->name : id)));
+		for (const auto &group : PermissionGroups()) {
+			const auto actions = group.actions;
+			const auto size = int(actions.size());
+			const auto count = [=] {
+				return int(ranges::count_if(actions, [&](PluginAction a) {
+					return Permission(id, a).value_or(false);
+				}));
+			};
+			const auto title = content->lifetime().make_state<
+				rpl::variable<QString>>();
+			const auto all = content->lifetime().make_state<
+				rpl::variable<bool>>();
+			const auto name = group.title;
+			const auto refresh = [=] {
+				const auto now = count();
+				*title = name
+					+ u"  "_q
+					+ QString::number(now)
+					+ u"/"_q
+					+ QString::number(size);
+				*all = (now == size);
+			};
+			refresh();
+			Ui::AddSkip(content);
+			const auto toggle = content->add(object_ptr<Ui::SettingsButton>(
+				content,
+				title->value(),
+				st::settingsButtonNoIcon));
+			toggle->toggleOn(all->value());
+			auto checks = std::vector<Ui::Checkbox*>();
+			for (const auto action : actions) {
+				const auto check = content->add(
+					object_ptr<Ui::Checkbox>(
+						content,
+						ActionTitle(action),
+						Permission(id, action).value_or(false),
+						st::defaultBoxCheckbox),
+					st::boxRowPadding + QMargins(0, st::boxLittleSkip, 0, 0));
+				check->checkedChanges(
+				) | rpl::on_next([=](bool checked) {
+					SetPermission(id, action, checked);
+					refresh();
+				}, check->lifetime());
+				checks.push_back(check);
+			}
+			// The switch turns the whole group on or off.
+			toggle->toggledChanges(
+			) | rpl::on_next([=](bool on) {
+				const auto now = count();
+				if ((on && now < size) || (!on && now == size)) {
+					for (const auto check : checks) {
+						check->setChecked(on);
+					}
+				}
+			}, toggle->lifetime());
+		}
+
+		Ui::AddSkip(content);
+		Ui::AddDivider(content);
+		Ui::AddSkip(content);
+		Ui::AddSubsectionTitle(content, tr::ayu_PluginPermissionsLog());
+		const auto &log = PermissionLog(id);
+		if (log.empty()) {
+			content->add(
+				object_ptr<Ui::FlatLabel>(
+					content,
+					tr::ayu_PluginPermissionsLogEmpty(),
+					st::boxDividerLabel),
+				st::boxRowPadding);
+		}
+		for (const auto &entry : log) {
+			content->add(
+				object_ptr<Ui::FlatLabel>(
+					content,
+					base::unixtime::parse(entry.date).toString(u"HH:mm:ss"_q)
+						+ u"  "_q
+						+ entry.method
+						+ u" — "_q
+						+ (entry.allowed
+							? tr::ayu_PluginPermissionAllowed(tr::now)
+							: tr::ayu_PluginPermissionDenied(tr::now)),
+					st::boxDividerLabel),
+				st::boxRowPadding);
+		}
+		box->addButton(tr::lng_close(), [=] {
+			box->closeBox();
+		});
+	}));
+}
+
+// What a plugin's manifest asks for, all allowed unless unchecked.
+void ShowRequestedPermissionsBox(
+		not_null<Window::SessionController*> controller,
+		const QString &id,
+		const QString &name,
+		QStringList keys,
+		Fn<void()> done) {
+	auto actions = std::vector<PluginAction>();
+	for (const auto &key : keys) {
+		if (const auto action = ActionByKey(key)) {
+			actions.push_back(*action);
+		}
+	}
+	if (actions.empty()) {
+		done();
+		return;
+	}
+	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
+		box->setTitle(rpl::single(name));
+		box->setWidth(st::boxWideWidth);
+		box->addRow(object_ptr<Ui::FlatLabel>(
+			box,
+			tr::ayu_PluginPermissionsRequested(),
+			st::boxLabel));
+		auto checks = std::vector<std::pair<PluginAction, Ui::Checkbox*>>();
+		for (const auto action : actions) {
+			checks.emplace_back(action, box->addRow(object_ptr<Ui::Checkbox>(
+				box,
+				ActionTitle(action),
+				true,
+				st::defaultBoxCheckbox)));
+		}
+		box->boxClosing() | rpl::on_next([=] {
+			for (const auto &[action, check] : checks) {
+				SetPermission(id, action, check->checked());
+			}
+			done();
+		}, box->lifetime());
+		box->addButton(tr::lng_box_ok(), [=] {
 			box->closeBox();
 		});
 	}));
@@ -516,22 +677,32 @@ void InstallPluginFile(
 			controller->showToast(error);
 			return;
 		}
-		const auto id = value.toObject().value(u"id"_q).toString();
-		if (installed) {
+		const auto object = value.toObject();
+		const auto id = object.value(u"id"_q).toString();
+		const auto finish = crl::guard(controller, [=] {
+			if (installed) {
+				Refresh();
+				installed();
+				return;
+			}
+			// The box needs the plugin in the list, which the refresh brings.
+			PluginsChanged(
+			) | rpl::take(1) | rpl::on_next(crl::guard(controller, [=] {
+				ShowPluginBox(controller, id, QString());
+			}), controller->lifetime());
 			Refresh();
-			installed();
-			return;
-		}
-		// The box needs the plugin in the list, which the refresh brings.
-		PluginsChanged(
-		) | rpl::take(1) | rpl::on_next(crl::guard(controller, [=] {
-			ShowPluginBox(controller, id, QString());
-		}), controller->lifetime());
-		Refresh();
+		});
+		ShowRequestedPermissionsBox(
+			controller,
+			id,
+			object.value(u"name"_q).toString(),
+			object.value(u"permissions"_q).toVariant().toStringList(),
+			finish);
 	}));
 }
 
 void UninstallPlugin(const QString &id, Fn<void()> done) {
+	ForgetPermissions(id);
 	Request(Command(u"uninstall"_q, id), [=](QJsonValue, QString) {
 		Refresh();
 		if (done) {

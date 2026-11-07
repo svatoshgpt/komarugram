@@ -25,7 +25,7 @@ import shutil
 import subprocess
 import sys
 
-from komaru_runtime import protocol
+from komaru_runtime import context, protocol
 
 SEND_HOOK_TIMEOUT = 1.0
 
@@ -154,7 +154,8 @@ class GoPlugin:
             self.manager.ensure_update_listener(self.record)
             self.manager.notify_changed()
         elif call == "send_message":
-            await self._send_message(message)
+            with context.running(self.record, message.get("account")):
+                await self._send_message(message)
 
     async def _send_message(self, message):
         try:

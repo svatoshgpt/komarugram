@@ -10,7 +10,7 @@ import asyncio
 import base64
 import itertools
 
-from komaru_runtime import protocol
+from komaru_runtime import context, protocol
 
 
 class _InputPeerReader:
@@ -56,10 +56,12 @@ class BridgeSender:
             return future
         request_id = next(self._ids)
         self._pending[request_id] = (future, request)
+        record = context.current_record()
         protocol.event(
             "invoke",
             request=request_id,
             account=self.account,
+            plugin=record.id if record else "",
             data=base64.b64encode(bytes(request)).decode("ascii"))
         return future
 

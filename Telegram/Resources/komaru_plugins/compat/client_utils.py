@@ -133,8 +133,9 @@ def send_request(request, fn=None, account=None):
     async def call():
         client = await context.manager().accounts.telethon(index)
         try:
-            prepared = await tl_bridge.to_telethon(request, client)
-            result, error = await client(prepared), None
+            with context.running(record, index):
+                prepared = await tl_bridge.to_telethon(request, client)
+                result, error = await client(prepared), None
         except Exception as e:
             result, error = None, e
             if record:

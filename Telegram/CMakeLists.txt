@@ -221,6 +221,9 @@ set(ayugram_files
         ayu/ui/components/image_view.h
         ayu/features/plugins/komaru_plugins.cpp
         ayu/features/plugins/komaru_plugins.h
+        ayu/features/plugins/plugin_permissions.cpp
+        ayu/features/plugins/plugin_permissions.h
+        ayu/features/plugins/plugin_permissions_table.cpp
         ayu/ui/settings/settings_plugins.cpp
         ayu/ui/settings/settings_plugins.h
         ayu/ui/components/color_swatch.cpp

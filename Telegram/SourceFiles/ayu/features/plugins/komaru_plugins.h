@@ -50,6 +50,8 @@ struct PluginInfo {
 	bool sendHook = false;
 	bool wantsUpdates = false;
 	std::vector<PluginMenuItem> menu;
+	// Actions from the manifest, asked for at install.
+	QStringList permissions;
 };
 
 using Done = Fn<void(QJsonValue result, QString error)>;
