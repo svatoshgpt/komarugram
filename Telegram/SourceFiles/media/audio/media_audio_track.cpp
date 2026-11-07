@@ -21,7 +21,9 @@ namespace Audio {
 namespace {
 
 constexpr auto kMaxFileSize = 10 * 1024 * 1024;
-constexpr auto kDetachDeviceTimeout = crl::time(500); // destroy the audio device after 500ms of silence
+// Reopening the device delays every notification sound, so it stays open through a chat.
+constexpr auto kDetachDeviceTimeout = crl::time(60000);
+constexpr auto kForcedDetachTimeout = crl::time(500);
 constexpr auto kTrackUpdateTimeout = crl::time(100);
 
 ALuint CreateSource() {
@@ -350,7 +352,7 @@ bool Instance::hasActiveTracks() const {
 
 void Instance::scheduleDetachFromDevice() {
 	_detachFromDeviceForce = true;
-	scheduleDetachIfNotUsed();
+	_detachFromDeviceTimer.callOnce(kForcedDetachTimeout);
 }
 
 void Instance::scheduleDetachIfNotUsed() {
