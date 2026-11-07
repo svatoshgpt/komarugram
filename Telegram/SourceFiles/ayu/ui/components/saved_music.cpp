@@ -96,7 +96,7 @@ QPixmap MakeNoCoverImage(const QSize &size) {
 		svgIcon.render(&p, QRect(0, 0, size.width(), size.height()));
 	}
 	const auto img = Image(std::move(image));
-	result = img.pix(size, Images::PrepareArgs{.options = Images::Option::RoundSmall});
+	result = img.pix(size, Images::PrepareArgs{.options = Images::Option::RoundLarge});
 	return result;
 }
 
@@ -121,7 +121,7 @@ Cover GetCurrentCover(
 		return image->size().scaled(targetSize, aspectRatio);
 	};
 	const auto args = Images::PrepareArgs{
-		.options = Images::Option::RoundSmall,
+		.options = Images::Option::RoundLarge,
 		.outer = size,
 	};
 	if (const auto normal = dataMedia->thumbnail()) {
@@ -277,7 +277,7 @@ void AyuMusicButton::makeCover() {
 			if (external && !external->isNull()) {
 				const auto img = Image(QImage(*external));
 				const auto args = Images::PrepareArgs{
-					.options = Images::Option::RoundSmall,
+					.options = Images::Option::RoundLarge,
 					.outer = QSize(size, size),
 				};
 				cover.pixToDraw = img.pix(QSize(size, size), args);
@@ -288,7 +288,7 @@ void AyuMusicButton::makeCover() {
 				if (!pix.isNull()) {
 					const auto img = Image(pix.toImage());
 					const auto args = Images::PrepareArgs{
-						.options = Images::Option::RoundSmall,
+						.options = Images::Option::RoundLarge,
 						.outer = QSize(size, size),
 					};
 					cover.pixToDraw = img.pix(QSize(size, size), args);
