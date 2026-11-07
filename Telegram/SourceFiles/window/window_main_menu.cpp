@@ -791,10 +791,6 @@ void MainMenu::setupMenu() {
 						tr::lng_wallet_menu(),
 						st::mainMenuButton,
 						{ &st::walletMenuIcon })));
-			Ui::NewBadge::AddAfterButtonText(
-				wallet->entity(),
-				tr::lng_wallet_menu(),
-				st::mainMenuButton);
 			wallet->toggleOn(rpl::combine(
 				session->appConfig().value() | rpl::map([=] {
 					return session->appConfig().walletAvailable();
