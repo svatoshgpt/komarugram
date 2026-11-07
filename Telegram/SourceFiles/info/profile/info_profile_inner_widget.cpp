@@ -95,6 +95,7 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 			st::infoProfileSkip));
 	button->setCornerRadius(st::roundRadiusLarge);
 	button->setPadding(st::ayuNowPlayingPadding);
+	button->setThemeColors(true);
 	button->setPlayIconShown(true);
 	rpl::combine(
 		KomaruNowPlaying::Value(),

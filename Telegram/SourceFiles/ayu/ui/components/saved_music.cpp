@@ -241,6 +241,16 @@ void AyuMusicButton::setPlayIconShown(bool shown) {
 	update();
 }
 
+void AyuMusicButton::setThemeColors(bool theme) {
+	if (_themeColors == theme) {
+		return;
+	}
+	_themeColors = theme;
+	if (_currentCover) {
+		makeCover();
+	}
+}
+
 void AyuMusicButton::setExternalCover(QImage image) {
 	_externalCover = std::move(image);
 }
@@ -271,9 +281,10 @@ void AyuMusicButton::downloadAndMakeCover(FullMsgId msgId) {
 void AyuMusicButton::makeCover() {
 	const auto weak = base::make_weak(this);
 	crl::async(
-		[=, mediaView = _mediaView, performerText = _performerText, titleText = _titleText, overrideBg = _overrideBg, external = _externalCover]()
+		[=, mediaView = _mediaView, performerText = _performerText, titleText = _titleText, overrideBg = _overrideBg, external = _externalCover, themeColors = _themeColors]()
 		{
 			const auto &settings = AyuSettings::getInstance();
+			const auto adaptiveColor = !themeColors && settings.adaptiveCoverColor();
 			const auto &font = st::infoMusicButtonTitle.style.font;
 			const auto skip = st::normalFont->spacew / 2;
 			const auto size = font->height + skip + font->height;
@@ -304,7 +315,7 @@ void AyuMusicButton::makeCover() {
 			}
 
 			QColor bgColor;
-			if (cover.noCover || !settings.adaptiveCoverColor()) {
+			if (cover.noCover || !adaptiveColor) {
 				bgColor = GetNoCoverBgColor(overrideBg);
 			} else {
 				if (const auto extractedColor = ExtractColorFromCover(cover.pixToBg)) {
@@ -316,7 +327,7 @@ void AyuMusicButton::makeCover() {
 				}
 			}
 
-			crl::on_main([weak, cover = std::move(cover), bgColor, overrideBg]() mutable
+			crl::on_main([weak, cover = std::move(cover), bgColor, overrideBg, adaptiveColor]() mutable
 			{
 				const auto strong = weak.get();
 				if (!strong) {
@@ -329,10 +340,9 @@ void AyuMusicButton::makeCover() {
 					.noCover = cover.noCover,
 				};
 
-				const auto &settings2 = AyuSettings::getInstance();
 				const auto &cover2 = *strong->_currentCover;
 
-				if (!cover2.noCover && settings2.adaptiveCoverColor() && !cover2.pix.isNull()) {
+				if (!cover2.noCover && adaptiveColor && !cover2.pix.isNull()) {
 					strong->_title->setTextColorOverride(Qt::white);
 					strong->_performer->setTextColorOverride(performerColor);
 				} else if (overrideBg) {
@@ -371,7 +381,9 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 
 	const auto &settings = AyuSettings::getInstance();
 	const auto cover = _currentCover.value();
-	const auto adaptive = !cover.noCover && settings.adaptiveCoverColor();
+	const auto adaptive = !cover.noCover
+		&& !_themeColors
+		&& settings.adaptiveCoverColor();
 	if (!adaptive) {
 		// A surface container of the current theme, as in Material 3.
 		p.fillRect(e->rect(), _overrideBg ? cover.bg : st::windowBgOver->c);
