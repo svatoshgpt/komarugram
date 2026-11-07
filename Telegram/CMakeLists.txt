@@ -136,6 +136,8 @@ set(ayugram_files
         ayu/ayu_settings.h
         ayu/ayu_lang.cpp
         ayu/ayu_lang.h
+        ayu/komaru_strings.cpp
+        ayu/komaru_strings.h
         ayu/ayu_infra.cpp
         ayu/ayu_infra.h
         ayu/utils/ayu_mapper.cpp

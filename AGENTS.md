@@ -704,6 +704,8 @@ As of 2026-10-20, `Qt::ImhDate` and `Qt::ImhTime` do nothing anywhere tdesktop r
 
 ### String Definitions
 
+New KomaruGram strings go to `kStrings` in `Telegram/SourceFiles/ayu/komaru_strings.cpp` (English and Russian) and are read with `Komaru::Text(key)` or `Komaru::TextValue(key)`. A new `lang.strings` key regenerates `lang_auto.h`, which most of the client includes, so it rebuilds hundreds of files.
+
 Strings are defined in `Telegram/Resources/langs/lang.strings`:
 
 ```
