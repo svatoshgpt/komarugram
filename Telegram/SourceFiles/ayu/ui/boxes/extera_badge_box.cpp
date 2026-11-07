@@ -89,14 +89,33 @@ object_ptr<RpWidget> CreateBadgeLogo(
 		if (!state->emoji) {
 			return;
 		}
+		// The arrow is tinted with the theme accent, keeping its shading.
+		const auto ratio = style::DevicePixelRatio();
+		auto image = QImage(
+			QSize(size, size) * ratio,
+			QImage::Format_ARGB32_Premultiplied);
+		image.setDevicePixelRatio(ratio);
+		image.fill(Qt::transparent);
+		{
+			auto q = QPainter(&image);
+			state->emoji->paint(q, {
+				.textColor = st::windowActiveTextFg->c,
+				.now = crl::now(),
+				.position = QPoint(),
+			});
+		}
+		auto tinted = image;
+		{
+			auto q = QPainter(&tinted);
+			q.setCompositionMode(QPainter::CompositionMode_Multiply);
+			q.fillRect(QRect(0, 0, size, size), st::windowActiveTextFg);
+			q.setCompositionMode(QPainter::CompositionMode_DestinationIn);
+			q.drawImage(0, 0, image);
+		}
 		auto p = QPainter(raw);
-		state->emoji->paint(p, {
-			.textColor = st::windowBoldFg->c,
-			.now = crl::now(),
-			.position = QPoint(
-				(raw->width() - size) / 2,
-				(raw->height() - size) / 2),
-		});
+		p.drawImage(
+			QPoint((raw->width() - size) / 2, (raw->height() - size) / 2),
+			tinted);
 	}, raw->lifetime());
 	return result;
 }
