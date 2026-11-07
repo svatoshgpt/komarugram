@@ -385,6 +385,7 @@ public:
 	[[nodiscard]] const QString &nowPlayingUsername() const { return _nowPlayingUsername.current(); }
 	[[nodiscard]] const QString &nowPlayingLastFmKey() const { return _nowPlayingLastFmKey.current(); }
 	[[nodiscard]] bool nowPlayingProfileMusic() const { return _nowPlayingProfileMusic.current(); }
+	[[nodiscard]] bool nowPlayingKeepMusic() const { return _nowPlayingKeepMusic.current(); }
 	[[nodiscard]] bool nowPlayingBio() const { return _nowPlayingBio.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
 
@@ -486,6 +487,7 @@ public:
 	void setNowPlayingUsername(const QString &val);
 	void setNowPlayingLastFmKey(const QString &val);
 	void setNowPlayingProfileMusic(bool val);
+	void setNowPlayingKeepMusic(bool val);
 	void setNowPlayingBio(bool val);
 	void setStreamerMode(bool val);
 
@@ -780,6 +782,7 @@ private:
 	rpl::variable<QString> _nowPlayingUsername;
 	rpl::variable<QString> _nowPlayingLastFmKey;
 	rpl::variable<bool> _nowPlayingProfileMusic = true;
+	rpl::variable<bool> _nowPlayingKeepMusic = false;
 	rpl::variable<bool> _nowPlayingBio = false;
 	rpl::variable<bool> _streamerMode = false;
 

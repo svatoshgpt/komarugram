@@ -132,6 +132,7 @@ void ApplyKomaruTranslations() {
 			u"Last.fm отвечает только приложениям с ключом. Бесплатный ключ можно создать на {link}."_q },
 		std::pair{ "ayu_NowPlayingPublicHeader", u"Показывать всем"_q },
 		std::pair{ "ayu_NowPlayingProfileMusic", u"Музыка профиля"_q },
+		std::pair{ "ayu_NowPlayingKeepMusic", u"Не удалять из истории"_q },
 		std::pair{ "ayu_NowPlayingBio", u"О себе"_q },
 		std::pair{
 			"ayu_NowPlayingPublicAbout",

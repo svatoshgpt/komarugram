@@ -1289,6 +1289,12 @@ void AyuSettings::setNowPlayingProfileMusic(bool val) {
 	save();
 }
 
+void AyuSettings::setNowPlayingKeepMusic(bool val) {
+	if (_nowPlayingKeepMusic.current() == val) return;
+	_nowPlayingKeepMusic = val;
+	save();
+}
+
 void AyuSettings::setNowPlayingBio(bool val) {
 	if (_nowPlayingBio.current() == val) return;
 	_nowPlayingBio = val;
@@ -1417,6 +1423,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"nowPlayingUsername", s._nowPlayingUsername.current()},
 		{"nowPlayingLastFmKey", s._nowPlayingLastFmKey.current()},
 		{"nowPlayingProfileMusic", s._nowPlayingProfileMusic.current()},
+		{"nowPlayingKeepMusic", s._nowPlayingKeepMusic.current()},
 		{"nowPlayingBio", s._nowPlayingBio.current()},
 		{"streamerMode", s._streamerMode.current()},
 		{"messageShotSettings", s._messageShotSettings}
@@ -1535,6 +1542,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._nowPlayingUsername = j.value("nowPlayingUsername", defaults._nowPlayingUsername.current());
 	s._nowPlayingLastFmKey = j.value("nowPlayingLastFmKey", defaults._nowPlayingLastFmKey.current());
 	s._nowPlayingProfileMusic = j.value("nowPlayingProfileMusic", defaults._nowPlayingProfileMusic.current());
+	s._nowPlayingKeepMusic = j.value("nowPlayingKeepMusic", defaults._nowPlayingKeepMusic.current());
 	s._nowPlayingBio = j.value("nowPlayingBio", defaults._nowPlayingBio.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
 

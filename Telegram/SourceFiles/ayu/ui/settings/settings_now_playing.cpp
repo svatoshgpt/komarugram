@@ -208,6 +208,12 @@ void BuildPublic(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setNowPlayingProfileMusic,
 	});
 	ayu.addSettingToggle({
+		.id = u"ayu/nowPlayingKeepMusic"_q,
+		.title = tr::ayu_NowPlayingKeepMusic(),
+		.getter = &AyuSettings::nowPlayingKeepMusic,
+		.setter = &AyuSettings::setNowPlayingKeepMusic,
+	});
+	ayu.addSettingToggle({
 		.id = u"ayu/nowPlayingBio"_q,
 		.title = tr::ayu_NowPlayingBio(),
 		.getter = &AyuSettings::nowPlayingBio,

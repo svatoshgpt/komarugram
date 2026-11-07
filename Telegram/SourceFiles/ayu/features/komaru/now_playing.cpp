@@ -577,8 +577,9 @@ void Manager::syncMusic(
 	if (applied.musicKey == key) {
 		return;
 	}
+	const auto keep = AyuSettings::getInstance().nowPlayingKeepMusic();
 	if (!track) {
-		if (const auto old = base::take(applied.music)) {
+		if (const auto old = base::take(applied.music); old && !keep) {
 			removeMusic(session, old);
 		}
 		applied.musicKey = QString();
@@ -604,7 +605,7 @@ void Manager::syncMusic(
 			music.save(found, Data::FileOrigin());
 			applied.music = found->id;
 		}
-		if (old && old != applied.music) {
+		if (old && old != applied.music && !keep) {
 			removeMusic(strong, old);
 		}
 		save();

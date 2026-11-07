@@ -9790,6 +9790,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_NowPlayingApiKeyAbout" = "Last.fm only answers apps that have a key. You can create a free one on the {link}.";
 "ayu_NowPlayingPublicHeader" = "Show to everyone";
 "ayu_NowPlayingProfileMusic" = "Profile music";
+"ayu_NowPlayingKeepMusic" = "Keep in history";
 "ayu_NowPlayingBio" = "Bio";
 "ayu_NowPlayingPublicAbout" = "Visible in any Telegram app. Profile music puts the track first in your profile: the file from your chats if it is there, otherwise a silent placeholder with the title and cover. Bio replaces your bio with the track and brings the old text back when the music stops.";
 "ayu_KomaruSupportProofInfo" = "Send a photo of the payment confirmation to **{item}**. Make sure the photo clearly shows the amount, date, and time of the transfer. Also tell which colors you want for the face and the particles around it.";
