@@ -59,6 +59,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/features/komaru/now_playing.h"
 #include "ayu/ui/components/saved_music.h"
 #include "info/profile/info_profile_music_button.h"
+#include "styles/style_ayu_styles.h"
 #include "styles/style_layers.h"
 #include "ui/basic_click_handlers.h"
 
@@ -93,6 +94,7 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 			st::boxRowPadding.right(),
 			st::infoProfileSkip));
 	button->setCornerRadius(st::roundRadiusLarge);
+	button->setPadding(st::ayuNowPlayingPadding);
 	button->setPlayIconShown(true);
 	rpl::combine(
 		KomaruNowPlaying::Value(),
@@ -236,6 +238,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 
 	if (!_savedMessages && _peer->isSelf() && !_topic && !_sublist) {
 		stack.add(NowPlayingSection(result.data()));
+		stack.addPlainSeparator();
 	}
 
 	if (!_savedMessages) {

@@ -224,6 +224,12 @@ void AyuMusicButton::updateData(MusicButtonData data) {
 	resizeToWidth(widthNoMargins());
 }
 
+void AyuMusicButton::setPadding(QMargins padding) {
+	_padding = padding;
+	resizeToWidth(widthNoMargins());
+	update();
+}
+
 void AyuMusicButton::setCornerRadius(int radius) {
 	_radius = radius;
 	update();
@@ -379,7 +385,8 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 
 	if (!cover.pix.isNull()) {
 		auto hq = PainterHighQualityEnabler(p);
-		const auto coverRect = QRect(st::infoMusicButtonPadding.left(), st::infoMusicButtonPadding.top(), size, size);
+		const auto padding = _padding.value_or(st::infoMusicButtonPadding);
+		const auto coverRect = QRect(padding.left(), padding.top(), size, size);
 		p.drawPixmap(coverRect, cover.pix);
 	}
 
@@ -394,7 +401,7 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		auto bg = fg;
 		bg.setAlphaF(adaptive ? 0.2 : 0.16);
 		const auto circle = QRectF(
-			width() - st::infoMusicButtonPadding.left() - size,
+			width() - _padding.value_or(st::infoMusicButtonPadding).left() - size,
 			(height() - size) / 2.,
 			size,
 			size);
@@ -418,7 +425,7 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 }
 
 int AyuMusicButton::resizeGetHeight(int newWidth) {
-	const auto padding = st::infoMusicButtonPadding;
+	const auto padding = _padding.value_or(st::infoMusicButtonPadding);
 	const auto &font = st::infoMusicButtonTitle.style.font;
 
 	const auto top = padding.top();
@@ -429,9 +436,9 @@ int AyuMusicButton::resizeGetHeight(int newWidth) {
 	const auto available = newWidth - padding.left() - padding.right() - coverSize
 		- (_playIcon ? (coverSize + padding.left()) : 0);
 	_title->resizeToNaturalWidth(available);
-	_title->moveToLeft(st::infoMusicButtonPadding.left() + padding.left() + coverSize, top);
+	_title->moveToLeft(padding.left() * 2 + coverSize, top);
 	_performer->resizeToNaturalWidth(available);
-	_performer->moveToLeft(st::infoMusicButtonPadding.left() + padding.left() + coverSize, top + font->height + skip);
+	_performer->moveToLeft(padding.left() * 2 + coverSize, top + font->height + skip);
 
 	return padding.top() + font->height + skip + font->height + padding.bottom();
 }

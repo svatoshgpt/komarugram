@@ -35,6 +35,7 @@ public:
 
 	void updateData(MusicButtonData data);
 	void setCornerRadius(int radius);
+	void setPadding(QMargins padding);
 	void setPlayIconShown(bool shown);
 	void setExternalCover(QImage image);
 
@@ -61,6 +62,7 @@ private:
 	std::optional<QColor> _overrideBg;
 	std::optional<QImage> _externalCover;
 	int _radius = 0;
+	std::optional<QMargins> _padding;
 	bool _playIcon = false;
 
 };
