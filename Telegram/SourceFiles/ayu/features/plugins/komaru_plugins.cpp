@@ -5,6 +5,7 @@
 #include "core/application.h"
 #include "core/core_settings.h"
 #include "data/data_peer.h"
+#include "data/data_session.h"
 #include "lang/lang_keys.h"
 #include "main/main_account.h"
 #include "main/main_domain.h"
@@ -553,6 +554,37 @@ void RunPluginRequest(const QJsonObject &message) {
 		0);
 }
 
+// Telethon in the host has no access hashes; the client gives it the peer.
+void RunPluginInputPeer(const QJsonObject &message) {
+	auto reply = QJsonObject();
+	reply.insert(u"request"_q, message.value(u"request"_q).toInt());
+	reply.insert(u"account"_q, message.value(u"account"_q).toInt());
+	const auto account = AccountByIndex(message.value(u"account"_q).toInt());
+	const auto bare = message.value(u"id"_q).toVariant().toULongLong();
+	const auto kind = message.value(u"kind"_q).toString();
+	const auto id = (kind == u"channel"_q)
+		? peerFromChannel(ChannelId(bare))
+		: (kind == u"chat"_q)
+		? peerFromChat(ChatId(bare))
+		: peerFromUser(UserId(bare));
+	const auto peer = (account && account->sessionExists())
+		? account->session().data().peerLoaded(id)
+		: nullptr;
+	if (!peer) {
+		reply.insert(u"ok"_q, false);
+		reply.insert(u"code"_q, 400);
+		reply.insert(u"type"_q, u"PEER_ID_INVALID"_q);
+	} else {
+		auto buffer = mtpBuffer();
+		peer->input().write(buffer);
+		reply.insert(u"ok"_q, true);
+		reply.insert(u"data"_q, QString::fromLatin1(QByteArray(
+			reinterpret_cast<const char*>(buffer.constData()),
+			buffer.size() * sizeof(mtpPrime)).toBase64()));
+	}
+	ReplyToPluginRequest(std::move(reply));
+}
+
 void HandleEvent(const QJsonObject &message) {
 	auto &state = Instance();
 	const auto event = message.value(u"event"_q).toString();
@@ -569,6 +601,8 @@ void HandleEvent(const QJsonObject &message) {
 		state.settingsChanged.fire(message.value(u"plugin"_q).toString());
 	} else if (event == u"invoke"_q) {
 		RunPluginRequest(message);
+	} else if (event == u"input_peer"_q) {
+		RunPluginInputPeer(message);
 	} else if (event == u"proxy"_q) {
 		ApplyPluginProxy(message);
 	} else if (event == u"toast"_q) {

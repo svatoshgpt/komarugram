@@ -13,6 +13,11 @@ import itertools
 from komaru_runtime import protocol
 
 
+class _InputPeerReader:
+    def read_result(self, reader):
+        return reader.tgread_object()
+
+
 class BridgeSender:
     """Stands in for Telethon's MTProtoSender."""
 
@@ -56,6 +61,19 @@ class BridgeSender:
             request=request_id,
             account=self.account,
             data=base64.b64encode(bytes(request)).decode("ascii"))
+        return future
+
+    def input_peer(self, kind, bare_id):
+        """The client's InputPeer for a peer Telethon has no hash for."""
+        future = asyncio.get_running_loop().create_future()
+        request_id = next(self._ids)
+        self._pending[request_id] = (future, _InputPeerReader())
+        protocol.event(
+            "input_peer",
+            request=request_id,
+            account=self.account,
+            kind=kind,
+            id=int(bare_id))
         return future
 
     def resolve(self, message):
@@ -119,6 +137,30 @@ def make_client(account, entry, config, device, log):
                     0, 0, 0, state.pts, state.qts,
                     int(state.date.timestamp()), state.seq, 0), [])
             self._updates_handle = self.loop.create_task(self._update_loop())
+
+        async def get_input_entity(self, peer):
+            try:
+                return await super().get_input_entity(peer)
+            except ValueError:
+                from telethon import utils
+                from telethon.tl import types
+                if isinstance(peer, types.PeerUser):
+                    kind, bare = "user", peer.user_id
+                elif isinstance(peer, types.PeerChannel):
+                    kind, bare = "channel", peer.channel_id
+                elif isinstance(peer, types.PeerChat):
+                    kind, bare = "chat", peer.chat_id
+                elif isinstance(peer, int):
+                    bare, made = utils.resolve_id(peer)
+                    kind = {types.PeerUser: "user",
+                            types.PeerChannel: "channel"}.get(made, "chat")
+                else:
+                    raise
+                # The host session is empty; the client knows the access hash.
+                try:
+                    return await self._sender.input_peer(kind, bare)
+                except Exception:
+                    raise ValueError("Could not find the input entity for %r" % (peer,))
 
         async def _borrow_exported_sender(self, dc_id):
             raise ConnectionError(
