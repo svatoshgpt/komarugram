@@ -213,6 +213,8 @@ set(ayugram_files
         ayu/ui/boxes/donate_qr_box.h
         ayu/ui/boxes/donate_info_box.cpp
         ayu/ui/boxes/donate_info_box.h
+        ayu/ui/boxes/extera_badge_box.cpp
+        ayu/ui/boxes/extera_badge_box.h
         ayu/ui/boxes/plugin_info_box.cpp
         ayu/ui/boxes/plugin_info_box.h
         ayu/ui/components/image_view.cpp

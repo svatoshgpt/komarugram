@@ -98,6 +98,14 @@ void ApplyKomaruTranslations() {
 		std::pair{ "ayu_PluginUpdateButton", u"Обновить"_q },
 		std::pair{ "ayu_PluginsNeedRuntime", u"Сначала установите среду для плагинов, затем откройте файл снова."_q },
 		std::pair{ "ayu_SupportBoxHeader", u"Поддержать разработку"_q },
+		std::pair{ "ayu_ExteraBadgeTitleSelf", u"Ваши возможности"_q },
+		std::pair{ "ayu_ExteraBadgeTitle", u"Значок exteraGram"_q },
+		std::pair{ "ayu_ExteraBadgeAboutSelf", u"Значок {number} — вот что вам доступно:"_q },
+		std::pair{ "ayu_ExteraBadgeAbout", u"У {item} значок {number}. Вот что он даёт:"_q },
+		std::pair{ "ayu_ExteraBadgeNumberTitle", u"Номерной значок"_q },
+		std::pair{
+			"ayu_ExteraBadgeNumberAbout",
+			u"Значок с номером рядом с именем, его видят все в exteraGram и KomaruGram."_q },
 		std::pair{
 			"ayu_SupportBoxInfo",
 			u"Поддерживая проект, вы не только вносите вклад в его развитие, "

@@ -9428,6 +9428,12 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 "ayu_SupportDescription1" = "Support Development";
 "ayu_SupportDescription2" = "{item} and get an unique badge!";
 "ayu_SupportBoxHeader" = "Support Development";
+"ayu_ExteraBadgeTitleSelf" = "Your perks";
+"ayu_ExteraBadgeTitle" = "exteraGram badge";
+"ayu_ExteraBadgeAboutSelf" = "Badge {number} gives you:";
+"ayu_ExteraBadgeAbout" = "{item} has badge {number}. It gives:";
+"ayu_ExteraBadgeNumberTitle" = "Numbered badge";
+"ayu_ExteraBadgeNumberAbout" = "A badge with your number next to the name, seen by everyone in exteraGram and KomaruGram.";
 "ayu_SupportBoxInfo" = "By supporting the project, you not only contribute to its development but also get a unique badge.";
 "ayu_SupportBoxMakeDonationHeader" = "Make a Donation";
 "ayu_SupportBoxMakeDonationInfo" = "Transfer an amount of {amount1} ({amount2}) to any of the project's payment details. These can be found in the **Other** section of the app settings.";

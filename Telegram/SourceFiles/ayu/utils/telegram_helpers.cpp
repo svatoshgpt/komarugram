@@ -16,6 +16,7 @@
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
 #include "ayu/features/komaru/komaru_badges.h"
+#include "ayu/ui/boxes/extera_badge_box.h"
 #include "ayu/ui/toasts.h"
 #include "ayu/utils/rc_manager.h"
 #include "core/core_settings.h"
@@ -53,6 +54,7 @@
 #include "ui/text/text_entity.h"
 #include "ui/toast/toast.h"
 #include "window/window_controller.h"
+#include "window/window_session_controller.h"
 
 #include <atomic>
 #include <functional>
@@ -259,6 +261,18 @@ Fn<void()> badgeClickHandler(
 		const auto isSupporter = isSupporterPeer(getBareID(peer));
 		const auto komaruDeveloper = badge.komaruDeveloper;
 		const auto komaruSupporter = badge.komaruSupporter;
+
+		// A supporter arrow opens what it gives, like in exteraGram.
+		const auto arrow = (badge.badge == Info::Profile::BadgeType::ExteraSupporter)
+			|| (badge.badge == Info::Profile::BadgeType::ExteraCustom && !isExtera);
+		if (arrow && !komaruDeveloper && !komaruSupporter) {
+			if (const auto window = Core::App().activeWindow()) {
+				if (const auto controller = window->sessionController()) {
+					controller->show(Box(Ui::FillExteraBadgeBox, controller, peer));
+					return;
+				}
+			}
+		}
 
 		TextWithEntities text;
 		if (komaruDeveloper) {
