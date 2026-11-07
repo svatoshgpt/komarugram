@@ -621,7 +621,8 @@ protected:
 	}
 };
 
-void BuildHelpSection(SectionBuilder &builder) {
+// KomaruGram leaves the Telegram FAQ, features and ask a question out.
+[[maybe_unused]] void BuildHelpSection(SectionBuilder &builder) {
 	builder.addDivider();
 	builder.addSkip();
 
@@ -793,7 +794,6 @@ void Main::setupContent() {
 		builder.addSkip();
 		BuildInterfaceScale(builder);
 		BuildPremiumSection(builder);
-		BuildHelpSection(builder);
 
 		std::move(showFinished) | rpl::on_next([=] {
 			for (const auto &[id, entry] : *highlights) {
@@ -868,7 +868,6 @@ const auto kMeta = BuildHelper({
 
 	BuildInterfaceScale(builder);
 	BuildPremiumSection(builder);
-	BuildHelpSection(builder);
 });
 
 } // namespace
