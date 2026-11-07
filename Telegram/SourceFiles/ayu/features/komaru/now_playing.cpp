@@ -225,16 +225,27 @@ void WriteBioBackup(uint64 userId, const QString &bio) {
 
 [[nodiscard]] QString BioText(
 		not_null<Main::Session*> session,
-		const Track &track) {
+		const Track &track,
+		const QString &bio) {
 	const auto limits = Data::PremiumLimits(session);
 	const auto limit = session->user()->isPremium()
 		? limits.aboutLengthPremium()
 		: limits.aboutLengthDefault();
-	auto result = u"🎧 "_q + track.artist + u" — "_q + track.title;
-	if (result.size() > limit) {
-		result = result.left(limit - 1).trimmed() + QChar(0x2026);
-	}
-	return result;
+	const auto cut = [](const QString &text, int size) {
+		return (text.size() > size)
+			? (text.left(std::max(size - 1, 0)).trimmed() + QChar(0x2026))
+			: text;
+	};
+	// "🎧 Artist — Title | bio", the bio shortened first when too long.
+	const auto song = cut(
+		u"🎧 "_q + track.artist + u" — "_q + track.title,
+		limit);
+	const auto about = bio.simplified();
+	const auto separator = u" | "_q;
+	const auto room = limit - song.size() - separator.size();
+	return (about.isEmpty() || room < 2)
+		? song
+		: (song + separator + cut(about, room));
 }
 
 [[nodiscard]] std::optional<Track> ParseLastFm(const QJsonObject &root) {
@@ -890,7 +901,10 @@ void Manager::syncBio(
 		})).send();
 		return;
 	}
-	const auto text = BioText(session, *track);
+	const auto text = BioText(
+		session,
+		*track,
+		BioToRestore(userId, applied.bioBackup));
 	const auto about = self->about();
 	if (!about.isEmpty()
 		&& !applied.bioText.isEmpty()
