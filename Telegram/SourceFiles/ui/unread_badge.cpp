@@ -34,6 +34,7 @@ namespace {
 
 constexpr auto kPlayStatusLimit = 12;
 constexpr auto kBotVerifiedScale = 0.88;
+constexpr auto kKomaruPlayDuration = crl::time(4000);
 
 class ScaledBotVerifiedEmoji final : public Ui::Text::CustomEmoji {
 public:
@@ -140,6 +141,7 @@ struct PeerBadge::KomaruAnimation {
 
 	Fn<void()> repaint;
 	base::Timer timer;
+	crl::time started = 0;
 };
 
 struct PeerBadge::BotVerifiedData {
@@ -624,16 +626,23 @@ int PeerBadge::drawKomaru(
 	const auto left = rectForName.x()
 		+ std::min(descriptor.nameWidth, rectForName.width() - iconw);
 	const auto now = descriptor.now ? descriptor.now : crl::now();
+	const auto animated = !descriptor.paused && KomaruBadges::Animated();
+	if (animated && !_komaruAnimation) {
+		_komaruAnimation = std::make_unique<KomaruAnimation>();
+		_komaruAnimation->started = now;
+	}
+	// Like emoji statuses, a face plays for a while and then stays still.
+	const auto playedTill = _komaruAnimation
+		? (_komaruAnimation->started + kKomaruPlayDuration)
+		: now;
+	const auto playing = animated && (now < playedTill);
 	KomaruBadges::Paint(
 		p,
 		QRect(left, rectForName.y(), iconw, icon->height()),
 		entry,
-		now,
+		std::min(now, playedTill),
 		(*descriptor.premiumFg)->c);
-	if (!descriptor.paused && KomaruBadges::Animated()) {
-		if (!_komaruAnimation) {
-			_komaruAnimation = std::make_unique<KomaruAnimation>();
-		}
+	if (playing) {
 		_komaruAnimation->repaint = descriptor.customEmojiRepaint;
 		if (!_komaruAnimation->timer.isActive()) {
 			_komaruAnimation->timer.callOnce(KomaruBadges::kFrameDelay);
