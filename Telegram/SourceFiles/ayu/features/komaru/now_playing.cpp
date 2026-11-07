@@ -38,10 +38,11 @@
 namespace KomaruNowPlaying {
 namespace {
 
-constexpr auto kPollInterval = 30 * crl::time(1000);
+constexpr auto kPollInterval = 5 * crl::time(1000);
 constexpr auto kMaxBackoff = 10 * 60 * crl::time(1000);
 constexpr auto kRestartDelay = 2 * crl::time(1000);
-constexpr auto kIdlePolls = 2;
+// A pause this long clears the card, the profile music and the bio.
+constexpr auto kStopDelay = 10 * crl::time(1000);
 constexpr auto kFetchTimeout = 15000;
 constexpr auto kSearchLimit = 20;
 constexpr auto kMaxSilence = 480;
@@ -292,7 +293,7 @@ private:
 	QPointer<QNetworkReply> _reply;
 	uint64 _generation = 0;
 	int _failures = 0;
-	int _idle = 0;
+	crl::time _idleSince = 0;
 	bool _known = false;
 	base::weak_ptr<Main::Session> _session;
 	base::weak_ptr<Main::Session> _active;
@@ -379,7 +380,8 @@ void Manager::restart() {
 	if (_reply) {
 		_reply->abort();
 	}
-	_failures = _idle = 0;
+	_failures = 0;
+	_idleSince = 0;
 	_known = false;
 	_current = std::nullopt;
 	if (Enabled()) {
@@ -448,14 +450,18 @@ void Manager::finish(std::optional<Track> track) {
 	_failures = 0;
 	_timer.callOnce(kPollInterval);
 	if (!track) {
-		if (++_idle < kIdlePolls && _known) {
+		const auto now = crl::now();
+		if (!_idleSince) {
+			_idleSince = now;
+		}
+		if (_known && (now - _idleSince < kStopDelay)) {
 			return;
 		}
 		_known = true;
 		setCurrent(std::nullopt);
 		return;
 	}
-	_idle = 0;
+	_idleSince = 0;
 	_known = true;
 	const auto now = _current.current();
 	if (now
