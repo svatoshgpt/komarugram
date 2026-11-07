@@ -329,10 +329,12 @@ void AyuMusicButton::makeCover() {
 				if (!cover2.noCover && settings2.adaptiveCoverColor() && !cover2.pix.isNull()) {
 					strong->_title->setTextColorOverride(Qt::white);
 					strong->_performer->setTextColorOverride(performerColor);
+				} else if (overrideBg) {
+					strong->_title->setTextColorOverride(st::groupCallMembersFg->c);
+					strong->_performer->setTextColorOverride(st::groupCallMembersFg->c);
 				} else {
-					strong->_title->setTextColorOverride(overrideBg ? st::groupCallMembersFg->c : st::windowBoldFg->c);
-					strong->_performer->setTextColorOverride(
-						overrideBg ? st::groupCallMembersFg->c : st::windowBoldFg->c);
+					strong->_title->setTextColorOverride(std::nullopt);
+					strong->_performer->setTextColorOverride(std::nullopt);
 				}
 
 				strong->repaint();
@@ -363,8 +365,10 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 
 	const auto &settings = AyuSettings::getInstance();
 	const auto cover = _currentCover.value();
-	if (cover.noCover || !settings.adaptiveCoverColor()) {
-		p.fillRect(e->rect(), cover.bg);
+	const auto adaptive = !cover.noCover && settings.adaptiveCoverColor();
+	if (!adaptive) {
+		// A surface container of the current theme, as in Material 3.
+		p.fillRect(e->rect(), _overrideBg ? cover.bg : st::windowBgOver->c);
 		paintRipple(p, QPoint());
 	} else {
 		QRadialGradient gradient(rect().topRight(), rect().width() * 2.0);
@@ -381,27 +385,35 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 
 	if (_playIcon) {
 		auto hq = PainterHighQualityEnabler(p);
-		const auto adaptive = !cover.noCover && settings.adaptiveCoverColor();
-		const auto fg = adaptive ? QColor(Qt::white) : st::windowBoldFg->c;
+		// Material 3 tonal icon button in the theme accent.
+		const auto fg = adaptive
+			? QColor(Qt::white)
+			: _overrideBg
+			? st::groupCallMembersFg->c
+			: st::windowBgActive->c;
 		auto bg = fg;
-		bg.setAlphaF(0.2);
-		const auto circle = QRect(
+		bg.setAlphaF(adaptive ? 0.2 : 0.16);
+		const auto circle = QRectF(
 			width() - st::infoMusicButtonPadding.left() - size,
-			(height() - size) / 2,
+			(height() - size) / 2.,
 			size,
 			size);
 		p.setPen(Qt::NoPen);
 		p.setBrush(bg);
 		p.drawEllipse(circle);
-		const auto side = size / 3.;
-		const auto center = QPointF(circle.center()) + QPointF(side / 8., 0.);
-		const auto triangle = QPolygonF({
-			center + QPointF(-side / 2., -side / 1.8),
-			center + QPointF(side / 1.6, 0.),
-			center + QPointF(-side / 2., side / 1.8),
-		});
+
+		const auto unit = size / 40.;
+		const auto c = circle.center();
+		auto triangle = QPainterPath();
+		triangle.moveTo(c + QPointF(-4.5 * unit, -7. * unit));
+		triangle.lineTo(c + QPointF(7. * unit, 0.));
+		triangle.lineTo(c + QPointF(-4.5 * unit, 7. * unit));
+		triangle.closeSubpath();
+		auto pen = QPen(fg, 2.5 * unit);
+		pen.setJoinStyle(Qt::RoundJoin);
+		p.setPen(pen);
 		p.setBrush(fg);
-		p.drawPolygon(triangle);
+		p.drawPath(triangle);
 	}
 }
 
