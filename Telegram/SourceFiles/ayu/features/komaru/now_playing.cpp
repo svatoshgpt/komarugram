@@ -370,6 +370,7 @@ private:
 	std::map<uint64, Applied> _applied;
 	base::flat_map<uint64, QString> _musicPending;
 	base::flat_set<uint64> _bioLoading;
+	base::flat_set<uint64> _staleBioChecked;
 	rpl::lifetime _lifetime;
 
 };
@@ -869,6 +870,23 @@ void Manager::syncBio(
 				.musicKey = applied.musicKey,
 			};
 			save();
+		} else if (!_staleBioChecked.contains(userId)) {
+			// A "🎧" bio left by a build that lost its state.
+			_staleBioChecked.emplace(userId);
+			const auto weak = base::make_weak(session);
+			session->api().request(MTPusers_GetFullUser(
+				MTP_inputUserSelf()
+			)).done(crl::guard(this, [=](const MTPusers_UserFull &result) {
+				const auto strong = weak.get();
+				const auto about = result.data().vfull_user().data().vabout();
+				const auto bio = about ? qs(*about) : QString();
+				if (strong
+					&& IsNowPlayingBio(bio)
+					&& !_current.current()
+					&& !_applied[userId].bioSaved) {
+					strong->api().saveSelfBio(BioToRestore(userId, bio));
+				}
+			})).send();
 		}
 		return;
 	}

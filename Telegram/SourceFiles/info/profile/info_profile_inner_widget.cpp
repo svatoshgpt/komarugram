@@ -73,12 +73,45 @@ constexpr auto kMembersInlineMax = 5;
 
 using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 
-[[nodiscard]] Section NowPlayingSection(not_null<Ui::RpWidget*> parent) {
-	auto result = object_ptr<Ui::VerticalLayout>(parent);
+// Another KomaruGram user's track, from the "🎧 Artist — Title | bio" they publish.
+[[nodiscard]] NowPlayingTrack TrackFromBio(const QString &about) {
+	const auto prefix = u"🎧 "_q;
+	if (!about.startsWith(prefix)) {
+		return std::nullopt;
+	}
+	const auto song = about.mid(prefix.size()).section(u" | "_q, 0, 0);
+	const auto dash = song.indexOf(u" — "_q);
+	if (dash <= 0) {
+		return std::nullopt;
+	}
+	auto result = KomaruNowPlaying::Track{
+		.title = song.mid(dash + 3).trimmed(),
+		.artist = song.left(dash).trimmed(),
+	};
+	if (result.title.isEmpty() || result.title.endsWith(QChar(0x2026))) {
+		return std::nullopt;
+	}
+	result.url = u"https://open.spotify.com/search/"_q
+		+ QString::fromUtf8(QUrl::toPercentEncoding(
+			result.artist + ' ' + result.title));
+	return result;
+}
+
+[[nodiscard]] Section NowPlayingSection(
+		not_null<Ui::RpWidget*> parent,
+		rpl::producer<NowPlayingTrack> tracks,
+		rpl::producer<QImage> covers) {
+	// The stack only places separators by `shown`; a block hides itself.
+	auto wrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+		parent,
+		object_ptr<Ui::VerticalLayout>(parent));
+	const auto result = wrap->entity();
+	const auto track = wrap->lifetime().make_state<
+		rpl::variable<NowPlayingTrack>>(std::move(tracks));
 	const auto url = std::make_shared<QString>();
 	const auto button = result->add(
 		object_ptr<AyuMusicButton>(
-			result.data(),
+			result,
 			MusicButtonData{
 				.name = Ui::Text::FormatSongName(QString(), QString(), QString()),
 			},
@@ -98,8 +131,8 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 	button->setThemeColors(true);
 	button->setPlayIconShown(true);
 	rpl::combine(
-		KomaruNowPlaying::Value(),
-		KomaruNowPlaying::CoverValue()
+		track->value(),
+		std::move(covers)
 	) | rpl::filter([](const NowPlayingTrack &track, const QImage &) {
 		return track.has_value();
 	}) | rpl::on_next([=](const NowPlayingTrack &track, QImage cover) {
@@ -114,12 +147,16 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 			.performer = track->artist,
 		});
 	}, button->lifetime());
-	return {
-		.widget = std::move(result),
-		.shown = KomaruNowPlaying::Value(
-		) | rpl::map([](const NowPlayingTrack &track) {
+	const auto shown = [=] {
+		return track->value() | rpl::map([](const NowPlayingTrack &track) {
 			return track.has_value();
-		}),
+		});
+	};
+	wrap->setDuration(st::infoSlideDuration)->toggleOn(shown());
+	wrap->finishAnimating();
+	return {
+		.widget = std::move(wrap),
+		.shown = shown(),
 	};
 }
 
@@ -238,7 +275,18 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 	}
 
 	if (!_savedMessages && _peer->isSelf() && !_topic && !_sublist) {
-		stack.add(NowPlayingSection(result.data()));
+		stack.add(NowPlayingSection(
+			result.data(),
+			KomaruNowPlaying::Value(),
+			KomaruNowPlaying::CoverValue()));
+		stack.addPlainSeparator();
+	} else if (_peer->isUser() && !_topic && !_sublist) {
+		stack.add(NowPlayingSection(
+			result.data(),
+			AboutValue(_peer) | rpl::map([](const TextWithEntities &about) {
+				return TrackFromBio(about.text);
+			}),
+			rpl::single(QImage())));
 		stack.addPlainSeparator();
 	}
 
