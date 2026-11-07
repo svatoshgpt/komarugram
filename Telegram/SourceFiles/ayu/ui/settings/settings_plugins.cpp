@@ -113,6 +113,9 @@ void ShowPluginBox(
 	not_null<Window::SessionController*> controller,
 	const QString &id,
 	const QString &page);
+void ShowPermissionsBox(
+	not_null<Window::SessionController*> controller,
+	const QString &id);
 
 void FillSettingsItems(
 		not_null<Window::SessionController*> controller,
