@@ -52,6 +52,12 @@ not_null<Ui::InputField*> AddField(
 		auto result = st::settingsBio;
 		result.textMargins.setRight(st::boxTextFont->spacew
 			+ st::boxTextFont->width(QString::number(limit)));
+		// A single line field is heightMin tall; the bio margins leave too little.
+		result.heightMin = std::max(
+			result.heightMin,
+			result.textMargins.top()
+				+ result.style.font->height
+				+ result.textMargins.bottom());
 		return result;
 	}());
 	const auto field = container->add(
