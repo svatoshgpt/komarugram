@@ -255,6 +255,8 @@ jobs:
 
       - name: KomaruGram build.
         if: env.ONLY_CACHE == 'false'
+        env:
+          KOMARU_BUILD_COMMIT: ${{ github.sha }}
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
 
@@ -582,8 +584,9 @@ jobs:
             echo "::warning::Linux is left out of the update feed"
           fi
 
-          printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s"}}%s}\n' \
-            "$V" "$V" "$V" "$V" "$LINUX" > current6
+          # Windows builds know their commit and update to any release from another one.
+          printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s","commit":"%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s","commit":"%s"}}%s}\n' \
+            "$V" "$V" "$GITHUB_SHA" "$V" "$V" "$GITHUB_SHA" "$LINUX" > current6
           cat current6
           gh release upload "$TAG" -R "$REPO" --clobber current6
           gh release edit "$TAG" -R "$REPO" --latest

@@ -285,6 +285,19 @@ if (NOT DESKTOP_APP_DISABLE_SWIFT6)
 endif()
 
 target_precompile_headers(Telegram PRIVATE $<$<COMPILE_LANGUAGE:CXX,OBJCXX>:${src_loc}/stdafx.h>)
+
+# The commit a release is built from; the updater offers any release from another one.
+set(komaru_build_commit "$ENV{KOMARU_BUILD_COMMIT}")
+file(CONFIGURE
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/komaru_build_commit.cpp
+    CONTENT "const char *KomaruBuildCommit() { return \"@komaru_build_commit@\"; }\n"
+    @ONLY
+)
+
+target_sources(Telegram PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/komaru_build_commit.cpp)
+set_source_files_properties(${CMAKE_CURRENT_BINARY_DIR}/komaru_build_commit.cpp
+    PROPERTIES SKIP_PRECOMPILE_HEADERS ON
+)
 nice_target_sources(Telegram ${src_loc}
 PRIVATE
     ${style_files}
