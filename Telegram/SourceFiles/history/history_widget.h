@@ -909,6 +909,7 @@ private:
 	crl::time _lastUserScrolled = 0;
 	bool _synteticScrollEvent = false;
 	Ui::Animations::Simple _scrollToAnimation;
+	bool _scrollingToBottom = false;
 
 	HistoryView::CornerButtons _cornerButtons;
 	std::unique_ptr<HistoryView::PullToNextChannel> _pullToNext;
