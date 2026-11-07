@@ -58,7 +58,21 @@ struct Applied {
 	QString bioBackup;
 	QString bioText;
 	bool bioSaved = false;
+	// Tracks this client put into profile music, so a repeat is moved, not kept.
+	std::vector<DocumentId> added;
 };
+
+constexpr auto kAddedLimit = 100;
+
+void RememberAdded(Applied &applied, DocumentId id) {
+	if (ranges::contains(applied.added, id)) {
+		return;
+	}
+	applied.added.push_back(id);
+	if (applied.added.size() > kAddedLimit) {
+		applied.added.erase(begin(applied.added));
+	}
+}
 
 [[nodiscard]] QNetworkAccessManager &Network() {
 	static const auto result = new QNetworkAccessManager(
@@ -528,7 +542,14 @@ void Manager::finish(std::optional<Track> track) {
 		if (_known && (now - _idleSince < kStopDelay)) {
 			return;
 		}
-		_known = true;
+		const auto wasKnown = std::exchange(_known, true);
+		if (!_current.current()) {
+			// After a restart nothing changes, yet music and bio may be left over.
+			if (!wasKnown) {
+				sync();
+			}
+			return;
+		}
 		setCurrent(std::nullopt);
 		return;
 	}
@@ -630,7 +651,8 @@ void Manager::sync(not_null<Main::Session*> session, bool active) {
 	if (i != end(_applied)
 		&& !i->second.music
 		&& i->second.musicKey.isEmpty()
-		&& !i->second.bioSaved) {
+		&& !i->second.bioSaved
+		&& i->second.added.empty()) {
 		_applied.erase(i);
 		save();
 	}
@@ -679,6 +701,12 @@ void Manager::syncMusic(
 		if (found && found->id == old) {
 			applied.music = old;
 		} else if (found && !music.has(found)) {
+			music.save(found, Data::FileOrigin());
+			applied.music = found->id;
+			RememberAdded(applied, found->id);
+		} else if (found && ranges::contains(applied.added, found->id)) {
+			// Ours from an earlier play: back to the top of the profile.
+			music.remove(found);
 			music.save(found, Data::FileOrigin());
 			applied.music = found->id;
 		}
@@ -868,6 +896,7 @@ void Manager::syncBio(
 			applied = Applied{
 				.music = applied.music,
 				.musicKey = applied.musicKey,
+				.added = std::move(applied.added),
 			};
 			save();
 		} else if (!_staleBioChecked.contains(userId)) {
@@ -960,6 +989,9 @@ void Manager::load() {
 			.bioText = value.value(u"bioText"_q).toString(),
 			.bioSaved = value.value(u"bioSaved"_q).toBool(),
 		};
+		for (const auto id : value.value(u"added"_q).toArray()) {
+			_applied[userId].added.push_back(id.toString().toULongLong());
+		}
 	}
 }
 
@@ -972,6 +1004,13 @@ void Manager::save() const {
 			{ u"bioBackup"_q, applied.bioBackup },
 			{ u"bioText"_q, applied.bioText },
 			{ u"bioSaved"_q, applied.bioSaved },
+			{ u"added"_q, [&] {
+				auto list = QJsonArray();
+				for (const auto id : applied.added) {
+					list.push_back(QString::number(id));
+				}
+				return list;
+			}() },
 		});
 	}
 	auto file = QFile(StatePath());

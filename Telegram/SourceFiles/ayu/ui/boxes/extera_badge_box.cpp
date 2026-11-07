@@ -184,7 +184,8 @@ void FillExteraBadgeBox(
 		style::al_top);
 
 	const auto name = peer->name();
-	content->add(
+	// Centered by its natural width, so the late number re-centers it.
+	const auto about = content->add(
 		object_ptr<FlatLabel>(
 			content,
 			profile->value() | rpl::map([=](const Profile &value) {
@@ -204,7 +205,9 @@ void FillExteraBadgeBox(
 						number);
 			}),
 			st::starrefCenteredText),
-		st::boxRowPadding);
+		st::boxRowPadding,
+		style::al_top);
+	about->setTryMakeSimilarLines(true);
 
 	AddSkip(content);
 	AddSkip(content);
