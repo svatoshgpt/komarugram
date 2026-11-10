@@ -94,6 +94,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/komaru/color_swatch.h"
 #include "ayu/features/filters/filters_controller.h"
 #include "ayu/features/message_shot/message_shot.h"
 #include "ayu/utils/telegram_helpers.h"
@@ -4287,7 +4288,8 @@ TextWithEntities HistoryItem::translatedTextWithLocalEntities() const {
 	if (isService()) {
 		return {};
 	}
-	auto result = withLocalEntities(translatedText());
+	auto result = KomaruColorSwatch::AddSwatches(
+		withLocalEntities(translatedText()));
 
 	if (hideLinks()) {
 		const auto isUrl = [](const EntityInText &entity) {

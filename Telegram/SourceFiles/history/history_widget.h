@@ -199,6 +199,8 @@ public:
 
 	bool updateReplaceMediaButton();
 	void updateFieldPlaceholder();
+	void updateRateHint();
+	bool acceptRateHint();
 
 	bool confirmSendingFiles(const QStringList &files);
 	bool confirmSendingFiles(not_null<const QMimeData*> data);
@@ -921,6 +923,7 @@ private:
 	UserData *_inlineBot = nullptr;
 	QString _inlineBotUsername;
 	bool _inlineLookingUpBot = false;
+	QString _rateHint;
 	mtpRequestId _inlineBotResolveRequestId = 0;
 	bool _isInlineBot = false;
 	bool _threadFieldVisible = false;

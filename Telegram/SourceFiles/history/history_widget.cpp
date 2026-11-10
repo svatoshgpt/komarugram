@@ -228,6 +228,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/komaru/crypto_rates.h"
 #include "ayu/features/filters/filters_cache_controller.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/message_shot/message_shot.h"
@@ -519,7 +520,9 @@ HistoryWidget::HistoryWidget(
 	}, _field->lifetime());
 	_field->tabbed(
 	) | rpl::on_next([=](not_null<Ui::InputField::TabbedRequest*> request) {
-		if (_supportAutocomplete) {
+		if (!request->backward && acceptRateHint()) {
+			request->handled = true;
+		} else if (_supportAutocomplete) {
 			_supportAutocomplete->activate(_field.data());
 			request->handled = true;
 		}
@@ -527,6 +530,10 @@ HistoryWidget::HistoryWidget(
 	_field->heightChanges(
 	) | rpl::on_next([=] {
 		fieldResized();
+	}, _field->lifetime());
+	KomaruCryptoRates::Updated(
+	) | rpl::on_next([=] {
+		updateRateHint();
 	}, _field->lifetime());
 	_field->focusedChanges(
 	) | rpl::filter(rpl::mappers::_1) | rpl::on_next([=] {
@@ -2457,6 +2464,7 @@ void HistoryWidget::fieldChanged() {
 	});
 
 	checkCharsCount();
+	updateRateHint();
 
 	updateSendButtonType();
 	if (!fieldHasSendText()) {
@@ -2485,6 +2493,33 @@ void HistoryWidget::fieldChanged() {
 
 	_saveDraftText = true;
 	saveDraft(true);
+}
+
+void HistoryWidget::updateRateHint() {
+	const auto &text = _field->getLastText();
+	const auto hint = (_editMsgId || _inlineBot)
+		? QString()
+		: KomaruCryptoRates::Completion(text);
+	if (_rateHint == hint) {
+		if (!hint.isEmpty()) {
+			updateFieldPlaceholder();
+		}
+		return;
+	}
+	_rateHint = hint;
+	updateFieldPlaceholder();
+}
+
+bool HistoryWidget::acceptRateHint() {
+	if (_rateHint.isEmpty()) {
+		return false;
+	}
+	auto cursor = _field->textCursor();
+	cursor.movePosition(QTextCursor::End);
+	const auto &text = _field->getLastText();
+	cursor.insertText((text.endsWith(' ') ? QString() : u" "_q) + _rateHint);
+	_field->setTextCursor(cursor);
+	return true;
 }
 
 void HistoryWidget::saveDraftDelayed() {
@@ -8028,6 +8063,12 @@ void HistoryWidget::updateFieldPlaceholder() {
 		_field->setPlaceholder(
 			rpl::single(_inlineBot->botInfo->inlinePlaceholder.mid(1)),
 			_inlineBotUsername.size() + 2);
+		return;
+	} else if (!_rateHint.isEmpty()) {
+		const auto &text = _field->getLastText();
+		_field->setPlaceholder(
+			rpl::single(_rateHint),
+			text.size() + (text.endsWith(' ') ? 0 : 1));
 		return;
 	}
 

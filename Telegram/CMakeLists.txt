@@ -124,6 +124,10 @@ PRIVATE
 set(ayugram_files
         ayu/ayu_worker.cpp
         ayu/ayu_worker.h
+        ayu/features/komaru/color_swatch.cpp
+        ayu/features/komaru/color_swatch.h
+        ayu/features/komaru/crypto_rates.cpp
+        ayu/features/komaru/crypto_rates.h
         ayu/features/komaru/komaru_badges.cpp
         ayu/features/komaru/komaru_badges.h
         ayu/features/komaru/now_playing.cpp
@@ -151,6 +155,8 @@ set(ayugram_files
         ayu/utils/rc_manager.h
         ayu/ui/ayu_logo.cpp
         ayu/ui/ayu_logo.h
+        ayu/ui/middle_autoscroll.cpp
+        ayu/ui/middle_autoscroll.h
         ayu/ui/toasts.cpp
         ayu/ui/toasts.h
         ayu/ui/ayu_userpic.cpp

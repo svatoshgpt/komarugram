@@ -1044,17 +1044,20 @@ void searchChatById(ID chatId, Main::Session *session, const UsernameResolverCal
 		});
 }
 
+// The pack id carries its creator for known serial ranges, as in KomaruGram Go: https://github.com/komarugif/komarugram-go/blob/main/internal/messenger/model/sticker_set.go
 ID getUserIdFromPackId(uint64 id) {
-	// https://github.com/TDesktop-x64/tdesktop/pull/218/commits/844e5f0ab116e7639cfc79633a68afe8fdcbc463
-	auto ownerId = id >> 32;
-	if ((id >> 16 & 0xff) == 0x3f) {
-		ownerId |= 0x80000000;
+	const auto high = id >> 32;
+	const auto serial = uint32(id & 0xFFFFFFFFULL);
+	if (serial >= 0x003F0000U && serial < 0x00400000U) {
+		return high | (1ULL << 31);
+	} else if (serial < (1U << 24)) {
+		return high;
+	} else if (serial >= 0xFF000000U && serial < 0xFF400000U) {
+		return high | (1ULL << 31) | (1ULL << 32);
+	} else if (serial >= 0xFF400000U && serial < 0xFF800000U) {
+		return high | (1ULL << 32);
 	}
-	if (id >> 24 & 0xff) {
-		ownerId += 0x100000000;
-	}
-
-	return ownerId;
+	return 0;
 }
 
 TextWithTags extractText(not_null<HistoryItem*> item) {
