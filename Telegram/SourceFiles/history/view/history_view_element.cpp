@@ -3053,7 +3053,8 @@ bool Element::toggleSelectionByHandlerClick(
 }
 
 bool Element::allowTextSelectionByHandler(
-		const ClickHandlerPtr &handler) const {
+		const ClickHandlerPtr &handler,
+		bool fromTouch) const {
 	return false;
 }
 

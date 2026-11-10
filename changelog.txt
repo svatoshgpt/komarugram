@@ -1,3 +1,11 @@
+7.4.1-k1.0.0 (10.11.26)
+
+- Updated the Telegram Desktop base to 7.4.1: HTML widgets in bots and a launch crash fix.
+- Color squares after #rgb and #rrggbb codes in messages.
+- Crypto rate hint in the message field: type "1 грам =" and press Tab.
+- Middle mouse button scrolls chats and lists.
+- More precise sticker pack owner lookup.
+
 7.3.3-1.4.3 (24.10.26)
 
 - Emoji statuses no longer hide the exteraGram badge: the developer face, supporter face, status and exteraGram badge now show together in that order.
