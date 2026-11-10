@@ -41,7 +41,7 @@ public:
 			QSize(size, size));
 		const auto radius = size / 4.;
 		auto hq = PainterHighQualityEnabler(p);
-		auto border = context.textColor;
+		auto border = QColor(context.textColor);
 		border.setAlphaF(0.3);
 		p.setPen(QPen(border, style::ConvertScaleExact(1.)));
 		p.setBrush(_color);
