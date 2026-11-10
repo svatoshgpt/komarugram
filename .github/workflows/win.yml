@@ -78,31 +78,40 @@ jobs:
       # it restores the build cache. C: lacks room for the libraries and the
       # build together, so big preinstalled tools the build never uses go.
       # A full Qt rebuild did not fit in 36.6 GB; the whole list frees ~51.
+      # It runs in the background while the caches come in and stops once
+      # 48 GB are free; "Wait for disk space" waits for it before the build.
       - name: Free disk space on C:.
-        shell: bash
+        shell: pwsh
         run: |
-          "$KOMARU" ci free-disk --timeout 600 --min-free 48 \
-            --path 'C:\Android' \
-            --path 'C:\Program Files (x86)\Android' \
-            --path 'C:\ghcup' \
-            --path 'C:\Program Files\MongoDB' \
-            --path 'C:\Program Files\Microsoft SQL Server' \
-            --path 'C:\Program Files\PostgreSQL' \
-            --path 'C:\Program Files\R' \
-            --path 'C:\rtools45' \
-            --path 'C:\rtools44' \
-            --path 'C:\Strawberry' \
-            --path 'C:\Julia' \
-            --path 'C:\Miniconda' \
-            --path 'C:\SeleniumWebDrivers' \
-            --path 'C:\Program Files\Google\Chrome' \
-            --path 'C:\Program Files\Mozilla Firefox' \
-            --path 'C:\hostedtoolcache\windows\go' \
-            --path 'C:\hostedtoolcache\windows\PyPy' \
-            --path 'C:\hostedtoolcache\windows\Ruby' \
-            --path 'C:\hostedtoolcache\windows\node' \
-            --path 'C:\hostedtoolcache\windows\CodeQL' \
-            --path 'C:\hostedtoolcache\windows\stack'
+          $paths = @(
+            'C:\Android',
+            'C:\Program Files (x86)\Android',
+            'C:\ghcup',
+            'C:\Program Files\MongoDB',
+            'C:\Program Files\Microsoft SQL Server',
+            'C:\Program Files\PostgreSQL',
+            'C:\Program Files\R',
+            'C:\rtools45',
+            'C:\rtools44',
+            'C:\Strawberry',
+            'C:\Julia',
+            'C:\Miniconda',
+            'C:\SeleniumWebDrivers',
+            'C:\Program Files\Google\Chrome',
+            'C:\Program Files\Mozilla Firefox',
+            'C:\hostedtoolcache\windows\go',
+            'C:\hostedtoolcache\windows\PyPy',
+            'C:\hostedtoolcache\windows\Ruby',
+            'C:\hostedtoolcache\windows\node',
+            'C:\hostedtoolcache\windows\CodeQL',
+            'C:\hostedtoolcache\windows\stack'
+          )
+          $arguments = @('ci', 'free-disk', '--timeout', '900', '--min-free', '48')
+          foreach ($path in $paths) { $arguments += @('--path', "`"$path`"") }
+          $process = Start-Process -FilePath $env:KOMARU -ArgumentList $arguments `
+            -RedirectStandardOutput "$env:RUNNER_TEMP\free-disk.log" `
+            -NoNewWindow -PassThru
+          "FREE_DISK_PID=$($process.Id)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: First set up.
         shell: bash
@@ -161,6 +170,13 @@ jobs:
           path: ${{ env.TBUILD }}\Libraries
           key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
           restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-
+
+      - name: Wait for disk space.
+        shell: pwsh
+        run: |
+          $process = Get-Process -Id $env:FREE_DISK_PID -ErrorAction SilentlyContinue
+          if ($process) { $process.WaitForExit() }
+          Get-Content "$env:RUNNER_TEMP\free-disk.log"
 
       - name: Libraries.
         run: |
@@ -312,13 +328,6 @@ jobs:
         shell: bash
         run: du -sm TBuild/$REPO_NAME/out || true
 
-      - name: Save build cache.
-        if: env.ONLY_CACHE == 'false'
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
-          key: ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-${{ github.sha }}
-
       - name: Move artifact.
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
         run: |
@@ -357,6 +366,14 @@ jobs:
             gh release create "$TAG" -R "$REPO" --title "KomaruGram $TAG" --notes "Built from $GITHUB_SHA." --verify-tag --latest=false || true
           fi
           gh release upload "$TAG" -R "$REPO" --clobber "$ZIP" update/*
+
+      # After the upload, so the client can be downloaded and released while this runs.
+      - name: Save build cache.
+        if: env.ONLY_CACHE == 'false'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
+          key: ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-${{ github.sha }}
 
   linux:
     name: Linux

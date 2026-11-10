@@ -199,12 +199,13 @@ fn free_disk(args: &Args) -> Result<u8, String> {
     let deadline = args.number("timeout")?.map(|s| Instant::now() + Duration::from_secs(s as u64));
     let wanted = args.number("min-free")?.map(|gb| gb.max(0) as u64 * (1u64 << 30));
     let checked = Mutex::new((Instant::now(), false));
+    // Stops once there is room enough, or at the timeout.
     let stop = || {
-        if !deadline.is_some_and(|d| Instant::now() > d) {
-            return false;
+        if deadline.is_some_and(|d| Instant::now() > d) {
+            return true;
         }
         let Some(wanted) = wanted else {
-            return true;
+            return false;
         };
         let mut state = checked.lock().unwrap();
         let (last, enough) = &mut *state;
