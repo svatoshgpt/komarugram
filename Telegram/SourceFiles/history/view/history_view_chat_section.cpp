@@ -1787,6 +1787,7 @@ void ChatWidget::setupComposeControls() {
 			}
 		}
 		_inner->sendingLandingUserScroll();
+		Tgw::ListScroll::Input(_inner.data());
 		_scroll->keyPressEvent(e);
 	}, lifetime());
 
@@ -1794,6 +1795,7 @@ void ChatWidget::setupComposeControls() {
 	) | rpl::on_next([=](not_null<QKeyEvent*> e) {
 		if (!_inner->lastMessageEditRequestNotify()) {
 			_inner->sendingLandingUserScroll();
+			Tgw::ListScroll::Input(_inner.data());
 			_scroll->keyPressEvent(e);
 		}
 	}, lifetime());
@@ -2008,6 +2010,7 @@ void ChatWidget::setupSwipeReplyAndBack() {
 		.update = std::move(update),
 		.init = std::move(init),
 		.dontStart = _inner->touchMaybeSelectingValue(),
+		.handoff = _inner->touchSwipeHandoff(),
 		.skipWheelEvent = [=](not_null<QWheelEvent*> event) {
 			const auto delta = Ui::ScrollDelta(event);
 			if (std::abs(delta.x()) <= std::abs(delta.y())) {
@@ -3888,9 +3891,6 @@ void ChatWidget::finishSending(const Api::SendOptions &options) {
 }
 
 void ChatWidget::setupSendingLanding() {
-	_scroll->setCustomWheelProcess([=](not_null<QWheelEvent*> e) {
-		return _inner->processSendingLandingWheel(e);
-	});
 	for (const auto child : _scroll->children()) {
 		if (const auto bar = dynamic_cast<Ui::ElasticScrollBar*>(child)) {
 			base::install_event_filter(bar, [=](not_null<QEvent*> e) {
