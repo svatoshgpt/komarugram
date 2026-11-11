@@ -8,6 +8,7 @@
 
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/komaru_strings.h"
 #include "ayu/ui/settings/ayu_builder.h"
 #include "ayu/ui/settings/settings_ayu_utils.h"
 #include "ayu/ui/settings/settings_main.h"
@@ -34,7 +35,7 @@ using namespace AyuBuilder;
 namespace {
 
 void BuildTranslator(SectionBuilder &builder, AyuSectionBuilder &ayu) {
-	builder.addSubsectionTitle(tr::lng_translate_settings_subtitle());
+	builder.addSubsectionTitle(Komaru::TextValue("translate_subtitle"));
 
 	auto *settings = &AyuSettings::getInstance();
 

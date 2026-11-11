@@ -14,7 +14,7 @@ struct Entry {
 
 // Add new strings here: { key, English, Russian }. Placeholders such as {name} are replaced by the caller.
 constexpr Entry kStrings[] = {
-	{ "placeholder", u"", u"" },
+	{ "translate_subtitle", u"Translate Messages", u"Перевод сообщений" },
 };
 
 } // namespace
