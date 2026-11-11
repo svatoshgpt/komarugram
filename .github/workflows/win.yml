@@ -106,12 +106,15 @@ jobs:
             'C:\hostedtoolcache\windows\CodeQL',
             'C:\hostedtoolcache\windows\stack'
           )
-          $arguments = @('ci', 'free-disk', '--timeout', '900', '--min-free', '48')
-          foreach ($path in $paths) { $arguments += @('--path', "`"$path`"") }
-          $process = Start-Process -FilePath $env:KOMARU -ArgumentList $arguments `
-            -RedirectStandardOutput "$env:RUNNER_TEMP\free-disk.log" `
-            -NoNewWindow -PassThru
-          "FREE_DISK_PID=$($process.Id)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+          $komaru = $env:KOMARU -replace '/', '\'
+          $log = "$env:RUNNER_TEMP\free-disk.log"
+          $line = "`"$komaru`" ci free-disk --timeout 900 --min-free 48"
+          foreach ($path in $paths) { $line += " --path `"$path`"" }
+          # The runner ends what a step starts; WMI's processes live on.
+          $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
+            -Arguments @{ CommandLine = "cmd /c `"$line > `"$log`" 2>&1`"" }
+          if ($created.ReturnValue -ne 0) { exit 1 }
+          "FREE_DISK_PID=$($created.ProcessId)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: First set up.
         shell: bash
@@ -176,7 +179,8 @@ jobs:
         run: |
           $process = Get-Process -Id $env:FREE_DISK_PID -ErrorAction SilentlyContinue
           if ($process) { $process.WaitForExit() }
-          Get-Content "$env:RUNNER_TEMP\free-disk.log"
+          Get-Content "$env:RUNNER_TEMP\free-disk.log" -ErrorAction SilentlyContinue
+          "C: free: {0:N1} GB" -f ((Get-PSDrive C).Free / 1GB)
 
       - name: Libraries.
         run: |
