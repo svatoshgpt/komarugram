@@ -13,6 +13,8 @@
 #include "data/data_premium_limits.h"
 #include "data/data_saved_music.h"
 #include "data/data_search_controller.h"
+#include "inline_bots/inline_bot_result.h"
+#include "main/main_app_config.h"
 #include "data/data_session.h"
 #include "data/data_user.h"
 #include "history/history_item.h"
@@ -174,12 +176,43 @@ void WriteBioBackup(uint64 userId, const QString &bio) {
 	return result;
 }
 
+// The title without "(feat. X)", "[Remastered]" and what follows a dash.
+[[nodiscard]] QString TitleCore(const QString &text) {
+	static const auto brackets = QRegularExpression(
+		u"[\\(\\[][^\\)\\]]*[\\)\\]]"_q);
+	auto result = QString(text).remove(brackets);
+	if (const auto dash = result.indexOf(u" - "_q); dash > 0) {
+		result = result.left(dash);
+	}
+	return Normalize(result);
+}
+
+// The first of several artists, like "A" of "A, B & C feat. D".
+[[nodiscard]] QString FirstArtist(const QString &text) {
+	static const auto separator = QRegularExpression(
+		u"\\s*(,|&|\\bfeat\\b|\\bft\\b|\\bx\\b)"_q,
+		QRegularExpression::CaseInsensitiveOption);
+	const auto at = text.indexOf(separator);
+	return Normalize((at > 0) ? text.left(at) : text);
+}
+
 [[nodiscard]] bool Matches(
 		not_null<DocumentData*> document,
-		const Track &track) {
+		const Track &track,
+		bool loose = false) {
 	const auto song = document->song();
 	if (!song) {
 		return false;
+	}
+	if (loose) {
+		const auto title = TitleCore(song->title);
+		const auto performer = Normalize(song->performer);
+		const auto artist = FirstArtist(track.artist);
+		return !title.isEmpty()
+			&& !performer.isEmpty()
+			&& !artist.isEmpty()
+			&& (title == TitleCore(track.title))
+			&& (performer.contains(artist) || artist.contains(performer));
 	}
 	const auto title = Normalize(song->title);
 	const auto wanted = Normalize(track.title);
@@ -352,6 +385,10 @@ private:
 		not_null<Main::Session*> session,
 		const std::optional<Track> &track);
 	void findMusic(
+		not_null<Main::Session*> session,
+		const Track &track,
+		Done done);
+	void findInBot(
 		not_null<Main::Session*> session,
 		const Track &track,
 		Done done);
@@ -819,12 +856,97 @@ void Manager::findMusic(
 				return;
 			}
 		}
-		uploadMusic(strong, track, done);
+		findInBot(strong, track, done);
 	}).fail([=] {
+		if (const auto strong = weak.get()) {
+			findInBot(strong, track, done);
+		}
+	}).send();
+}
+
+// Telegram's own music search has the real track far more often than your chats.
+void Manager::findInBot(
+		not_null<Main::Session*> session,
+		const Track &track,
+		Done done) {
+	const auto username = session->appConfig().get<QString>(
+		u"music_search_username"_q,
+		QString());
+	const auto weak = base::make_weak(session);
+	const auto fallback = [=] {
 		if (const auto strong = weak.get()) {
 			uploadMusic(strong, track, done);
 		}
-	}).send();
+	};
+	if (username.isEmpty()) {
+		fallback();
+		return;
+	}
+	const auto search = [=](UserData *bot) {
+		const auto strong = weak.get();
+		if (!strong) {
+			return;
+		} else if (!bot) {
+			fallback();
+			return;
+		}
+		strong->api().request(MTPmessages_GetInlineBotResults(
+			MTP_flags(0),
+			bot->inputUser(),
+			strong->user()->input(),
+			MTPInputGeoPoint(),
+			MTP_string(track.artist + QChar(' ') + track.title),
+			MTP_string()
+		)).done([=](const MTPmessages_BotResults &result) {
+			const auto strong = weak.get();
+			if (!strong) {
+				return;
+			}
+			const auto &data = result.data();
+			strong->data().processUsers(data.vusers());
+			auto songs = std::vector<not_null<DocumentData*>>();
+			for (const auto &item : data.vresults().v) {
+				const auto parsed = InlineBots::Result::Create(
+					strong,
+					data.vquery_id().v,
+					item);
+				const auto document = parsed ? parsed->document() : nullptr;
+				if (document
+					&& document->isSong()
+					&& parsed->contentUrl().isEmpty()) {
+					songs.push_back(document);
+				}
+			}
+			for (const auto loose : { false, true }) {
+				for (const auto document : songs) {
+					if (Matches(document, track, loose)) {
+						done(document);
+						return;
+					}
+				}
+			}
+			fallback();
+		}).fail(fallback).send();
+	};
+	if (const auto peer = session->data().peerByUsername(username)) {
+		search(peer->asUser());
+		return;
+	}
+	session->api().request(MTPcontacts_ResolveUsername(
+		MTP_flags(0),
+		MTP_string(username),
+		MTP_string()
+	)).done([=](const MTPcontacts_ResolvedPeer &result) {
+		const auto strong = weak.get();
+		if (!strong) {
+			return;
+		}
+		const auto &data = result.data();
+		strong->data().processUsers(data.vusers());
+		strong->data().processChats(data.vchats());
+		const auto peer = strong->data().peerLoaded(peerFromMTP(data.vpeer()));
+		search(peer ? peer->asUser() : nullptr);
+	}).fail(fallback).send();
 }
 
 void Manager::uploadMusic(
