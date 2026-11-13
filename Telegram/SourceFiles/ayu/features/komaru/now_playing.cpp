@@ -330,6 +330,7 @@ public:
 	[[nodiscard]] std::optional<Track> current() const;
 	[[nodiscard]] rpl::producer<std::optional<Track>> value() const;
 	[[nodiscard]] rpl::producer<QImage> cover() const;
+	[[nodiscard]] bool isQuitPrevent();
 
 private:
 	using Done = Fn<void(DocumentData*)>;
@@ -385,6 +386,8 @@ private:
 	base::flat_map<uint64, QString> _musicPending;
 	base::flat_set<uint64> _bioLoading;
 	base::flat_set<uint64> _staleBioChecked;
+	bool _quitStarted = false;
+	int _quitRequests = 0;
 	rpl::lifetime _lifetime;
 
 };
@@ -425,6 +428,69 @@ rpl::producer<std::optional<Track>> Manager::value() const {
 
 rpl::producer<QImage> Manager::cover() const {
 	return _cover.value();
+}
+
+bool Manager::isQuitPrevent() {
+	if (_quitStarted) {
+		return (_quitRequests > 0);
+	}
+	_quitStarted = true;
+	++_generation;
+	_timer.cancel();
+	const auto keep = AyuSettings::getInstance().nowPlayingKeepMusic();
+	const auto finished = [=] {
+		if (--_quitRequests == 0) {
+			Core::App().quitPreventFinished();
+		}
+	};
+	for (const auto &entry : Core::App().domain().accounts()) {
+		const auto session = entry.account->maybeSession();
+		if (!session) {
+			continue;
+		}
+		const auto userId = session->userId().bare;
+		const auto i = _applied.find(userId);
+		if (i == end(_applied)) {
+			continue;
+		}
+		auto &applied = i->second;
+		if (applied.bioSaved) {
+			const auto about = session->user()->about();
+			if (about.isEmpty()
+				|| about == applied.bioText
+				|| IsNowPlayingBio(about)) {
+				++_quitRequests;
+				session->api().request(MTPaccount_UpdateProfile(
+					MTP_flags(MTPaccount_UpdateProfile::Flag::f_about),
+					MTPstring(),
+					MTPstring(),
+					MTP_string(BioToRestore(userId, applied.bioBackup))
+				)).done(finished).fail(finished).send();
+			}
+		}
+		if (const auto music = applied.music; music && !keep) {
+			const auto document = session->data().document(music);
+			if (document->hasRemoteLocation()) {
+				++_quitRequests;
+				session->api().request(MTPaccount_SaveMusic(
+					MTP_flags(MTPaccount_SaveMusic::Flag::f_unsave),
+					document->mtpInput(),
+					MTPInputDocument()
+				)).done(finished).fail(finished).send();
+				applied.music = 0;
+				applied.musicKey = QString();
+			}
+		}
+		if (applied.bioSaved) {
+			applied = Applied{
+				.music = applied.music,
+				.musicKey = applied.musicKey,
+				.added = std::move(applied.added),
+			};
+		}
+	}
+	save();
+	return (_quitRequests > 0);
 }
 
 void Manager::loadCover(const QString &url, Fn<void(QByteArray)> done) {
@@ -615,6 +681,9 @@ void Manager::setCurrent(std::optional<Track> track) {
 }
 
 void Manager::sync() {
+	if (_quitStarted) {
+		return;
+	}
 	const auto active = _active.get();
 	if (const auto previous = _session.get(); previous && previous != active) {
 		sync(previous, false);
@@ -1029,6 +1098,10 @@ void Start() {
 	if (!Instance) {
 		Instance = new Manager();
 	}
+}
+
+bool IsQuitPrevent() {
+	return Instance && Instance->isQuitPrevent();
 }
 
 std::optional<Track> Current() {

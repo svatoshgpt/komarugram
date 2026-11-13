@@ -117,6 +117,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_infra.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/features/komaru/now_playing.h"
 #include "ayu/features/streamer_mode/streamer_mode.h"
 
 
@@ -2113,6 +2114,9 @@ bool Application::readyToQuit() {
 					prevented = true;
 				}
 			}
+		}
+		if (KomaruNowPlaying::IsQuitPrevent()) {
+			prevented = true;
 		}
 	}
 	if (prevented) {
