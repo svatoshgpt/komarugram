@@ -144,6 +144,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/komaru/save_media.h"
 #include "ayu/features/filters/filters_cache_controller.h"
 #include "ayu/ui/context_menu/context_menu.h"
 #include "ayu/ui/settings/filters/edit_filter.h"
@@ -3250,6 +3251,11 @@ void HistoryInner::showContextMenu(QContextMenuEvent *e, bool showFromTouch) {
 				}, &st::menuIconGif);
 			}
 		}
+		KomaruSaveMedia::AddActions(
+			_menu,
+			controller->uiShow(),
+			document,
+			!hasCopyMediaRestriction(item));
 		if (!document->filepath(true).isEmpty()) {
 			_menu->addAction(Platform::IsMac() ? tr::lng_context_show_in_finder(tr::now) : tr::lng_context_show_in_folder(tr::now), [=] {
 				showContextInFolder(document);

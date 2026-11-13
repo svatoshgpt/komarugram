@@ -17,6 +17,11 @@ constexpr Entry kStrings[] = {
 	{ "translate_subtitle", u"Translate Messages", u"Перевод сообщений" },
 	{ "messages_count", u"Messages", u"Сообщений" },
 	{ "hide_paid_stickers", u"Hide Premium stickers and emoji", u"Скрыть Premium-стикеры и эмодзи" },
+	{ "save_as_gif", u"Save as GIF", u"Сохранить в GIF" },
+	{ "save_sticker_video", u"Save as video", u"Сохранить как видео" },
+	{ "save_gif_download_first", u"Download it first.", u"Сначала скачайте файл." },
+	{ "save_gif_preparing", u"Converting…", u"Конвертирую…" },
+	{ "save_gif_failed", u"Could not convert.", u"Не удалось конвертировать." },
 };
 
 } // namespace

@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "history/view/history_view_context_menu.h"
 
+#include "ayu/features/komaru/save_media.h"
+
 #include "api/api_attached_stickers.h"
 #include "api/api_editing.h"
 #include "api/api_global_privacy.h"
@@ -471,6 +473,11 @@ void AddDocumentActions(
 			}, &st::menuIconGif);
 		}
 	}
+	KomaruSaveMedia::AddActions(
+		menu,
+		controller->uiShow(),
+		document,
+		!item || !list->hasCopyMediaRestriction(item));
 	if (document->sticker() && document->sticker()->set) {
 		menu->addAction(
 			(document->isStickerSetInstalled()
