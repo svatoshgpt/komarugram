@@ -1759,6 +1759,7 @@ void Updates::feedUpdate(const MTPUpdate &update) {
 			} else {
 				owner.histories().checkTopicCreated(id, newId);
 			}
+			owner.histories().checkReplyTargetSent(id, newId);
 			session().data().unregisterMessageRandomId(randomId);
 		} else {
 			Core::App().calls().handleUpdate(&session(), update);

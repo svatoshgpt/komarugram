@@ -199,6 +199,7 @@ public:
 	void delayedShowAt(MsgId showAtMsgId, const Window::SectionShow &params);
 
 	bool updateReplaceMediaButton();
+	void startMediaReplace();
 	void updateFieldPlaceholder();
 	void updateRateHint();
 	bool acceptRateHint();

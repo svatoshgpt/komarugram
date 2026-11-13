@@ -1,6 +1,6 @@
-7.4.1-k1.0.0 (10.11.26)
+7.4.3-k1.0.0 (13.11.26)
 
-- Updated the Telegram Desktop base to 7.4.1: HTML widgets in bots and a launch crash fix.
+- Updated the Telegram Desktop base to 7.4.3: HTML widgets in bots, reply to forwarded messages and fixes.
 - Color squares after #rgb and #rrggbb codes in messages.
 - Crypto rate hint in the message field: type "1 грам =" and press Tab.
 - Middle mouse button scrolls chats and lists.
