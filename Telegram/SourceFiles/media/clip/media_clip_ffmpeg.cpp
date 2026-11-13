@@ -214,6 +214,12 @@ bool FFMpegReaderImplementation::renderFrame(
 		: _frame->format;
 	const auto bgra = (format == AV_PIX_FMT_BGRA);
 	hasAlpha = bgra || (format == AV_PIX_FMT_YUVA420P);
+	// KomaruGram: a preview at half the size or less scales by area and decodes without deblocking.
+	const auto shrunk = (toSize.width() * 2 <= _frame->width)
+		&& (toSize.height() * 2 <= _frame->height);
+	_codecContext->skip_loop_filter = shrunk
+		? AVDISCARD_ALL
+		: AVDISCARD_DEFAULT;
 	if (bgra
 		&& _frame->width == toSize.width()
 		&& _frame->height == toSize.height()
@@ -234,7 +240,8 @@ bool FFMpegReaderImplementation::renderFrame(
 			format,
 			toSize,
 			AV_PIX_FMT_BGRA,
-			&_swsContext);
+			&_swsContext,
+			shrunk ? SWS_AREA : 0);
 		if (!_swsContext) {
 			LOG(("Gif Error: Unable to create sws context %1").arg(logData()));
 			return false;

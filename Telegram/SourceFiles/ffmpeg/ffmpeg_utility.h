@@ -201,7 +201,8 @@ using SwscalePointer = std::unique_ptr<SwsContext, SwscaleDeleter>;
 	int srcFormat,
 	QSize dstSize,
 	int dstFormat,
-	SwscalePointer *existing = nullptr);
+	SwscalePointer *existing = nullptr,
+	int flags = 0);
 [[nodiscard]] SwscalePointer MakeSwscalePointer(
 	not_null<AVFrame*> frame,
 	QSize resize,

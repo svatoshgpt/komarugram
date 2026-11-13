@@ -559,7 +559,8 @@ SwscalePointer MakeSwscalePointer(
 		int srcFormat,
 		QSize dstSize,
 		int dstFormat,
-		SwscalePointer *existing) {
+		SwscalePointer *existing,
+		int flags) {
 	// We have to use custom caching for SwsContext, because
 	// sws_getCachedContext checks passed flags with existing context flags,
 	// and re-creates context if they're different, but in the process of
@@ -587,7 +588,7 @@ SwscalePointer MakeSwscalePointer(
 		dstSize.width(),
 		dstSize.height(),
 		AVPixelFormat(dstFormat),
-		0,
+		flags,
 		nullptr,
 		nullptr,
 		nullptr);
