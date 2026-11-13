@@ -2,6 +2,7 @@
 #include "ayu/ui/boxes/extera_badge_box.h"
 
 #include "lang_auto.h"
+#include "ayu/komaru_strings.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "data/data_peer.h"
 #include "data/data_session.h"
@@ -18,6 +19,7 @@
 #include "styles/style_premium.h"
 #include "styles/style_settings.h"
 #include "ui/layers/generic_box.h"
+#include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/rp_widget.h"
 #include "ui/text/text_custom_emoji.h"
@@ -138,6 +140,47 @@ object_ptr<RpWidget> CreateBadgeLogo(
 	return result;
 }
 
+// "Badge #5040" on an accent pill, empty until the number loads.
+object_ptr<RpWidget> CreateNumberPill(
+		not_null<RpWidget*> parent,
+		rpl::producer<int> number) {
+	auto result = object_ptr<RpWidget>(parent);
+	const auto raw = result.data();
+	const auto &font = st::semiboldFont;
+	const auto skip = font->height / 2;
+	raw->resize(0, font->height + skip);
+	const auto text = raw->lifetime().make_state<QString>();
+	std::move(
+		number
+	) | rpl::on_next([=](int value) {
+		*text = value
+			? Komaru::Text("extera_badge_number").replace(
+				u"{number}"_q,
+				QString::number(value))
+			: QString();
+		raw->resize(
+			text->isEmpty() ? 0 : (font->width(*text) + 2 * skip),
+			raw->height());
+		raw->update();
+	}, raw->lifetime());
+	raw->paintRequest(
+	) | rpl::on_next([=] {
+		if (text->isEmpty()) {
+			return;
+		}
+		auto p = QPainter(raw);
+		auto hq = PainterHighQualityEnabler(p);
+		const auto radius = raw->height() / 2.;
+		p.setPen(Qt::NoPen);
+		p.setBrush(st::windowBgActive);
+		p.drawRoundedRect(raw->rect(), radius, radius);
+		p.setPen(st::windowFgActive);
+		p.setFont(font);
+		p.drawText(raw->rect(), *text, style::al_center);
+	}, raw->lifetime());
+	return result;
+}
+
 object_ptr<RpWidget> PerkRow(
 		not_null<RpWidget*> parent,
 		const QString &title,
@@ -201,44 +244,40 @@ void FillExteraBadgeBox(
 	AddSkip(content);
 
 	content->add(
-		object_ptr<FlatLabel>(
+		CreateNumberPill(
 			content,
-			(self
-				? tr::ayu_ExteraBadgeTitleSelf(tr::bold)
-				: tr::ayu_ExteraBadgeTitle(tr::bold)),
-			st::boxTitle),
-		st::boxRowPadding,
+			profile->value() | rpl::map([](const Profile &value) {
+				return value.number;
+			})),
 		style::al_top);
+	AddSkip(content);
 
 	const auto name = peer->name();
-	// Centered by its natural width, so the late number re-centers it.
-	const auto about = content->add(
-		object_ptr<FlatLabel>(
-			content,
-			profile->value() | rpl::map([=](const Profile &value) {
-				const auto number = value.number
-					? (u"#"_q + QString::number(value.number))
-					: QString();
-				auto result = self
-					? tr::ayu_ExteraBadgeAboutSelf(
-						tr::now,
-						lt_number,
-						number)
-					: tr::ayu_ExteraBadgeAbout(
-						tr::now,
-						lt_item,
-						name,
-						lt_number,
-						number);
-				// No gap is left where the number is still loading.
-				return number.isEmpty()
-					? result.replace(u"  "_q, u" "_q).replace(u" ."_q, u"."_q)
-					: result;
-			}),
-			st::starrefCenteredText),
+	auto title = rpl::producer<TextWithEntities>();
+	if (self) {
+		title = tr::ayu_ExteraBadgeTitleSelf(tr::bold);
+	} else {
+		// The name stands out in the accent colour.
+		const auto phrase = Komaru::Text("extera_supports");
+		const auto tag = u"{name}"_q;
+		const auto at = phrase.indexOf(tag);
+		auto composed = TextWithEntities();
+		if (at < 0) {
+			composed.append(phrase);
+		} else {
+			composed.append(
+				phrase.left(at)
+			).append(tr::link(name, u"internal:action"_q)).append(
+				phrase.mid(at + tag.size()));
+		}
+		title = rpl::single(std::move(composed));
+	}
+	const auto titleLabel = content->add(
+		object_ptr<FlatLabel>(content, std::move(title), st::boxTitle),
 		st::boxRowPadding,
 		style::al_top);
-	about->setTryMakeSimilarLines(true);
+	titleLabel->setTryMakeSimilarLines(true);
+	titleLabel->setClickHandlerFilter([](const auto &...) { return false; });
 
 	// The caption the person wrote for the badge.
 	if (!custom.text.isEmpty()) {

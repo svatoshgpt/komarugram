@@ -39,13 +39,7 @@ public:
 		const auto rect = QRect(
 			context.position + QPoint(skip, skip),
 			QSize(size, size));
-		const auto radius = size / 4.;
-		auto hq = PainterHighQualityEnabler(p);
-		auto border = QColor(context.textColor);
-		border.setAlphaF(0.3);
-		p.setPen(QPen(border, style::ConvertScaleExact(1.)));
-		p.setBrush(_color);
-		p.drawRoundedRect(rect, radius, radius);
+		KomaruColorSwatch::Paint(p, rect, _color, context.textColor);
 	}
 	void unload() override {
 	}
@@ -146,6 +140,39 @@ TextWithEntities AddSwatches(TextWithEntities text) {
 			return a.offset() < b.offset();
 		});
 	return text;
+}
+
+QColor TrailingColor(const QString &text) {
+	auto size = text.size();
+	while (size > 0 && text[size - 1].isSpace()) {
+		--size;
+	}
+	struct Found {
+		size_t end = 0;
+		size_t digits = 0;
+	};
+	auto found = Found();
+	komaru_color_find(text.utf16(), size, [](
+			void *context,
+			size_t end,
+			size_t digits) {
+		*static_cast<Found*>(context) = { end, digits };
+	}, &found);
+	return (found.digits && qsizetype(found.end) == size)
+		? ParseHex(QStringView(text).mid(
+			qsizetype(found.end - found.digits),
+			qsizetype(found.digits)))
+		: QColor();
+}
+
+void Paint(QPainter &p, QRect rect, QColor color, QColor textColor) {
+	const auto radius = rect.width() / 4.;
+	auto hq = PainterHighQualityEnabler(p);
+	auto border = textColor;
+	border.setAlphaF(0.3);
+	p.setPen(QPen(border, style::ConvertScaleExact(1.)));
+	p.setBrush(color);
+	p.drawRoundedRect(rect, radius, radius);
 }
 
 bool IsSwatchData(QStringView data) {

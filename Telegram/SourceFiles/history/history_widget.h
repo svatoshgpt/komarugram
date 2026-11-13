@@ -202,6 +202,7 @@ public:
 	void startMediaReplace();
 	void updateFieldPlaceholder();
 	void updateRateHint();
+	void updateColorHint();
 	bool acceptRateHint();
 
 	bool confirmSendingFiles(const QStringList &files);
@@ -930,6 +931,8 @@ private:
 	QString _inlineBotUsername;
 	bool _inlineLookingUpBot = false;
 	QString _rateHint;
+	Ui::RpWidget *_colorHint = nullptr;
+	QColor _colorHintColor;
 	mtpRequestId _inlineBotResolveRequestId = 0;
 	bool _isInlineBot = false;
 	bool _threadFieldVisible = false;

@@ -230,6 +230,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/komaru/color_swatch.h"
 #include "ayu/features/komaru/crypto_rates.h"
 #include "ayu/features/komaru/scroll_autoload.h"
 #include "ayu/features/filters/filters_cache_controller.h"
@@ -538,6 +539,7 @@ HistoryWidget::HistoryWidget(
 	_field->heightChanges(
 	) | rpl::on_next([=] {
 		fieldResized();
+		updateColorHint();
 	}, _field->lifetime());
 	KomaruCryptoRates::Updated(
 	) | rpl::on_next([=] {
@@ -2497,6 +2499,7 @@ void HistoryWidget::fieldChanged() {
 
 	checkCharsCount();
 	updateRateHint();
+	updateColorHint();
 
 	updateSendButtonType();
 	if (!fieldHasSendText()) {
@@ -2540,6 +2543,46 @@ void HistoryWidget::updateRateHint() {
 	}
 	_rateHint = hint;
 	updateFieldPlaceholder();
+}
+
+// A square of the color follows "#rrggbb" at the end of the typed text.
+void HistoryWidget::updateColorHint() {
+	const auto &text = _field->getLastText();
+	const auto color = KomaruColorSwatch::TrailingColor(text);
+	if (!color.isValid()) {
+		if (_colorHint) {
+			_colorHint->hide();
+		}
+		return;
+	}
+	if (!_colorHint) {
+		_colorHint = Ui::CreateChild<Ui::RpWidget>(_field.data());
+		_colorHint->setAttribute(Qt::WA_TransparentForMouseEvents);
+		_colorHint->paintRequest() | rpl::on_next([=] {
+			auto p = QPainter(_colorHint);
+			const auto line = style::ConvertScale(1);
+			KomaruColorSwatch::Paint(
+				p,
+				_colorHint->rect().marginsRemoved({ line, line, line, line }),
+				_colorHintColor,
+				st::historyComposeField.textFg->c);
+		}, _colorHint->lifetime());
+	}
+	_colorHintColor = color;
+	const auto edit = _field->rawTextEdit();
+	auto cursor = edit->textCursor();
+	cursor.movePosition(QTextCursor::End);
+	const auto rect = edit->cursorRect(cursor);
+	const auto size = rect.height() * 4 / 5;
+	const auto skip = text.endsWith(' ') ? 0 : (rect.height() / 4);
+	const auto point = edit->viewport()->mapTo(
+		_field.data(),
+		QPoint(
+			rect.x() + rect.width() + skip,
+			rect.y() + (rect.height() - size) / 2));
+	_colorHint->setGeometry(QRect(point, QSize(size, size)));
+	_colorHint->show();
+	_colorHint->update();
 }
 
 bool HistoryWidget::acceptRateHint() {

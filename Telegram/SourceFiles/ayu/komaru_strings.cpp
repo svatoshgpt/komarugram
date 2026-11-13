@@ -17,6 +17,8 @@ constexpr Entry kStrings[] = {
 	{ "translate_subtitle", u"Translate Messages", u"Перевод сообщений" },
 	{ "messages_count", u"Messages", u"Сообщений" },
 	{ "badge_title", u"Your badge", u"Ваш значок" },
+	{ "extera_badge_number", u"Badge #{number}", u"Значок #{number}" },
+	{ "extera_supports", u"{name} supports exteraGram", u"{name} поддерживает exteraGram" },
 	{ "badge_hint", u"Click the badge to choose any emoji.", u"Нажмите на значок, чтобы выбрать любой эмодзи." },
 	{ "badge_caption", u"Caption", u"Подпись" },
 	{ "badge_about", u"Everyone who clicks your badge sees the caption. {name} becomes your name, **bold** and [links](url) work.", u"Подпись видят все, кто нажмёт на ваш значок. {name} заменяется вашим именем, работают **жирный** и [ссылки](url)." },
