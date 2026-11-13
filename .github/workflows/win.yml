@@ -128,6 +128,8 @@ jobs:
           echo "$(sha256sum $TBUILD/$REPO_NAME/$PREPARE_PATH | awk '{ print $1 }')" >> CACHE_KEY.txt
           echo "$SDK" >> CACHE_KEY.txt
           echo "CACHE_KEY=$(sha256sum CACHE_KEY.txt | awk '{ print $1 }')" >> $GITHUB_ENV
+          # prepare.py rebuilds tdesktop_rust when this crate changes, so the libraries are saved again.
+          echo "RUST_KEY=$(git -C "$TBUILD/$REPO_NAME" rev-parse HEAD:Telegram/rust/komaru_core | cut -c1-16)" >> $GITHUB_ENV
 
           echo "Configurate git for cherry-picks."
           git config --global user.email "you@example.com"
@@ -171,8 +173,10 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ env.TBUILD }}\Libraries
-          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-
+          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}-${{ env.RUST_KEY }}
+          restore-keys: |
+            ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
+            ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-
 
       - name: Wait for disk space.
         shell: pwsh
@@ -228,7 +232,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: ${{ env.TBUILD }}\Libraries
-          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
+          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}-${{ env.RUST_KEY }}
 
       - name: Build cache.
         id: cache-build
@@ -277,6 +281,8 @@ jobs:
         if: env.ONLY_CACHE == 'false'
         env:
           KOMARU_BUILD_COMMIT: ${{ github.sha }}
+          # Folding identical functions takes most of the link, so only releases do it.
+          LINK_OPT: ${{ (startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '') && '/OPT:ICF' || '/OPT:NOICF' }}
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
 
@@ -286,6 +292,7 @@ jobs:
           %TDESKTOP_BUILD_API% ^
           -D CMAKE_CONFIGURATION_TYPES=MinSizeRel ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
+          -D CMAKE_EXE_LINKER_FLAGS_MINSIZEREL=%LINK_OPT% ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF ^
           -D KOMARUGRAM_BUILD_PACKER=%BUILD_PACKER% ^
           %TDESKTOP_BUILD_DEFINE%
