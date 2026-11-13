@@ -231,6 +231,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/features/komaru/crypto_rates.h"
+#include "ayu/features/komaru/scroll_autoload.h"
 #include "ayu/features/filters/filters_cache_controller.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/message_shot/message_shot.h"
@@ -5592,6 +5593,14 @@ void HistoryWidget::handleScroll() {
 		if (!_synteticScrollEvent) {
 			checkLastPinnedClickedIdReset(_lastScrollTop, scrollTop);
 		}
+		KomaruAutoload::Scrolled(
+			scrollTop - _lastScrollTop,
+			_scroll->height(),
+			crl::guard(this, [=] {
+				if (_list) {
+					_list->update();
+				}
+			}));
 		_lastScrolled = now;
 		_lastScrollTop = scrollTop;
 	}

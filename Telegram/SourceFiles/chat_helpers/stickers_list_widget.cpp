@@ -889,7 +889,7 @@ bool StickersListWidget::addSearchShortcut(not_null<StickersSet*> set) {
 	if (ranges::contains(_searchShortcutSets, set->id, &Set::id)) {
 		return false;
 	}
-	const auto skipPremium = !session().premiumPossible();
+	const auto skipPremium = skipPremiumStickers();
 	auto elements = PrepareStickers(
 		set->stickers.empty() ? set->covers : set->stickers,
 		skipPremium);
@@ -918,7 +918,7 @@ void StickersListWidget::fillSelectedSearchShortcut() {
 		return;
 	}
 	const auto set = it->second.get();
-	const auto skipPremium = !session().premiumPossible();
+	const auto skipPremium = skipPremiumStickers();
 	auto elements = PrepareStickers(
 		set->stickers.empty() ? set->covers : set->stickers,
 		skipPremium);
@@ -2209,6 +2209,13 @@ void StickersListWidget::clipCallback(
 	});
 }
 
+// KomaruGram: Premium stickers stay out of the panel for those who cannot send them, if asked.
+bool StickersListWidget::skipPremiumStickers() const {
+	return !session().premiumPossible()
+		|| (AyuSettings::getInstance().hidePaidStickers()
+			&& !session().premium());
+}
+
 bool StickersListWidget::itemVisible(
 		const SectionInfo &info,
 		int index) const {
@@ -3322,7 +3329,7 @@ void StickersListWidget::refreshSearchSets() {
 	refreshSearchIndex();
 
 	const auto &sets = session().data().stickers().sets();
-	const auto skipPremium = !session().premiumPossible();
+	const auto skipPremium = skipPremiumStickers();
 	const auto refreshElements = [&](Set &entry, not_null<StickersSet*> set) {
 		auto elements = PrepareStickers(
 			set->stickers.empty() ? set->covers : set->stickers,
@@ -3430,7 +3437,7 @@ bool StickersListWidget::appendSet(
 			return false;
 		}
 	}
-	const auto skipPremium = !session().premiumPossible();
+	const auto skipPremium = skipPremiumStickers();
 	auto elements = PrepareStickers(
 		((set->stickers.empty() && externalLayout)
 			? set->covers
@@ -3593,7 +3600,7 @@ void StickersListWidget::refreshFavedStickers() {
 	if (it == sets.cend()) {
 		return;
 	}
-	const auto skipPremium = !session().premiumPossible();
+	const auto skipPremium = skipPremiumStickers();
 	const auto set = it->second.get();
 	const auto externalLayout = false;
 	const auto shortName = QString();
@@ -3673,7 +3680,7 @@ void StickersListWidget::refreshMegagroupStickers(GroupStickersPlace place) {
 		} else if (isShownHere(hidden)) {
 			const auto shortName = QString();
 			const auto externalLayout = false;
-			const auto skipPremium = !session().premiumPossible();
+			const auto skipPremium = skipPremiumStickers();
 			auto elements = PrepareStickers(set->stickers, skipPremium);
 			if (!elements.empty()) {
 				_mySets.emplace_back(

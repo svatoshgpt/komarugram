@@ -366,6 +366,7 @@ private:
 		not_null<DocumentData*> document,
 		int indexHint);
 	[[nodiscard]] bool itemVisible(const SectionInfo &info, int index) const;
+	[[nodiscard]] bool skipPremiumStickers() const;
 	void markLottieFrameShown(Set &set);
 	void checkVisibleLottie();
 	void pauseInvisibleLottieIn(const SectionInfo &info);

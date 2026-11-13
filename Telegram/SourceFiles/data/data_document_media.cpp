@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_document_media.h"
 
+#include "ayu/features/komaru/scroll_autoload.h"
 #include "data/data_document.h"
 #include "data/data_document_resolver.h"
 #include "data/data_session.h"
@@ -327,7 +328,8 @@ void DocumentMedia::automaticLoad(
 	const auto filename = toCache
 		? QString()
 		: DocumentFileNameForSave(_owner);
-	const auto shouldLoadFromCloud = (indata.isEmpty()
+	const auto shouldLoadFromCloud = !KomaruAutoload::Paused()
+		&& (indata.isEmpty()
 		|| Core::DetectNameType(indata) != Core::NameType::Executable)
 		&& Core::DetectNameType(filename) != Core::NameType::Executable
 		&& (item

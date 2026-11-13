@@ -138,6 +138,8 @@ set(ayugram_files
         ayu/features/komaru/color_swatch.h
         ayu/features/komaru/crypto_rates.cpp
         ayu/features/komaru/crypto_rates.h
+        ayu/features/komaru/scroll_autoload.cpp
+        ayu/features/komaru/scroll_autoload.h
         ayu/features/komaru/komaru_badges.cpp
         ayu/features/komaru/komaru_badges.h
         ayu/features/komaru/now_playing.cpp

@@ -292,6 +292,7 @@ public:
 	[[nodiscard]] bool hidePremiumStatuses() const { return _hidePremiumStatuses.current(); }
 	[[nodiscard]] bool hideExteraBadges() const { return _hideExteraBadges.current(); }
 	[[nodiscard]] bool showOnlyAddedEmojisAndStickers() const { return _showOnlyAddedEmojisAndStickers.current(); }
+	[[nodiscard]] bool hidePaidStickers() const { return _hidePaidStickers.current(); }
 	[[nodiscard]] bool collapseSimilarChannels() const { return _collapseSimilarChannels.current(); }
 	[[nodiscard]] bool hideSimilarChannels() const { return _hideSimilarChannels.current(); }
 	[[nodiscard]] int messageBubbleRadius() const { return _messageBubbleRadius.current(); }
@@ -402,6 +403,7 @@ public:
 	void setHidePremiumStatuses(bool val);
 	void setHideExteraBadges(bool val);
 	void setShowOnlyAddedEmojisAndStickers(bool val);
+	void setHidePaidStickers(bool val);
 	void setCollapseSimilarChannels(bool val);
 	void setHideSimilarChannels(bool val);
 	void setMessageBubbleRadius(int val);
@@ -695,6 +697,7 @@ private:
 	rpl::variable<bool> _disableStories = false;
 	rpl::variable<bool> _disableCustomBackgrounds = false;
 	rpl::variable<bool> _showOnlyAddedEmojisAndStickers = false;
+	rpl::variable<bool> _hidePaidStickers = false;
 	rpl::variable<bool> _collapseSimilarChannels = true;
 	rpl::variable<bool> _hideSimilarChannels = true;
 	rpl::variable<int> _messageBubbleRadius = 16;

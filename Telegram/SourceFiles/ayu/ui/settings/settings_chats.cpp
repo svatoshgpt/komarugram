@@ -8,6 +8,7 @@
 
 #include "lang_auto.h"
 #include "ayu/ayu_settings.h"
+#include "ayu/komaru_strings.h"
 #include "ayu/ui/boxes/edit_mark_box.h"
 #include "ayu/ui/components/message_preview.h"
 #include "ayu/ui/settings/ayu_builder.h"
@@ -42,6 +43,13 @@ void BuildStickersAndEmoji(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.title = tr::ayu_ShowOnlyAddedEmojisAndStickers(),
 		.getter = &AyuSettings::showOnlyAddedEmojisAndStickers,
 		.setter = &AyuSettings::setShowOnlyAddedEmojisAndStickers,
+	});
+
+	ayu.addSettingToggle({
+		.id = u"ayu/hidePaidStickers"_q,
+		.title = Komaru::TextValue("hide_paid_stickers"),
+		.getter = &AyuSettings::hidePaidStickers,
+		.setter = &AyuSettings::setHidePaidStickers,
 	});
 
 	ayu.addSettingToggle({

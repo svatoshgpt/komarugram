@@ -610,6 +610,12 @@ void AyuSettings::setShowOnlyAddedEmojisAndStickers(bool val) {
 	save();
 }
 
+void AyuSettings::setHidePaidStickers(bool val) {
+	if (_hidePaidStickers.current() == val) return;
+	_hidePaidStickers = val;
+	save();
+}
+
 void AyuSettings::setCollapseSimilarChannels(bool val) {
 	if (_collapseSimilarChannels.current() == val) return;
 	_collapseSimilarChannels = val;
@@ -1338,6 +1344,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"hidePremiumStatuses", s._hidePremiumStatuses.current()},
 		{"hideExteraBadges", s._hideExteraBadges.current()},
 		{"showOnlyAddedEmojisAndStickers", s._showOnlyAddedEmojisAndStickers.current()},
+		{"hidePaidStickers", s._hidePaidStickers.current()},
 		{"collapseSimilarChannels", s._collapseSimilarChannels.current()},
 		{"hideSimilarChannels", s._hideSimilarChannels.current()},
 		{"messageBubbleRadius", s._messageBubbleRadius.current()},
@@ -1457,6 +1464,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._hidePremiumStatuses = j.value("hidePremiumStatuses", defaults._hidePremiumStatuses.current());
 	s._hideExteraBadges = j.value("hideExteraBadges", defaults._hideExteraBadges.current());
 	s._showOnlyAddedEmojisAndStickers = j.value("showOnlyAddedEmojisAndStickers", defaults._showOnlyAddedEmojisAndStickers.current());
+	s._hidePaidStickers = j.value("hidePaidStickers", defaults._hidePaidStickers.current());
 	s._collapseSimilarChannels = j.value("collapseSimilarChannels", defaults._collapseSimilarChannels.current());
 	s._hideSimilarChannels = j.value("hideSimilarChannels", defaults._hideSimilarChannels.current());
 	s._messageBubbleRadius = j.value("messageBubbleRadius", defaults._messageBubbleRadius.current());

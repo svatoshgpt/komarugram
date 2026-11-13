@@ -121,6 +121,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ui/utils/ayu_profile_values.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/komaru_strings.h"
+#include "lang/lang_tag.h"
 #include "styles/style_ayu_styles.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/text/text_entity.h"
@@ -1405,6 +1407,37 @@ bool SetClickContext(
 	return false;
 }
 
+// KomaruGram: how many messages a chat has, asked as a one message slice.
+[[nodiscard]] rpl::producer<TextWithEntities> MessagesCountValue(
+		not_null<PeerData*> peer) {
+	return [=](auto consumer) {
+		auto lifetime = rpl::lifetime();
+		const auto api = &peer->session().api();
+		const auto requestId = api->request(MTPmessages_GetHistory(
+			peer->input(),
+			MTP_int(0),
+			MTP_int(0),
+			MTP_int(0),
+			MTP_int(1),
+			MTP_int(0),
+			MTP_int(0),
+			MTP_long(0)
+		)).done([=](const MTPmessages_Messages &result) {
+			const auto count = result.match([](
+					const MTPDmessages_messages &data) {
+				return int(data.vmessages().v.size());
+			}, [](const auto &data) {
+				return int(data.vcount().v);
+			});
+			consumer.put_next(TextWithEntities{
+				Lang::FormatCountDecimal(count),
+			});
+		}).send();
+		lifetime.add([=] { api->request(requestId).cancel(); });
+		return lifetime;
+	};
+}
+
 void AddRegistrationOrCreationButton(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
@@ -1903,6 +1936,12 @@ Section DetailsFiller::makeInfo() {
 			});
 			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
 		}
+		if (!_topic) {
+			addInfoOneLine(
+				Komaru::TextValue("messages_count"),
+				MessagesCountValue(_peer),
+				QString());
+		}
 	} else {
 		const auto topicRootId = _topic ? _topic->rootId() : 0;
 		const auto addToLink = topicRootId
@@ -2018,6 +2057,12 @@ Section DetailsFiller::makeInfo() {
 				return false;
 			});
 			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
+		}
+		if (!_topic) {
+			addInfoOneLine(
+				Komaru::TextValue("messages_count"),
+				MessagesCountValue(_peer),
+				QString());
 		}
 
 		if (_topic) {

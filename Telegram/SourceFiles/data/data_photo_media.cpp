@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_photo_media.h"
 
+#include "ayu/features/komaru/scroll_autoload.h"
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
 #include "history/history.h"
@@ -177,10 +178,11 @@ void PhotoMedia::automaticLoad(
 	if (loaded() || _owner->cancelled()) {
 		return;
 	}
-	const auto loadFromCloud = Data::AutoDownload::Should(
-		_owner->session().settings().autoDownload(),
-		peer,
-		_owner);
+	const auto loadFromCloud = !KomaruAutoload::Paused()
+		&& Data::AutoDownload::Should(
+			_owner->session().settings().autoDownload(),
+			peer,
+			_owner);
 	_owner->load(
 		origin,
 		loadFromCloud ? LoadFromCloudOrLocal : LoadFromLocalOnly,
