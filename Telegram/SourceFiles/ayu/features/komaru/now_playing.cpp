@@ -42,7 +42,8 @@ namespace KomaruNowPlaying {
 namespace {
 
 constexpr auto kPollInterval = 5 * crl::time(1000);
-constexpr auto kMaxBackoff = 10 * 60 * crl::time(1000);
+constexpr auto kMaxBackoff = 30 * crl::time(1000);
+constexpr auto kQuickRetries = 3;
 constexpr auto kRestartDelay = 2 * crl::time(1000);
 // A pause this long clears the card, the profile music and the bio.
 constexpr auto kStopDelay = 10 * crl::time(1000);
@@ -372,6 +373,7 @@ private:
 	void poll();
 	void finish(std::optional<Track> track);
 	void fail();
+	[[nodiscard]] crl::time nextPollDelay() const;
 	void requestDuration(Track track);
 	void setCurrent(std::optional<Track> track);
 	void loadCover(const QString &url, Fn<void(QByteArray)> done);
@@ -415,6 +417,7 @@ private:
 	QPointer<QNetworkReply> _reply;
 	uint64 _generation = 0;
 	int _failures = 0;
+	crl::time _pollStarted = 0;
 	crl::time _idleSince = 0;
 	bool _known = false;
 	base::weak_ptr<Main::Session> _session;
@@ -601,6 +604,7 @@ void Manager::poll() {
 			+ QString::fromUtf8(QUrl::toPercentEncoding(user))
 			+ u"/streams/current"_q);
 	}
+	_pollStarted = crl::now();
 	const auto generation = _generation;
 	const auto lastFm = (settings.nowPlayingService()
 		== NowPlayingService::LastFm);
@@ -627,16 +631,26 @@ void Manager::poll() {
 }
 
 void Manager::fail() {
-	++_failures;
+	// A hiccup is asked again at the usual pace, a lasting failure slower.
+	if (++_failures <= kQuickRetries) {
+		_timer.callOnce(nextPollDelay());
+		return;
+	}
 	const auto delay = std::min(
-		kPollInterval << std::min(_failures, 5),
+		kPollInterval << std::min(_failures - kQuickRetries, 5),
 		kMaxBackoff);
 	_timer.callOnce(delay);
 }
 
+// Counted from when the last request started, so the answer time is not added.
+crl::time Manager::nextPollDelay() const {
+	const auto passed = crl::now() - _pollStarted;
+	return std::clamp(kPollInterval - passed, crl::time(100), kPollInterval);
+}
+
 void Manager::finish(std::optional<Track> track) {
 	_failures = 0;
-	_timer.callOnce(kPollInterval);
+	_timer.callOnce(nextPollDelay());
 	if (!track) {
 		const auto now = crl::now();
 		if (!_idleSince) {
