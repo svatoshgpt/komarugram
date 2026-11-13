@@ -46,6 +46,12 @@ struct Profile {
 	friend inline bool operator==(const Profile &, const Profile &) = default;
 };
 
+// What the box showed last, so it opens complete the next time.
+[[nodiscard]] std::map<uint64, Profile> &Loaded() {
+	static auto result = std::map<uint64, Profile>();
+	return result;
+}
+
 [[nodiscard]] Profile ParseProfile(const QByteArray &bytes) {
 	const auto root = QJsonDocument::fromJson(bytes).object();
 	return {
@@ -163,8 +169,17 @@ void FillExteraBadgeBox(
 		not_null<PeerData*> peer) {
 	const auto session = &controller->session();
 	const auto self = peer->isSelf();
-	const auto profile = box->lifetime().make_state<
-		rpl::variable<Profile>>(Profile{ .badge = kDefaultArrow });
+	const auto peerId = uint64(getBareID(peer));
+	const auto custom = isCustomBadgePeer(getBareID(peer))
+		? getCustomBadge(getBareID(peer))
+		: CustomBadge();
+	const auto loaded = Loaded().find(peerId);
+	const auto profile = box->lifetime().make_state<rpl::variable<Profile>>(
+		(loaded != end(Loaded()))
+			? loaded->second
+			: Profile{ .badge = custom.emojiStatusId.documentId
+				? custom.emojiStatusId.documentId
+				: kDefaultArrow });
 
 	box->setStyle(st::giveawayGiftCodeBox);
 	box->setNoContentMargin(true);
@@ -204,7 +219,7 @@ void FillExteraBadgeBox(
 				const auto number = value.number
 					? (u"#"_q + QString::number(value.number))
 					: QString();
-				return self
+				auto result = self
 					? tr::ayu_ExteraBadgeAboutSelf(
 						tr::now,
 						lt_number,
@@ -215,11 +230,28 @@ void FillExteraBadgeBox(
 						name,
 						lt_number,
 						number);
+				// No gap is left where the number is still loading.
+				return number.isEmpty()
+					? result.replace(u"  "_q, u" "_q).replace(u" ."_q, u"."_q)
+					: result;
 			}),
 			st::starrefCenteredText),
 		st::boxRowPadding,
 		style::al_top);
 	about->setTryMakeSimilarLines(true);
+
+	// The caption the person wrote for the badge.
+	if (!custom.text.isEmpty()) {
+		AddSkip(content);
+		content->add(
+			object_ptr<FlatLabel>(
+				content,
+				rpl::single(tr::rich(
+					QString(custom.text).replace(u"{name}"_q, name))),
+				st::starrefCenteredText),
+			st::boxRowPadding,
+			style::al_top);
+	}
 
 	AddSkip(content);
 	AddSkip(content);
@@ -252,8 +284,9 @@ void FillExteraBadgeBox(
 		}
 		auto parsed = ParseProfile(reply->readAll());
 		if (!parsed.badge) {
-			parsed.badge = kDefaultArrow;
+			parsed.badge = profile->current().badge;
 		}
+		Loaded()[peerId] = parsed;
 		*profile = parsed;
 	});
 }

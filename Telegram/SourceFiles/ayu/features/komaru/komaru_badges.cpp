@@ -64,6 +64,14 @@ struct StatusLine {
 	QString text;
 };
 
+// A change made here shows this long, until the shared list has it.
+constexpr auto kLocalFor = crl::time(20 * 60 * 1000);
+
+struct LocalStatus {
+	std::optional<StatusLine> line;
+	crl::time till = 0;
+};
+
 // How often a rotating status line is checked for its next status.
 constexpr auto kRotationCheck = crl::time(1000);
 
@@ -74,6 +82,10 @@ struct State {
 	std::unordered_map<uint64, StatusLine> statuses;
 	crl::time rotationStep = -1;
 	QByteArray statusesRaw;
+	std::unordered_map<uint64, StatusLine> custom;
+	QByteArray customRaw;
+	std::unordered_map<uint64, LocalStatus> local;
+	QString bot;
 	base::flat_map<QString, std::vector<DocumentId>> sets;
 	base::flat_set<QString> requestedSets;
 	Main::Session *session = nullptr;
@@ -362,6 +374,73 @@ void FetchStatuses() {
 	});
 }
 
+[[nodiscard]] QString ExtraPath(const QString &name) {
+	return cWorkingDir() + u"tdata/komaru_badges/"_q + name;
+}
+
+// What people set themselves through the bot, over the statuses list.
+bool ApplyCustom(const QByteArray &data) {
+	auto &state = Instance();
+	if (state.customRaw == data) {
+		return false;
+	}
+	state.customRaw = data;
+	state.custom = ParseStatuses(data);
+	return true;
+}
+
+bool ApplyBot(const QByteArray &data) {
+	static const auto expression = QRegularExpression(
+		u"^[A-Za-z0-9_]{5,32}$"_q);
+	auto name = QString::fromUtf8(data).trimmed().remove('@');
+	if (!expression.match(name).hasMatch()) {
+		name = QString();
+	}
+	auto &state = Instance();
+	if (state.bot == name) {
+		return false;
+	}
+	state.bot = name;
+	return true;
+}
+
+void FetchExtra(const QString &name, bool (*apply)(const QByteArray &)) {
+	const auto reply = Get(QString::fromLatin1(kGistRaw) + name);
+	QObject::connect(reply, &QNetworkReply::finished, [=] {
+		reply->deleteLater();
+		// The file may not exist yet, that is not an error.
+		if (reply->error() != QNetworkReply::NoError) {
+			return;
+		}
+		const auto data = reply->readAll();
+		if (!apply(data)) {
+			return;
+		}
+		QDir().mkpath(cWorkingDir() + u"tdata/komaru_badges"_q);
+		auto file = QFile(ExtraPath(name));
+		if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+			file.write(data);
+		}
+		Instance().updated.fire({});
+		RepaintAll();
+	});
+}
+
+[[nodiscard]] const StatusLine *FindStatus(
+		const State &state,
+		uint64 peerId) {
+	const auto base = state.statuses.find(peerId);
+	if (base == end(state.statuses)) {
+		return nullptr;
+	}
+	const auto local = state.local.find(peerId);
+	if (local != end(state.local) && local->second.till > crl::now()) {
+		return local->second.line ? &*local->second.line : &base->second;
+	}
+	const auto custom = state.custom.find(peerId);
+	return (custom != end(state.custom)) ? &custom->second : &base->second;
+}
+
 void LoadCachedLists() {
 	auto any = false;
 	for (const auto kind : { Kind::Developer, Kind::Supporter }) {
@@ -372,6 +451,14 @@ void LoadCachedLists() {
 	}
 	if (auto file = QFile(StatusesPath()); file.open(QIODevice::ReadOnly)) {
 		any = ApplyStatuses(file.readAll()) || any;
+	}
+	const auto custom = u"custom.txt"_q;
+	if (auto file = QFile(ExtraPath(custom)); file.open(QIODevice::ReadOnly)) {
+		any = ApplyCustom(file.readAll()) || any;
+	}
+	const auto bot = u"bot.txt"_q;
+	if (auto file = QFile(ExtraPath(bot)); file.open(QIODevice::ReadOnly)) {
+		any = ApplyBot(file.readAll()) || any;
 	}
 	if (any) {
 		Instance().updated.fire({});
@@ -474,6 +561,8 @@ void Refresh() {
 	FetchList(Kind::Developer);
 	FetchList(Kind::Supporter);
 	FetchStatuses();
+	FetchExtra(u"custom.txt"_q, ApplyCustom);
+	FetchExtra(u"bot.txt"_q, ApplyBot);
 	FetchRate();
 }
 
@@ -594,12 +683,12 @@ const Entry *Supporter(uint64 peerId) {
 
 std::vector<uint64> Statuses(uint64 peerId) {
 	const auto &state = Instance();
-	const auto i = state.statuses.find(peerId);
-	if (i == end(state.statuses)) {
+	const auto line = FindStatus(state, peerId);
+	if (!line) {
 		return {};
 	}
 	auto result = std::vector<uint64>();
-	for (const auto &ref : i->second.refs) {
+	for (const auto &ref : line->refs) {
 		if (!ref.random) {
 			if (const auto id = Resolve(state, ref)) {
 				result.push_back(id);
@@ -625,7 +714,7 @@ std::vector<uint64> Statuses(uint64 peerId) {
 			}
 		}
 	}
-	const auto period = i->second.period;
+	const auto period = line->period;
 	if (period > 0 && result.size() > 1) {
 		const auto index = (crl::now() / period) % int64(result.size());
 		return { result[index] };
@@ -634,9 +723,32 @@ std::vector<uint64> Statuses(uint64 peerId) {
 }
 
 QString StatusText(uint64 peerId) {
+	const auto line = FindStatus(Instance(), peerId);
+	return line ? line->text : QString();
+}
+
+bool CanEditStatus(uint64 peerId) {
 	const auto &state = Instance();
-	const auto i = state.statuses.find(peerId);
-	return (i != end(state.statuses)) ? i->second.text : QString();
+	return !state.bot.isEmpty() && state.statuses.contains(peerId);
+}
+
+QString EditBot() {
+	return Instance().bot;
+}
+
+void SetLocalStatus(uint64 peerId, uint64 documentId, const QString &text) {
+	auto &state = Instance();
+	auto &local = state.local[peerId];
+	local.till = crl::now() + kLocalFor;
+	local.line = std::nullopt;
+	if (documentId) {
+		local.line = StatusLine{
+			.refs = { StatusRef{ .id = DocumentId(documentId) } },
+			.text = text,
+		};
+	}
+	state.updated.fire({});
+	RepaintAll();
 }
 
 rpl::producer<> Updated() {

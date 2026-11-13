@@ -49,6 +49,13 @@ inline constexpr auto kMaxStatuses = size_t(20);
 [[nodiscard]] std::vector<uint64> Statuses(uint64 peerId);
 [[nodiscard]] QString StatusText(uint64 peerId);
 
+// Whether the person has a status and the bot that changes it is known.
+[[nodiscard]] bool CanEditStatus(uint64 peerId);
+[[nodiscard]] QString EditBot();
+
+// Shows the change at once, before the list catches up; no id resets it.
+void SetLocalStatus(uint64 peerId, uint64 documentId, const QString &text);
+
 // Fires when a list or the rate changes.
 [[nodiscard]] rpl::producer<> Updated();
 

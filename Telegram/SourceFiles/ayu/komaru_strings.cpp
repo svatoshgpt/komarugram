@@ -16,6 +16,13 @@ struct Entry {
 constexpr Entry kStrings[] = {
 	{ "translate_subtitle", u"Translate Messages", u"Перевод сообщений" },
 	{ "messages_count", u"Messages", u"Сообщений" },
+	{ "badge_title", u"Your badge", u"Ваш значок" },
+	{ "badge_hint", u"Click the badge to choose any emoji.", u"Нажмите на значок, чтобы выбрать любой эмодзи." },
+	{ "badge_caption", u"Caption", u"Подпись" },
+	{ "badge_about", u"Everyone who clicks your badge sees the caption. {name} becomes your name, **bold** and [links](url) work.", u"Подпись видят все, кто нажмёт на ваш значок. {name} заменяется вашим именем, работают **жирный** и [ссылки](url)." },
+	{ "badge_reset", u"Reset badge", u"Сбросить значок" },
+	{ "badge_saved", u"Saved. Others will see it in a few minutes.", u"Сохранено. У других обновится через несколько минут." },
+	{ "badge_reset_done", u"Badge reset.", u"Значок сброшен." },
 	{ "hide_paid_stickers", u"Hide Premium stickers and emoji", u"Скрыть Premium-стикеры и эмодзи" },
 	{ "save_as_gif", u"Save as GIF", u"Сохранить в GIF" },
 	{ "save_sticker_video", u"Save as video", u"Сохранить как видео" },

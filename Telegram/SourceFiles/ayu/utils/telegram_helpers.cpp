@@ -17,6 +17,7 @@
 #include "ayu/features/filters/filters_controller.h"
 #include "ayu/features/komaru/komaru_badges.h"
 #include "ayu/ui/boxes/extera_badge_box.h"
+#include "ayu/ui/boxes/komaru_badge_box.h"
 #include "ayu/ui/toasts.h"
 #include "ayu/utils/rc_manager.h"
 #include "core/core_settings.h"
@@ -276,6 +277,18 @@ Fn<void()> badgeClickHandler(
 			}
 		}
 
+		// Your own status opens its editor.
+		if (peer->isSelf()
+			&& !badge.komaruStatuses.empty()
+			&& KomaruBadges::CanEditStatus(getBareID(peer))) {
+			if (const auto window = Core::App().activeWindow()) {
+				if (const auto controller = window->sessionController()) {
+					controller->show(Box(Ui::FillKomaruBadgeBox, controller));
+					return;
+				}
+			}
+		}
+
 		TextWithEntities text;
 		if (komaruDeveloper) {
 			// Channels in the developer list are the project's own.
@@ -298,7 +311,9 @@ Fn<void()> badgeClickHandler(
 				tr::rich);
 		} else if (!badge.komaruStatuses.empty()
 			&& badge.badge == Info::Profile::BadgeType::Komaru) {
-			const auto custom = KomaruBadges::StatusText(getBareID(peer));
+			const auto custom = KomaruBadges::StatusText(
+				getBareID(peer)
+			).replace(u"{name}"_q, peer->name());
 			text = !custom.isEmpty()
 				? tr::rich(custom)
 				: tr::ayu_KomaruStatusPopup(
