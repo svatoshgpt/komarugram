@@ -89,7 +89,21 @@ object_ptr<RpWidget> CreateBadgeLogo(
 		if (!state->emoji) {
 			return;
 		}
-		// The arrow is tinted with the theme accent, keeping its shading.
+		const auto origin = QPoint(
+			(raw->width() - size) / 2,
+			(raw->height() - size) / 2);
+		const auto color = st::profileVerifiedCheckBg->c;
+		if (state->id != kDefaultArrow) {
+			// A chosen emoji keeps its own colours.
+			auto p = QPainter(raw);
+			state->emoji->paint(p, {
+				.textColor = color,
+				.now = crl::now(),
+				.position = origin,
+			});
+			return;
+		}
+		// The arrow is as blue as next to the name, keeping its shading.
 		const auto ratio = style::DevicePixelRatio();
 		auto image = QImage(
 			QSize(size, size) * ratio,
@@ -99,7 +113,7 @@ object_ptr<RpWidget> CreateBadgeLogo(
 		{
 			auto q = QPainter(&image);
 			state->emoji->paint(q, {
-				.textColor = st::windowActiveTextFg->c,
+				.textColor = color,
 				.now = crl::now(),
 				.position = QPoint(),
 			});
@@ -108,14 +122,12 @@ object_ptr<RpWidget> CreateBadgeLogo(
 		{
 			auto q = QPainter(&tinted);
 			q.setCompositionMode(QPainter::CompositionMode_Multiply);
-			q.fillRect(QRect(0, 0, size, size), st::windowActiveTextFg);
+			q.fillRect(QRect(0, 0, size, size), color);
 			q.setCompositionMode(QPainter::CompositionMode_DestinationIn);
 			q.drawImage(0, 0, image);
 		}
 		auto p = QPainter(raw);
-		p.drawImage(
-			QPoint((raw->width() - size) / 2, (raw->height() - size) / 2),
-			tinted);
+		p.drawImage(origin, tinted);
 	}, raw->lifetime());
 	return result;
 }
