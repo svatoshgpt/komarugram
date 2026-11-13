@@ -195,6 +195,8 @@ struct FilePrepareResult {
 	SendMediaType type = SendMediaType::File;
 	QString filepath;
 	QByteArray content;
+	// KomaruGram: bytes of filepath zeroed on upload, see KomaruMetadata.
+	std::vector<std::pair<int64, int64>> scrubRanges;
 
 	QString filename;
 	QString filemime;

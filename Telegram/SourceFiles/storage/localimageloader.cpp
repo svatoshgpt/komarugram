@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "storage/localimageloader.h"
 
+#include "ayu/features/komaru/send_metadata.h"
+
 #include "api/api_text_entities.h"
 #include "api/api_sending.h"
 #include "data/data_document.h"
@@ -1234,6 +1236,7 @@ void FileLoadTask::process(ProcessArgs &&args) {
 
 	_result->type = _type;
 	_result->filepath = _filepath;
+	_result->scrubRanges = KomaruMetadata::Find(_filepath);
 	_result->content = _content;
 
 	_result->filename = filename;

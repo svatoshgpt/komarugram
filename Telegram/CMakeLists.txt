@@ -140,6 +140,8 @@ set(ayugram_files
         ayu/features/komaru/crypto_rates.h
         ayu/features/komaru/scroll_autoload.cpp
         ayu/features/komaru/scroll_autoload.h
+        ayu/features/komaru/send_metadata.cpp
+        ayu/features/komaru/send_metadata.h
         ayu/features/komaru/komaru_badges.cpp
         ayu/features/komaru/komaru_badges.h
         ayu/features/komaru/now_playing.cpp
