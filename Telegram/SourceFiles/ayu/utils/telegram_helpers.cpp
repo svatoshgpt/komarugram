@@ -63,6 +63,8 @@
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
 
+#include <komaru_core.h>
+
 namespace {
 
 constexpr auto usernameResolverBotId = 7424190611L;
@@ -1046,18 +1048,7 @@ void searchChatById(ID chatId, Main::Session *session, const UsernameResolverCal
 
 // The pack id carries its creator for known serial ranges, as in KomaruGram Go: https://github.com/komarugif/komarugram-go/blob/main/internal/messenger/model/sticker_set.go
 ID getUserIdFromPackId(uint64 id) {
-	const auto high = id >> 32;
-	const auto serial = uint32(id & 0xFFFFFFFFULL);
-	if (serial >= 0x003F0000U && serial < 0x00400000U) {
-		return high | (1ULL << 31);
-	} else if (serial < (1U << 24)) {
-		return high;
-	} else if (serial >= 0xFF000000U && serial < 0xFF400000U) {
-		return high | (1ULL << 31) | (1ULL << 32);
-	} else if (serial >= 0xFF400000U && serial < 0xFF800000U) {
-		return high | (1ULL << 32);
-	}
-	return 0;
+	return komaru_pack_owner_id(id);
 }
 
 TextWithTags extractText(not_null<HistoryItem*> item) {

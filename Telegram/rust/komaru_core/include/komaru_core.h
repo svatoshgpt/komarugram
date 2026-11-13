@@ -163,6 +163,40 @@ uint8_t komaru_filter_find(
 	size_t size);
 void komaru_filter_free(KomaruFilter *filter);
 
+// Byte ranges of a JPEG or MP4 that tell where, when and with what it was taken.
+typedef void (*KomaruRangeSink)(void *context, int64_t offset, int64_t size);
+void komaru_metadata_find(
+	const char *path,
+	size_t size,
+	KomaruRangeSink sink,
+	void *context);
+
+// "#rgb" and "#rrggbb" in UTF-16 text: where each ends and its digit count.
+typedef void (*KomaruColorSink)(void *context, size_t end, size_t digits);
+void komaru_color_find(
+	const uint16_t *text,
+	size_t size,
+	KomaruColorSink sink,
+	void *context);
+
+// Completes "1 gram =" into out as UTF-8, gives its size or 0 for none.
+typedef double (*KomaruRateLookup)(
+	void *context,
+	const char *coin,
+	size_t coinSize,
+	const char *fiat,
+	size_t fiatSize);
+size_t komaru_rate_completion(
+	const char *query,
+	size_t size,
+	KomaruRateLookup lookup,
+	void *context,
+	char *out,
+	size_t capacity);
+
+// The user id inside a sticker or emoji pack id, 0 when unknown.
+uint64_t komaru_pack_owner_id(uint64_t id);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

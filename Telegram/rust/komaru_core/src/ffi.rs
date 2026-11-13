@@ -261,3 +261,80 @@ pub unsafe extern "C" fn komaru_filter_free(pattern: *mut Pattern) {
         drop(Box::from_raw(pattern));
     }
 }
+
+type RangeSink = unsafe extern "C" fn(context: *mut c_void, offset: i64, size: i64);
+type ColorSink = unsafe extern "C" fn(context: *mut c_void, end: usize, digits: usize);
+type RateLookup = unsafe extern "C" fn(
+    context: *mut c_void,
+    coin: *const u8,
+    coin_size: usize,
+    fiat: *const u8,
+    fiat_size: usize,
+) -> f64;
+
+/// # Safety
+/// `path` must point to `size` bytes of UTF-8, `sink` is called with
+/// `context` for every range.
+#[no_mangle]
+pub unsafe extern "C" fn komaru_metadata_find(
+    path: *const u8,
+    size: usize,
+    sink: RangeSink,
+    context: *mut c_void,
+) {
+    let path = String::from_utf8_lossy(text(path, size)).into_owned();
+    for (offset, size) in guard(Vec::new(), || crate::metadata::find(&path)) {
+        sink(context, offset, size);
+    }
+}
+
+/// # Safety
+/// `data` must point to `size` UTF-16 units, `sink` is called with
+/// `context` for every color.
+#[no_mangle]
+pub unsafe extern "C" fn komaru_color_find(
+    data: *const u16,
+    size: usize,
+    sink: ColorSink,
+    context: *mut c_void,
+) {
+    if data.is_null() || size == 0 {
+        return;
+    }
+    let units = std::slice::from_raw_parts(data, size);
+    for (end, digits) in guard(Vec::new(), || crate::color::find(units)) {
+        sink(context, end, digits);
+    }
+}
+
+/// # Safety
+/// `query` must point to `size` bytes of UTF-8, `out` to `capacity`
+/// writable bytes, `lookup` is called with `context` at most once.
+#[no_mangle]
+pub unsafe extern "C" fn komaru_rate_completion(
+    query: *const u8,
+    size: usize,
+    lookup: RateLookup,
+    context: *mut c_void,
+    out: *mut u8,
+    capacity: usize,
+) -> usize {
+    let query = String::from_utf8_lossy(text(query, size)).into_owned();
+    let result = guard(None, || {
+        crate::rates::completion(&query, |coin, fiat| {
+            lookup(context, coin.as_ptr(), coin.len(), fiat.as_ptr(), fiat.len())
+        })
+    });
+    match result {
+        Some(result) if !out.is_null() && result.len() <= capacity => {
+            std::ptr::copy_nonoverlapping(result.as_ptr(), out, result.len());
+            result.len()
+        }
+        _ => 0,
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn komaru_pack_owner_id(id: u64) -> u64 {
+    crate::packs::owner_id(id)
+}

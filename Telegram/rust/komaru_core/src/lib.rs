@@ -3,8 +3,12 @@
 //! The C API lives in `ffi.rs` and is declared for C++ in
 //! `include/komaru_core.h`.
 
+mod color;
 mod db;
 mod filter;
 mod ffi;
 mod log;
+mod metadata;
+mod packs;
+mod rates;
 mod sqlite;

@@ -4,7 +4,7 @@
 #include "ui/painter.h"
 #include "styles/style_basic.h"
 
-#include <QtCore/QRegularExpression>
+#include <komaru_core.h>
 
 namespace KomaruColorSwatch {
 namespace {
@@ -93,14 +93,21 @@ private:
 } // namespace
 
 TextWithEntities AddSwatches(TextWithEntities text) {
-	static const auto regex = QRegularExpression(
-		u"(?<![\\w#])#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})(?![\\w])"_q);
 	auto positions = std::vector<std::pair<int, QString>>();
-	auto i = regex.globalMatch(text.text);
-	while (i.hasNext()) {
-		const auto match = i.next();
-		positions.emplace_back(match.capturedEnd(), match.captured(1));
-	}
+	struct Context {
+		const QString &text;
+		std::vector<std::pair<int, QString>> &positions;
+	};
+	auto context = Context{ text.text, positions };
+	komaru_color_find(text.text.utf16(), text.text.size(), [](
+			void *context,
+			size_t end,
+			size_t digits) {
+		const auto data = static_cast<Context*>(context);
+		data->positions.emplace_back(
+			int(end),
+			data->text.mid(int(end - digits), int(digits)));
+	}, &context);
 	if (positions.empty()) {
 		return text;
 	}
