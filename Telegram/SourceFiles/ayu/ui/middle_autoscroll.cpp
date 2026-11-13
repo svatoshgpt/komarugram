@@ -31,7 +31,6 @@ struct Target {
 	Fn<int()> top;
 	Fn<int()> max;
 	Fn<void(int)> scrollTo;
-	Fn<void()> stopSmooth;
 };
 
 [[nodiscard]] std::optional<Target> FindTarget(QWidget *widget) {
@@ -43,7 +42,6 @@ struct Target {
 					.top = [=] { return scroll->scrollTop(); },
 					.max = [=] { return scroll->scrollTopMax(); },
 					.scrollTo = [=](int y) { scroll->scrollToY(y); },
-					.stopSmooth = [=] { scroll->stopSmoothScroll(); },
 				};
 			}
 		} else if (const auto scroll = dynamic_cast<Ui::ElasticScroll*>(w)) {
@@ -53,7 +51,6 @@ struct Target {
 					.top = [=] { return scroll->scrollTop(); },
 					.max = [=] { return scroll->scrollTopMax(); },
 					.scrollTo = [=](int y) { scroll->scrollToY(y); },
-					.stopSmooth = [=] { scroll->stopSmoothScroll(); },
 				};
 			}
 		}
@@ -183,7 +180,6 @@ bool Autoscroll::eventFilter(QObject *object, QEvent *e) {
 }
 
 void Autoscroll::start(Target target, QPoint origin) {
-	target.stopSmooth();
 	_target = std::move(target);
 	_origin = origin;
 	_held = true;

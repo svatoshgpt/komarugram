@@ -2034,7 +2034,6 @@ void HistoryWidget::animatedScrollToY(
 	}
 
 	_scrollToAnimation.stop();
-	_scrollingToBottom = (scrollTo >= _scroll->scrollTopMax());
 	const auto itemId = attachTo->fullId();
 	const auto consumed = Tgw::ListScroll::Consumed(this);
 	auto maxAnimatedDelta = _scroll->height();
@@ -2087,9 +2086,6 @@ void HistoryWidget::scrollToAnimationCallback(
 			[=](int top) { synteticScrollToY(top); });
 	}
 	if (!_scrollToAnimation.animating()) {
-		if (base::take(_scrollingToBottom)) {
-			synteticScrollToY(_scroll->scrollTopMax());
-		}
 		preloadHistoryByScroll();
 		checkReplyReturns();
 	}
@@ -5590,7 +5586,6 @@ void HistoryWidget::handleScroll() {
 	const auto now = crl::now();
 	if (!_synteticScrollEvent) {
 		_lastUserScrolled = now;
-		_scrollingToBottom = false;
 	}
 	const auto scrollTop = _scroll->scrollTop();
 	if (scrollTop != _lastScrollTop) {
@@ -9006,11 +9001,7 @@ void HistoryWidget::updateHistoryGeometry(
 		return;
 	}
 	const auto wasScrollTop = _scroll->scrollTop();
-	// A message that comes in while we scroll down after sending keeps the chat at the bottom.
-	const auto stickToBottom = _scrollingToBottom
-		&& _scrollToAnimation.animating();
-	const auto wasAtBottom = stickToBottom
-		|| (wasScrollTop >= _scroll->scrollTopMax());
+	const auto wasAtBottom = (wasScrollTop >= _scroll->scrollTopMax());
 	const auto needResize = (_scroll->width() != newScrollWidth)
 		|| (_scroll->height() != newScrollHeight);
 	if (needResize) {
@@ -9071,10 +9062,6 @@ void HistoryWidget::updateHistoryGeometry(
 		&& !loadedDown
 		&& !_history->unreadBar()) {
 		newScrollTop = countAutomaticScrollTop();
-		if (stickToBottom) {
-			_scrollToAnimation.stop();
-			_scrollingToBottom = false;
-		}
 	} else {
 		newScrollTop = std::min(
 			_list->historyScrollTop(),

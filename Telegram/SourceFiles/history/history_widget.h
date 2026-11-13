@@ -918,7 +918,6 @@ private:
 	bool _synteticScrollEvent = false;
 	Tgw::ScrollFlight _scrollToFlight;
 	Ui::Animations::Simple _scrollToAnimation;
-	bool _scrollingToBottom = false;
 
 	HistoryView::CornerButtons _cornerButtons;
 	std::unique_ptr<HistoryView::PullToNextChannel> _pullToNext;
