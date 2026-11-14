@@ -262,7 +262,7 @@ fn kept_library(relative: &str, size: u64) -> bool {
     let path = format!("/{relative}");
     let name = relative.rsplit('/').next().unwrap_or(relative);
     let extension = name.rsplit_once('.').map(|(_, e)| e);
-    (KEPT_TREES.iter().any(|t| relative.starts_with(t)) && !path.contains("/target/"))
+    (KEPT_TREES.iter().any(|t| path.contains(&format!("/{t}"))) && !path.contains("/target/"))
         || KEPT_PARTS.iter().any(|p| path.contains(p))
         || name == "Makefile"
         || extension.is_some_and(|e| KEPT_EXTENSIONS.contains(&e))
@@ -299,6 +299,7 @@ mod tests {
         assert!(kept("openssl/include/openssl/ssl.h", 1));
         assert!(kept("tlottie/src/lib.rs", 1));
         assert!(kept("wallet-engine/Cargo.toml", 1));
+        assert!(kept("win64/tlottie/Cargo.toml", 1));
         assert!(kept("nv-codec-headers/ffnvcodec.pc.in", 1));
         assert!(kept("cache_keys/qt_6", 1));
         assert!(kept("ffmpeg/Makefile", 1));
