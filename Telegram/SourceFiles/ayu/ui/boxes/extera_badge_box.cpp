@@ -100,42 +100,13 @@ object_ptr<RpWidget> CreateBadgeLogo(
 		const auto origin = QPoint(
 			(raw->width() - size) / 2,
 			(raw->height() - size) / 2);
-		const auto color = st::profileVerifiedCheckBg->c;
-		if (state->id != kDefaultArrow) {
-			// A chosen emoji keeps its own colours.
-			auto p = QPainter(raw);
-			state->emoji->paint(p, {
-				.textColor = color,
-				.now = crl::now(),
-				.position = origin,
-			});
-			return;
-		}
-		// The arrow is as blue as next to the name, keeping its shading.
-		const auto ratio = style::DevicePixelRatio();
-		auto image = QImage(
-			QSize(size, size) * ratio,
-			QImage::Format_ARGB32_Premultiplied);
-		image.setDevicePixelRatio(ratio);
-		image.fill(Qt::transparent);
-		{
-			auto q = QPainter(&image);
-			state->emoji->paint(q, {
-				.textColor = color,
-				.now = crl::now(),
-				.position = QPoint(),
-			});
-		}
-		auto tinted = image;
-		{
-			auto q = QPainter(&tinted);
-			q.setCompositionMode(QPainter::CompositionMode_Multiply);
-			q.fillRect(QRect(0, 0, size, size), color);
-			q.setCompositionMode(QPainter::CompositionMode_DestinationIn);
-			q.drawImage(0, 0, image);
-		}
+		// An adaptive emoji takes the colour itself, so nothing is laid over.
 		auto p = QPainter(raw);
-		p.drawImage(origin, tinted);
+		state->emoji->paint(p, {
+			.textColor = st::profileVerifiedCheckBg->c,
+			.now = crl::now(),
+			.position = origin,
+		});
 	}, raw->lifetime());
 	return result;
 }
