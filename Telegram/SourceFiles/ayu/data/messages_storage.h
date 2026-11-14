@@ -7,6 +7,9 @@
 #pragma once
 
 #include "ayu/data/entities.h"
+#include "base/flat_set.h"
+
+class History;
 
 namespace AyuMessages {
 
@@ -19,5 +22,13 @@ std::vector<AyuMessageBase> getDeletedMessages(not_null<PeerData*> peer, ID topi
 bool hasDeletedMessages(not_null<PeerData*> peer, ID topicId);
 void removeDeletedMessage(not_null<HistoryItem*> item);
 void clearDeletedMessages(not_null<PeerData*> peer, ID topicId);
+
+// The page with the saved deleted messages between the two ids put back.
+[[nodiscard]] QVector<MTPMessage> withDeletedMessages(
+	not_null<History*> history,
+	const QVector<MTPMessage> &slice,
+	MsgId after,
+	MsgId before,
+	base::flat_set<MsgId> &restored);
 
 }

@@ -88,6 +88,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
+#include "ayu/data/messages_storage.h"
 
 
 namespace {
@@ -1910,24 +1911,51 @@ void History::addEdgesToSharedMedia() {
 	}
 }
 
-void History::addOlderSlice(const QVector<MTPMessage> &slice) {
-	if (slice.isEmpty()) {
-		_loadedAtTop = true;
-		checkLocalMessages();
-		return;
-	}
-	if (const auto newest = maxMsgId()) {
+void History::addOlderSlice(const QVector<MTPMessage> &server) {
+	if (const auto newest = maxMsgId(); newest && !server.isEmpty()) {
 		// WHY: a stale latest-page answer can arrive after older messages
 		// were loaded; prepending it would break the order of blocks.
 		const auto older = [&](const MTPMessage &message) {
 			return IdFromMessage(message) <= newest;
 		};
-		if (ranges::none_of(slice, older)) {
+		if (ranges::none_of(server, older)) {
 			return;
 		}
 	}
+	// Saved deleted messages come back between the page and what is loaded.
+	auto restored = base::flat_set<MsgId>();
+	auto after = MsgId();
+	auto before = minMsgId();
+	if (!server.isEmpty()) {
+		auto newest = MsgId();
+		for (const auto &message : server) {
+			const auto id = IdFromMessage(message);
+			after = after ? std::min(after, id) : id;
+			newest = std::max(newest, id);
+		}
+		const auto last = lastMessage();
+		if (!before && (!last || last->id > newest)) {
+			before = newest;
+		}
+	}
+	const auto slice = AyuMessages::withDeletedMessages(
+		this,
+		server,
+		after,
+		before,
+		restored);
+	if (slice.isEmpty()) {
+		_loadedAtTop = true;
+		checkLocalMessages();
+		return;
+	}
 
 	if (const auto added = createItems(slice); !added.empty()) {
+		for (const auto &item : added) {
+			if (restored.contains(item->id)) {
+				item->setDeleted();
+			}
+		}
 		addCreatedOlderSlice(added);
 	} else {
 		// If no items were added it means we've loaded everything old.
@@ -1959,20 +1987,50 @@ void History::addCreatedOlderSlice(
 	addToSharedMedia(items);
 }
 
-void History::addNewerSlice(const QVector<MTPMessage> &slice) {
+void History::addNewerSlice(const QVector<MTPMessage> &server) {
 	bool wasLoadedAtBottom = loadedAtBottom();
 
-	if (slice.isEmpty()) {
+	if (server.isEmpty()) {
 		_loadedAtBottom = true;
 		if (!lastMessage()) {
 			setLastMessage(lastAvailableMessage());
 		}
 	}
+	// Saved deleted messages come back between what is loaded and the page.
+	auto restored = base::flat_set<MsgId>();
+	auto after = maxMsgId();
+	auto before = MsgId();
+	if (!server.isEmpty()) {
+		auto oldest = MsgId();
+		for (const auto &message : server) {
+			const auto id = IdFromMessage(message);
+			oldest = oldest ? std::min(oldest, id) : id;
+			before = std::max(before, id);
+		}
+		const auto last = lastMessage();
+		if (last && last->id <= before) {
+			before = MsgId();
+		}
+		if (!after) {
+			after = oldest;
+		}
+	}
+	const auto slice = after
+		? AyuMessages::withDeletedMessages(
+			this,
+			server,
+			after,
+			before,
+			restored)
+		: server;
 
 	if (const auto added = createItems(slice); !added.empty()) {
 		Assert(!isBuildingFrontBlock());
 
 		for (const auto &item : added) {
+			if (restored.contains(item->id)) {
+				item->setDeleted();
+			}
 			addItemToBlock(item);
 		}
 
