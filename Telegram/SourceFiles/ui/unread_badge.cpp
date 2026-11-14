@@ -33,6 +33,12 @@ namespace Ui {
 namespace {
 
 constexpr auto kPlayStatusLimit = 12;
+
+// Our statuses stand in a row, so each gets the same gap before it.
+[[nodiscard]] int CustomStatusWidth() {
+	return style::ConvertScale(2)
+		+ Ui::Text::AdjustCustomEmojiSize(st::emojiSize);
+}
 constexpr auto kBotVerifiedScale = 0.88;
 constexpr auto kKomaruPlayDuration = crl::time(4000);
 
@@ -339,10 +345,7 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 	const auto komaruStatuses = hideExteraBadges
 		? std::vector<uint64>()
 		: KomaruBadges::Statuses(getBareID(peer));
-	const auto customEmojiSkip = (st::emojiSize
-		- Ui::Text::AdjustCustomEmojiSize(st::emojiSize)) / 2;
-	const auto customEmojiWidth = descriptor.premium->width()
-		- 4 * customEmojiSkip;
+	const auto customEmojiWidth = CustomStatusWidth();
 	const auto exteraCustomWidth = paintExteraCustom ? customEmojiWidth : 0;
 	const auto komaruSize = descriptor.exteraSupporter->width();
 	const auto komaruStatusWidth = customEmojiWidth
@@ -562,9 +565,11 @@ int PeerBadge::drawCustomStatus(
 		std::unique_ptr<EmojiStatus> &slot) {
 	const auto peer = descriptor.peer;
 	const auto rectForName = descriptor.rectForName;
-	const auto iconw = descriptor.premium->width();
+	const auto iconw = CustomStatusWidth();
+	const auto emojiSize = Ui::Text::AdjustCustomEmojiSize(st::emojiSize);
 	const auto iconx = rectForName.x()
-		+ qMin(descriptor.nameWidth, rectForName.width() - iconw);
+		+ qMin(descriptor.nameWidth, rectForName.width() - iconw)
+		+ (iconw - emojiSize);
 	const auto icony = rectForName.y();
 	if (!slot) {
 		slot = std::make_unique<EmojiStatus>();
@@ -585,12 +590,10 @@ int PeerBadge::drawCustomStatus(
 	slot->emoji->paint(p, {
 		.textColor = (*descriptor.premiumFg)->c,
 		.now = descriptor.now,
-		.position = QPoint(
-			iconx - 2 * slot->skip,
-			icony + slot->skip),
+		.position = QPoint(iconx, icony + slot->skip),
 		.paused = descriptor.paused || On(PowerSaving::kEmojiStatus),
 	});
-	return iconw - 4 * slot->skip;
+	return iconw;
 }
 
 int PeerBadge::drawPremiumStar(Painter &p, const Descriptor &descriptor) {
