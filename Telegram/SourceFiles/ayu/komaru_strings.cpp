@@ -16,6 +16,8 @@ struct Entry {
 constexpr Entry kStrings[] = {
 	{ "translate_subtitle", u"Translate Messages", u"Перевод сообщений" },
 	{ "messages_count", u"Messages", u"Сообщений" },
+	{ "extera_listening", u"Listening now", u"Слушает сейчас" },
+	{ "extera_listened", u"Last track", u"Последний трек" },
 	{ "show_messages_count", u"Messages count in profile", u"Число сообщений в профиле" },
 	{ "badge_title", u"Your badge", u"Ваш значок" },
 	{ "extera_badge_number", u"Badge #{number}", u"Значок #{number}" },
