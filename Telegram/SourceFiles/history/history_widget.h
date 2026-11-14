@@ -931,6 +931,7 @@ private:
 	QString _inlineBotUsername;
 	bool _inlineLookingUpBot = false;
 	QString _rateHint;
+	Ui::RpWidget *_rateHintWidget = nullptr;
 	Ui::RpWidget *_colorHint = nullptr;
 	QColor _colorHintColor;
 	mtpRequestId _inlineBotResolveRequestId = 0;

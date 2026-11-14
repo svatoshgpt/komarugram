@@ -34,6 +34,11 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "data/data_file_origin.h"
 #include "data/data_user.h"
 #include "data/data_saved_sublist.h"
+#include "data/data_saved_music.h"
+#include "data/data_session.h"
+#include "data/data_document.h"
+#include "history/history_item.h"
+#include "data/data_media_types.h"
 #include "info_profile_actions.h"
 #include "main/main_session.h"
 #include "apiwrap.h"
@@ -98,25 +103,74 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 	return result;
 }
 
-// What exteraGram knows the user plays, else what their KomaruGram bio says.
+[[nodiscard]] QString SearchUrl(const QString &artist, const QString &title) {
+	return u"https://open.spotify.com/search/"_q
+		+ QString::fromUtf8(QUrl::toPercentEncoding(artist + ' ' + title));
+}
+
+// The first track pinned to the profile, the one Telegram shows on top.
+[[nodiscard]] rpl::producer<NowPlayingTrack> ProfileMusicTrackValue(
+		not_null<UserData*> user) {
+	const auto savedMusic = &user->owner().savedMusic();
+	const auto peerId = user->id;
+	return rpl::single(
+		peerId
+	) | rpl::then(
+		savedMusic->changed() | rpl::filter(rpl::mappers::_1 == peerId)
+	) | rpl::map([=]() -> NowPlayingTrack {
+		const auto &list = savedMusic->list(peerId);
+		const auto media = list.empty() ? nullptr : list.front()->media();
+		const auto document = media ? media->document() : nullptr;
+		const auto song = document ? document->song() : nullptr;
+		if (!song || song->title.trimmed().isEmpty()) {
+			return std::nullopt;
+		}
+		const auto title = song->title.trimmed();
+		const auto artist = song->performer.trimmed();
+		return KomaruNowPlaying::Track{
+			.title = title,
+			.artist = artist,
+			.url = SearchUrl(artist, title),
+		};
+	});
+}
+
+// What exteraGram knows the user plays, else the bio, else the profile music.
 [[nodiscard]] rpl::producer<NowPlayingTrack> OtherTrackValue(
 		not_null<UserData*> user) {
 	return rpl::combine(
 		KomaruExteraNowPlaying::Value(
 			uint64(user->id.value & PeerId::kChatTypeMask)),
-		AboutValue(user)
+		AboutValue(user),
+		ProfileMusicTrackValue(user)
 	) | rpl::map([](
 			const KomaruExteraNowPlaying::Track &extera,
-			const TextWithEntities &about) -> NowPlayingTrack {
-		if (extera.empty()) {
-			return TrackFromBio(about.text);
+			const TextWithEntities &about,
+			const NowPlayingTrack &music) -> NowPlayingTrack {
+		if (!extera.empty()) {
+			return KomaruNowPlaying::Track{
+				.title = extera.title,
+				.artist = extera.artist,
+				.url = extera.url,
+				.cover = extera.cover,
+			};
+		} else if (auto bio = TrackFromBio(about.text)) {
+			return bio;
 		}
-		return KomaruNowPlaying::Track{
-			.title = extera.title,
-			.artist = extera.artist,
-			.url = extera.url,
-			.cover = extera.cover,
-		};
+		return music;
+	});
+}
+
+// What we play now, else the music pinned to our profile.
+[[nodiscard]] rpl::producer<NowPlayingTrack> SelfTrackValue(
+		not_null<UserData*> user) {
+	return rpl::combine(
+		KomaruNowPlaying::Value(),
+		ProfileMusicTrackValue(user)
+	) | rpl::map([](
+			const NowPlayingTrack &playing,
+			const NowPlayingTrack &music) {
+		return playing ? playing : music;
 	});
 }
 
@@ -321,7 +375,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 		&& !_topic
 		&& !_sublist) {
 		auto tracks = (user->isSelf()
-			? KomaruNowPlaying::Value()
+			? SelfTrackValue(user)
 			: OtherTrackValue(user)
 		) | rpl::start_spawning(result->lifetime());
 		auto covers = OfficialCoverValue(rpl::duplicate(tracks));

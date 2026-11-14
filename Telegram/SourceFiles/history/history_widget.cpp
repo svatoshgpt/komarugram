@@ -540,6 +540,7 @@ HistoryWidget::HistoryWidget(
 	) | rpl::on_next([=] {
 		fieldResized();
 		updateColorHint();
+		updateRateHint();
 	}, _field->lifetime());
 	KomaruCryptoRates::Updated(
 	) | rpl::on_next([=] {
@@ -2535,14 +2536,40 @@ void HistoryWidget::updateRateHint() {
 	const auto hint = (_editMsgId || _inlineBot)
 		? QString()
 		: KomaruCryptoRates::Completion(text);
-	if (_rateHint == hint) {
-		if (!hint.isEmpty()) {
-			updateFieldPlaceholder();
+	_rateHint = hint;
+	if (hint.isEmpty()) {
+		if (_rateHintWidget) {
+			_rateHintWidget->hide();
 		}
 		return;
 	}
-	_rateHint = hint;
-	updateFieldPlaceholder();
+	// Drawn by us after the text, the field placeholder hides once typed over.
+	if (!_rateHintWidget) {
+		_rateHintWidget = Ui::CreateChild<Ui::RpWidget>(_field.data());
+		_rateHintWidget->setAttribute(Qt::WA_TransparentForMouseEvents);
+		_rateHintWidget->paintRequest() | rpl::on_next([=] {
+			auto p = QPainter(_rateHintWidget);
+			p.setFont(st::historyComposeField.style.font);
+			p.setPen(st::historyComposeField.placeholderFg);
+			p.drawText(
+				_rateHintWidget->rect(),
+				Qt::AlignLeft | Qt::AlignVCenter,
+				_rateHint);
+		}, _rateHintWidget->lifetime());
+	}
+	const auto edit = _field->rawTextEdit();
+	auto cursor = edit->textCursor();
+	cursor.movePosition(QTextCursor::End);
+	const auto rect = edit->cursorRect(cursor);
+	const auto &font = st::historyComposeField.style.font;
+	const auto skip = text.endsWith(' ') ? 0 : font->spacew;
+	const auto point = edit->viewport()->mapTo(
+		_field.data(),
+		QPoint(rect.x() + rect.width() + skip, rect.y()));
+	const auto width = std::max(_field->width() - point.x(), 0);
+	_rateHintWidget->setGeometry(QRect(point, QSize(width, rect.height())));
+	_rateHintWidget->show();
+	_rateHintWidget->update();
 }
 
 // A square of the color follows "#rrggbb" at the end of the typed text.
@@ -8158,12 +8185,6 @@ void HistoryWidget::updateFieldPlaceholder() {
 		_field->setPlaceholder(
 			rpl::single(_inlineBot->botInfo->inlinePlaceholder.mid(1)),
 			_inlineBotUsername.size() + 2);
-		return;
-	} else if (!_rateHint.isEmpty()) {
-		const auto &text = _field->getLastText();
-		_field->setPlaceholder(
-			rpl::single(_rateHint),
-			text.size() + (text.endsWith(' ') ? 0 : 1));
 		return;
 	}
 

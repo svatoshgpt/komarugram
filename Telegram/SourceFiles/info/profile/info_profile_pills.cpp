@@ -77,13 +77,9 @@ PillsRow::PillsRow(
 
 	ProfileMusicValue(
 		user
-	) | rpl::on_next([=](DocumentData *document) {
-		if (document) {
-			music->updateData({ Ui::Text::FormatSongNameFor(document) });
-			music->show();
-		} else {
-			music->hide();
-		}
+	) | rpl::on_next([=](DocumentData*) {
+		// KomaruGram shows the profile music as a card under the header.
+		music->hide();
 	}, _lifetime);
 
 	// Without the action buttons the row fits the gap below the status.

@@ -52,6 +52,7 @@ void Load() {
 	}
 	state.loading = true;
 	state.requested = now;
+	LOG(("Komaru Rates: requesting."));
 	auto request = QNetworkRequest(QUrl(kUrl));
 	request.setTransferTimeout(kTimeout);
 	request.setHeader(QNetworkRequest::UserAgentHeader, u"KomaruGram"_q);
@@ -71,6 +72,7 @@ void Load() {
 		}
 		state.rates = object;
 		state.loaded = crl::now();
+		LOG(("Komaru Rates: loaded %1 coins.").arg(object.size()));
 		state.updated.fire({});
 	});
 }
