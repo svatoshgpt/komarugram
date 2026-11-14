@@ -16,6 +16,7 @@ struct Entry {
 constexpr Entry kStrings[] = {
 	{ "translate_subtitle", u"Translate Messages", u"Перевод сообщений" },
 	{ "messages_count", u"Messages", u"Сообщений" },
+	{ "show_messages_count", u"Messages count in profile", u"Число сообщений в профиле" },
 	{ "badge_title", u"Your badge", u"Ваш значок" },
 	{ "extera_badge_number", u"Badge #{number}", u"Значок #{number}" },
 	{ "extera_supports", u"{name} supports exteraGram", u"{name} поддерживает exteraGram" },

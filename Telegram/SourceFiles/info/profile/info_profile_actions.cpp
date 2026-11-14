@@ -121,6 +121,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ui/utils/ayu_profile_values.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/ayu_settings.h"
 #include "ayu/komaru_strings.h"
 #include "lang/lang_tag.h"
 #include "styles/style_ayu_styles.h"
@@ -1936,7 +1937,7 @@ Section DetailsFiller::makeInfo() {
 			});
 			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
 		}
-		if (!_topic) {
+		if (!_topic && AyuSettings::getInstance().showMessagesCount()) {
 			addInfoOneLine(
 				Komaru::TextValue("messages_count"),
 				MessagesCountValue(_peer),
@@ -2058,7 +2059,7 @@ Section DetailsFiller::makeInfo() {
 			});
 			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
 		}
-		if (!_topic) {
+		if (!_topic && AyuSettings::getInstance().showMessagesCount()) {
 			addInfoOneLine(
 				Komaru::TextValue("messages_count"),
 				MessagesCountValue(_peer),

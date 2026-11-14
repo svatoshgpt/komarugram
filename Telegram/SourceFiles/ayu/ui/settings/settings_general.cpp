@@ -241,6 +241,12 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.getter = &AyuSettings::showMessageSeconds,
 		.setter = &AyuSettings::setShowMessageSeconds,
 	});
+	ayu.addSettingToggle({
+		.id = u"ayu/showMessagesCount"_q,
+		.title = Komaru::TextValue("show_messages_count"),
+		.getter = &AyuSettings::showMessagesCount,
+		.setter = &AyuSettings::setShowMessagesCount,
+	});
 
 	BuildShowPeerId(builder);
 
