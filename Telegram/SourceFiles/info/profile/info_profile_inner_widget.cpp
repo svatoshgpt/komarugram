@@ -56,6 +56,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/komaru/extera_now_playing.h"
 #include "ayu/features/komaru/now_playing.h"
 #include "ayu/ui/components/saved_music.h"
 #include "info/profile/info_profile_music_button.h"
@@ -95,6 +96,45 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 		+ QString::fromUtf8(QUrl::toPercentEncoding(
 			result.artist + ' ' + result.title));
 	return result;
+}
+
+// What exteraGram knows the user plays, else what their KomaruGram bio says.
+[[nodiscard]] rpl::producer<NowPlayingTrack> OtherTrackValue(
+		not_null<UserData*> user) {
+	return rpl::combine(
+		KomaruExteraNowPlaying::Value(
+			uint64(user->id.value & PeerId::kChatTypeMask)),
+		AboutValue(user)
+	) | rpl::map([](
+			const KomaruExteraNowPlaying::Track &extera,
+			const TextWithEntities &about) -> NowPlayingTrack {
+		if (extera.empty()) {
+			return TrackFromBio(about.text);
+		}
+		return KomaruNowPlaying::Track{
+			.title = extera.title,
+			.artist = extera.artist,
+			.url = extera.url,
+			.cover = extera.cover,
+		};
+	});
+}
+
+// The official art for the track, whatever cover the file has.
+[[nodiscard]] rpl::producer<QImage> OfficialCoverValue(
+		rpl::producer<NowPlayingTrack> tracks) {
+	return std::move(
+		tracks
+	) | rpl::map([](const NowPlayingTrack &track) {
+		return track
+			? KomaruExteraNowPlaying::CoverValue(
+				track->title,
+				track->artist,
+				(track->cover.contains(u"mzstatic.com"_q)
+					? track->cover
+					: QString()))
+			: rpl::single(QImage());
+	}) | rpl::flatten_latest();
 }
 
 [[nodiscard]] Section NowPlayingSection(
@@ -274,19 +314,21 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 		return result;
 	}
 
-	if (!_savedMessages && _peer->isSelf() && !_topic && !_sublist) {
+	const auto user = _peer->asUser();
+	if (!_savedMessages
+		&& user
+		&& !user->isBot()
+		&& !_topic
+		&& !_sublist) {
+		auto tracks = (user->isSelf()
+			? KomaruNowPlaying::Value()
+			: OtherTrackValue(user)
+		) | rpl::start_spawning(result->lifetime());
+		auto covers = OfficialCoverValue(rpl::duplicate(tracks));
 		stack.add(NowPlayingSection(
 			result.data(),
-			KomaruNowPlaying::Value(),
-			KomaruNowPlaying::CoverValue()));
-		stack.addPlainSeparator();
-	} else if (_peer->isUser() && !_topic && !_sublist) {
-		stack.add(NowPlayingSection(
-			result.data(),
-			AboutValue(_peer) | rpl::map([](const TextWithEntities &about) {
-				return TrackFromBio(about.text);
-			}),
-			rpl::single(QImage())));
+			std::move(tracks),
+			std::move(covers)));
 		stack.addPlainSeparator();
 	}
 

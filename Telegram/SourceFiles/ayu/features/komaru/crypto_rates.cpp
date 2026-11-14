@@ -66,6 +66,7 @@ void Load() {
 		}
 		const auto object = QJsonDocument::fromJson(reply->readAll()).object();
 		if (object.isEmpty()) {
+			LOG(("Komaru Rates Error: empty answer."));
 			return;
 		}
 		state.rates = object;

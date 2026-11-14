@@ -122,7 +122,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ui/utils/ayu_profile_values.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "ayu/ayu_settings.h"
-#include "ayu/features/komaru/extera_now_playing.h"
 #include "ayu/komaru_strings.h"
 #include "lang/lang_tag.h"
 #include "styles/style_ayu_styles.h"
@@ -1943,41 +1942,6 @@ Section DetailsFiller::makeInfo() {
 				Komaru::TextValue("messages_count"),
 				MessagesCountValue(_peer),
 				QString());
-		}
-		if (!user->isBot()) {
-			// The track Last.fm gives exteraGram for this user.
-			using KomaruExteraNowPlaying::Track;
-			auto track = KomaruExteraNowPlaying::Value(
-				uint64(user->id.value & PeerId::kChatTypeMask)
-			) | rpl::start_spawning(result->lifetime());
-			auto label = rpl::duplicate(
-				track
-			) | rpl::map([](const Track &track) {
-				return track.playing;
-			}) | rpl::distinct_until_changed(
-			) | rpl::map([](bool playing) {
-				return Komaru::TextValue(playing
-					? "extera_listening"
-					: "extera_listened");
-			}) | rpl::flatten_latest();
-			auto text = std::move(
-				track
-			) | rpl::map([](const Track &track) {
-				if (track.empty()) {
-					return TextWithEntities();
-				}
-				const auto line = track.artist.isEmpty()
-					? track.title
-					: (track.artist + u" \u2014 "_q + track.title);
-				return track.url.isEmpty()
-					? TextWithEntities{ line }
-					: tr::link(line, track.url);
-			});
-			addInfoOneLine(
-				std::move(label),
-				std::move(text),
-				QString()
-			).text->setLinksTrusted();
 		}
 	} else {
 		const auto topicRootId = _topic ? _topic->rootId() : 0;
