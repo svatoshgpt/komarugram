@@ -11,6 +11,8 @@ import sys
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data", required=True)
+    # The client restarts the host with it after the last one died.
+    parser.add_argument("--after-crash", action="store_true")
     args = parser.parse_args()
 
     here = os.path.dirname(os.path.abspath(__file__))
@@ -19,7 +21,7 @@ def main():
             sys.path.insert(0, path)
 
     from komaru_runtime.manager import run
-    run(os.path.abspath(args.data))
+    run(os.path.abspath(args.data), args.after_crash)
 
 
 if __name__ == "__main__":

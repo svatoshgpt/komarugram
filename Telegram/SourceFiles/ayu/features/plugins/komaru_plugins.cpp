@@ -50,6 +50,9 @@ constexpr auto kProbeTimeout = 10000;
 constexpr auto kStartDelay = 5000;
 constexpr auto kStopTimeout = 3000;
 constexpr auto kSendHookTimeout = 1500;
+constexpr auto kRestartDelay = 1000;
+constexpr auto kRestartWindow = crl::time(60 * 1000);
+constexpr auto kRestartsInWindow = 3;
 constexpr auto kCreateNoWindow = 0x08000000;
 
 struct State {
@@ -66,6 +69,7 @@ struct State {
 	rpl::lifetime lifetime;
 	bool ready = false;
 	bool started = false;
+	std::vector<crl::time> crashes;
 };
 
 [[nodiscard]] State &Instance() {
@@ -778,7 +782,32 @@ void HostStopped() {
 	state.pluginsChanged.fire({});
 }
 
-void StartHost() {
+void StartHost(bool afterCrash = false);
+
+// The host blames and turns off the plugin that killed it, then comes back;
+// a host that keeps dying stays down until the plugins screen opens.
+void RestartAfterCrash() {
+	auto &state = Instance();
+	const auto now = crl::now();
+	state.crashes.erase(
+		ranges::remove_if(state.crashes, [&](crl::time when) {
+			return now - when > kRestartWindow;
+		}),
+		end(state.crashes));
+	if (int(state.crashes.size()) >= kRestartsInWindow) {
+		LOG(("Komaru Plugins: the host keeps crashing, left stopped."));
+		return;
+	}
+	state.crashes.push_back(now);
+	base::call_delayed(kRestartDelay, [] {
+		if (!Core::Quitting() && PluginsEnabled()) {
+			StartHost(true);
+			Refresh();
+		}
+	});
+}
+
+void StartHost(bool afterCrash) {
 	auto &state = Instance();
 	if (state.process || !PluginsEnabled() || !RuntimeInstalled()) {
 		return;
@@ -795,9 +824,18 @@ void StartHost() {
 	process->setProcessEnvironment(environment);
 	process->setStandardErrorFile(DataDir() + u"host-stderr.log"_q);
 	QObject::connect(process, &QProcess::readyReadStandardOutput, ReadOutput);
-	QObject::connect(process, &QProcess::finished, [=] {
-		if (Instance().process == process) {
-			HostStopped();
+	QObject::connect(process, &QProcess::finished, [=](
+			int code,
+			QProcess::ExitStatus status) {
+		if (Instance().process != process) {
+			return;
+		}
+		HostStopped();
+		if ((code != 0 || status == QProcess::CrashExit)
+			&& !Core::Quitting()
+			&& PluginsEnabled()) {
+			LOG(("Komaru Plugins: the host died with %1.").arg(code));
+			RestartAfterCrash();
 		}
 	});
 	QObject::connect(process, &QProcess::errorOccurred, [=](
@@ -807,9 +845,15 @@ void StartHost() {
 			HostStopped();
 		}
 	});
-	process->start(
-		PythonExecutable(),
-		{ HostDir() + u"host.py"_q, u"--data"_q, DataDir() });
+	auto arguments = QStringList{
+		HostDir() + u"host.py"_q,
+		u"--data"_q,
+		DataDir(),
+	};
+	if (afterCrash) {
+		arguments.push_back(u"--after-crash"_q);
+	}
+	process->start(PythonExecutable(), arguments);
 }
 
 } // namespace

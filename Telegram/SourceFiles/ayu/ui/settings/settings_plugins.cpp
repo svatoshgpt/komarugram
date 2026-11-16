@@ -3,6 +3,7 @@
 
 #include "ayu/features/plugins/komaru_plugins.h"
 #include "ayu/features/plugins/plugin_permissions.h"
+#include "ayu/komaru_strings.h"
 #include "base/unixtime.h"
 #include "core/file_utilities.h"
 #include "lang_auto.h"
@@ -466,11 +467,23 @@ void ShowPermissionsBox(
 }
 
 // What a plugin's manifest asks for, all allowed unless unchecked.
+// What the code check found, worst first, one line each.
+[[nodiscard]] QString RisksText(const QStringList &risks) {
+	auto lines = QStringList();
+	for (const auto &risk : risks) {
+		const auto key = (u"plugin_risk_"_q + risk).toUtf8();
+		const auto text = Komaru::Text(key.constData());
+		lines.push_back(QString(QChar(0x2022)) + QChar(' ') + text);
+	}
+	return lines.join('\n');
+}
+
 void ShowRequestedPermissionsBox(
 		not_null<Window::SessionController*> controller,
 		const QString &id,
 		const QString &name,
 		QStringList keys,
+		QStringList risks,
 		Fn<void()> done) {
 	auto actions = std::vector<PluginAction>();
 	for (const auto &key : keys) {
@@ -478,17 +491,31 @@ void ShowRequestedPermissionsBox(
 			actions.push_back(*action);
 		}
 	}
-	if (actions.empty()) {
+	if (actions.empty() && risks.isEmpty()) {
 		done();
 		return;
 	}
 	controller->show(Box([=](not_null<Ui::GenericBox*> box) {
 		box->setTitle(rpl::single(name));
 		box->setWidth(st::boxWideWidth);
-		box->addRow(object_ptr<Ui::FlatLabel>(
-			box,
-			tr::ayu_PluginPermissionsRequested(),
-			st::boxLabel));
+		const auto cancelled = box->lifetime().make_state<bool>(false);
+		if (!risks.isEmpty()) {
+			// Nothing of the plugin ran yet, so saying no costs nothing.
+			box->addRow(object_ptr<Ui::FlatLabel>(
+				box,
+				Komaru::TextValue("plugin_risk_title"),
+				st::boxLabel));
+			box->addRow(object_ptr<Ui::FlatLabel>(
+				box,
+				rpl::single(RisksText(risks)),
+				st::boxDividerLabel));
+		}
+		if (!actions.empty()) {
+			box->addRow(object_ptr<Ui::FlatLabel>(
+				box,
+				tr::ayu_PluginPermissionsRequested(),
+				st::boxLabel));
+		}
 		auto checks = std::vector<std::pair<PluginAction, Ui::Checkbox*>>();
 		for (const auto action : actions) {
 			checks.emplace_back(action, box->addRow(object_ptr<Ui::Checkbox>(
@@ -498,14 +525,26 @@ void ShowRequestedPermissionsBox(
 				st::defaultBoxCheckbox)));
 		}
 		box->boxClosing() | rpl::on_next([=] {
+			if (*cancelled) {
+				UninstallPlugin(id, nullptr);
+				return;
+			}
 			for (const auto &[action, check] : checks) {
 				SetPermission(id, action, check->checked());
 			}
 			done();
 		}, box->lifetime());
-		box->addButton(tr::lng_box_ok(), [=] {
-			box->closeBox();
-		});
+		box->addButton(
+			(risks.isEmpty()
+				? tr::lng_box_ok()
+				: Komaru::TextValue("plugin_risk_install")),
+			[=] { box->closeBox(); });
+		if (!risks.isEmpty()) {
+			box->addButton(tr::lng_cancel(), [=] {
+				*cancelled = true;
+				box->closeBox();
+			});
+		}
 	}));
 }
 
@@ -700,6 +739,7 @@ void InstallPluginFile(
 			id,
 			object.value(u"name"_q).toString(),
 			object.value(u"permissions"_q).toVariant().toStringList(),
+			object.value(u"risks"_q).toVariant().toStringList(),
 			finish);
 	}));
 }

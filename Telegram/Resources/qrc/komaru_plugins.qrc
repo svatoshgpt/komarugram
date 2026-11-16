@@ -41,6 +41,8 @@
     <file alias="komaru_runtime/manager.py">../komaru_plugins/komaru_runtime/manager.py</file>
     <file alias="komaru_runtime/tl_bridge.py">../komaru_plugins/komaru_runtime/tl_bridge.py</file>
     <file alias="komaru_runtime/meta.py">../komaru_plugins/komaru_runtime/meta.py</file>
+    <file alias="komaru_runtime/guard.py">../komaru_plugins/komaru_runtime/guard.py</file>
+    <file alias="komaru_runtime/scan.py">../komaru_plugins/komaru_runtime/scan.py</file>
     <file alias="komaru_runtime/protocol.py">../komaru_plugins/komaru_runtime/protocol.py</file>
     <file alias="komaru_runtime/stubs.py">../komaru_plugins/komaru_runtime/stubs.py</file>
   </qresource>

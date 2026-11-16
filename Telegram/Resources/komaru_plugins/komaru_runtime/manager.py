@@ -9,6 +9,7 @@ import importlib.util
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -17,10 +18,31 @@ import types
 import zipfile
 
 from komaru_runtime import HOST_VERSION, context, meta as metamod, protocol, stubs
+from komaru_runtime.guard import Guard
+from komaru_runtime.scan import scan as scan_code
 from komaru_runtime.accounts import Accounts
 from komaru_runtime.goplugin import GoPlugin
 
 log = logging.getLogger("komaru.host")
+
+# exteraGram refuses other ids, so a plugin with one is not really its.
+EXTERA_ID = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]{1,31}$")
+
+
+def _zipped_extera(path):
+    return path.lower().endswith(".plugin") and zipfile.is_zipfile(path)
+
+
+def _extera_main(directory):
+    """The .py of a zipped exteraGram plugin: the one that sets __id__."""
+    candidates = sorted(
+        name for name in os.listdir(directory) if name.endswith(".py"))
+    for name in candidates:
+        with open(os.path.join(directory, name), "r", encoding="utf-8-sig") as f:
+            source = f.read()
+        if "__id__" in source:
+            return name, source
+    raise metamod.MetaError("No plugin file with __id__ in the archive")
 
 
 def _lower_first(name):
@@ -120,14 +142,23 @@ class Record:
             "runtime": self.runtime,
             "enabled": self.enabled,
             "loaded": self.loaded,
-            "error": self.error,
+            "error": self.error or self.crash_note(),
             "has_settings": self.has_settings(),
             "send_hook": self.send_hook or bool(self.go and self.go.send_hook),
             "wants_updates": bool(self.update_hooks)
                 or bool(self.go and self.go.wants_updates),
             "menu": self.describe_menu(),
             "permissions": [str(p) for p in (self.meta.get("permissions") or [])],
+            "risks": list(self.info.get("risks") or []),
         }
+
+    def crash_note(self):
+        reason = self.manager.state["crashed"].get(self.id)
+        if reason == "hang":
+            return "Turned off: it froze the plugins"
+        if reason == "crash":
+            return "Turned off: it crashed the plugins"
+        return ""
 
     def describe_menu(self):
         result = []
@@ -154,7 +185,7 @@ class Manager:
         self.loop = asyncio.get_running_loop()
         self.accounts = Accounts(self._log)
         self.records = {}
-        self.state = {"enabled": {}, "settings": {}}
+        self.state = {"enabled": {}, "settings": {}, "crashed": {}}
         self._update_clients = set()
         self._changed_pending = False
         # Plugins the user let read and change messages, from the client.
@@ -173,6 +204,7 @@ class Manager:
                 data = json.load(f)
             self.state["enabled"] = dict(data.get("enabled", {}))
             self.state["settings"] = dict(data.get("settings", {}))
+            self.state["crashed"] = dict(data.get("crashed", {}))
         except (OSError, ValueError):
             pass
 
@@ -244,7 +276,20 @@ class Manager:
 
     # Install.
     def install(self, path):
-        if metamod.is_archive(path):
+        zipped = _zipped_extera(path)
+        if zipped:
+            with zipfile.ZipFile(path) as archive:
+                if any(item.flag_bits & 0x1 for item in archive.infolist()):
+                    raise metamod.MetaError("The plugin is locked with a password")
+            staging = os.path.join(self.data_dir, "staging")
+            shutil.rmtree(staging, ignore_errors=True)
+            os.makedirs(staging)
+            self._extract(path, staging)
+            main, source = _extera_main(staging)
+            meta = metamod.from_source(source, metamod.fallback_id(path))
+            meta["main"] = main
+            fmt = "exteraGram"
+        elif metamod.is_archive(path):
             meta = metamod.from_archive(path)
             fmt = "Go" if meta["runtime"] == "go" else "Elyx"
         else:
@@ -255,6 +300,8 @@ class Manager:
                 meta = metamod.from_source(f.read(), fallback)
             fmt = "exteraGram" if path.lower().endswith(".plugin") else "Python"
         plugin_id = meta["id"]
+        if fmt == "exteraGram" and not EXTERA_ID.match(str(plugin_id)):
+            raise metamod.MetaError("Bad plugin id: %s" % plugin_id)
         old = self.records.get(plugin_id)
         was_enabled = bool(old and old.enabled)
         if old is not None:
@@ -262,12 +309,16 @@ class Manager:
         directory = os.path.join(self.installed_dir, plugin_id)
         shutil.rmtree(directory, ignore_errors=True)
         os.makedirs(directory)
-        if fmt in ("Elyx", "Go"):
+        if zipped:
+            os.rmdir(directory)
+            shutil.move(staging, directory)
+        elif fmt in ("Elyx", "Go"):
             self._extract(path, directory)
         else:
             shutil.copyfile(path, os.path.join(directory, "plugin.py"))
             meta["main"] = "plugin.py"
-        info = {"format": fmt, "source": os.path.basename(path), "meta": meta}
+        info = {"format": fmt, "source": os.path.basename(path), "meta": meta,
+                "zipped": zipped, "risks": scan_code(directory)}
         with open(os.path.join(directory, "komaru.json"), "w", encoding="utf-8") as f:
             json.dump(info, f, ensure_ascii=False, indent=1, default=str)
         record = Record(self, plugin_id, directory, info)
@@ -294,6 +345,7 @@ class Manager:
         self.records.pop(record.id, None)
         self.state["enabled"].pop(record.id, None)
         self.state["settings"].pop(record.id, None)
+        self.state["crashed"].pop(record.id, None)
         self.save_state()
         self.notify_changed()
 
@@ -376,6 +428,10 @@ class Manager:
 
     def _load_python(self, record):
         self._prepare_dependencies(record)
+        if record.info.get("zipped") and record.dir not in sys.path:
+            # A zipped plugin imports the modules packed next to it.
+            sys.path.insert(0, record.dir)
+            record.sys_paths.append(record.dir)
         package = "komaru_plugins." + record.id
         main = os.path.join(record.dir, record.meta.get("main") or "plugin.py")
         if record.info.get("format") in ("Elyx",):
@@ -453,6 +509,8 @@ class Manager:
 
     def set_enabled(self, record, enabled):
         self.state["enabled"][record.id] = bool(enabled)
+        if enabled:
+            self.state["crashed"].pop(record.id, None)
         self.save_state()
         if enabled:
             self.load(record)
@@ -716,7 +774,7 @@ def _setup_logging(data_dir):
     root.setLevel(logging.INFO)
 
 
-def run(data_dir):
+def run(data_dir, after_crash=False):
     os.makedirs(data_dir, exist_ok=True)
     _setup_logging(data_dir)
     stubs.install()
@@ -729,6 +787,17 @@ def run(data_dir):
         context.set_manager(manager)
         manager.load_state()
         manager.scan()
+        guard = Guard(data_dir)
+        # Windows dumps handled faults too, so only a real death counts.
+        blamed, reason = (guard.previous(manager.records)
+                          if after_crash else (None, None))
+        if blamed is not None:
+            log.error("Plugin %s took the last host down (%s), turned off", blamed, reason)
+            manager.state["enabled"][blamed] = False
+            manager.state["crashed"][blamed] = reason
+            manager.save_state()
+        guard.arm()
+        guard.watch(loop, lambda: manager.records)
         protocol.start_reader(loop, manager.dispatch)
         for record in list(manager.records.values()):
             if record.enabled:
