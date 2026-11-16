@@ -677,7 +677,10 @@ class Manager:
                     break
 
     def warm_accounts(self):
-        if any(r.instance is not None or r.go is not None
+        # A Telethon client per account costs tens of megabytes, so they
+        # start ahead only for plugins that surely talk to the account; the
+        # rest get one on their first call.
+        if any(r.go is not None or r.update_hooks or r.telethon_handlers
                for r in self.records.values()):
             self.spawn(None, self.accounts.warm())
 
