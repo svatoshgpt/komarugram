@@ -226,10 +226,15 @@ void Manager::startAllHiding() {
 }
 
 void Manager::stopAllHiding() {
+	auto linked = 0;
 	for (const auto &notification : _notifications) {
 		notification->stopHiding();
+		if (!notification->isUnlinked()) {
+			++linked;
+		}
 	}
-	if (_hideAll) {
+	// A button fading out after the others left must not come back on hover.
+	if (_hideAll && (linked > 1 || !_queuedNotifications.empty())) {
 		_hideAll->stopHiding();
 	}
 }
