@@ -165,6 +165,11 @@ QVector<MTPMessage> withDeletedMessages(
 		before.bare,
 		kPerPage);
 	if (saved.empty()) {
+		LOG(("Komaru Deleted: none saved in %1 between %2 and %3, topic %4."
+			).arg(peer->id.value
+			).arg(after.bare
+			).arg(before.bare
+			).arg(topicId.bare));
 		return slice;
 	}
 	auto taken = base::flat_set<MsgId>();
