@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_replies_list.h"
 
+#include "ayu/data/messages_storage.h"
+
 #include "history/history.h"
 #include "history/history_item.h"
 #include "history/history_item_helpers.h"
@@ -706,7 +708,7 @@ bool RepliesList::processMessagesIsEmpty(const MTPmessages_Messages &result) {
 	const auto guard = gsl::finally([&] { _listChanges.fire({}); });
 
 	auto &owner = _history->owner();
-	const auto list = result.match([&](
+	const auto server = result.match([&](
 			const MTPDmessages_messagesNotModified &) {
 		LOG(("API Error: received messages.messagesNotModified! "
 			"(HistoryWidget::messagesReceived)"));
@@ -739,9 +741,25 @@ bool RepliesList::processMessagesIsEmpty(const MTPmessages_Messages &result) {
 		return data.vcount().v;
 	});
 
-	if (list.isEmpty()) {
+	if (server.isEmpty()) {
 		return true;
 	}
+
+	// Saved deleted messages of the topic come back between the pages.
+	auto restored = base::flat_set<MsgId>();
+	const auto serverMax = IdFromMessage(server.front());
+	auto serverMin = serverMax;
+	for (const auto &message : server) {
+		serverMin = std::min(serverMin, IdFromMessage(message));
+	}
+	const auto newer = !_list.empty() && (serverMax > _list.front());
+	const auto list = AyuMessages::withDeletedMessages(
+		_history,
+		server,
+		newer ? _list.front() : serverMin,
+		(_list.empty() || newer) ? MsgId() : _list.back(),
+		restored,
+		_rootId);
 
 	const auto maxId = IdFromMessage(list.front());
 	const auto wasSize = int(_list.size());
@@ -755,6 +773,9 @@ bool RepliesList::processMessagesIsEmpty(const MTPmessages_Messages &result) {
 	auto skipped = 0;
 	for (const auto &message : list) {
 		if (const auto item = owner.addNewMessage(message, localFlags, type)) {
+			if (restored.contains(item->id)) {
+				item->setDeleted();
+			}
 			if (item->inThread(_rootId)) {
 				if (toFront && item->id > _list.front()) {
 					refreshed.push_back(item->id);

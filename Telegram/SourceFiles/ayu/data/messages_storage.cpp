@@ -148,7 +148,8 @@ QVector<MTPMessage> withDeletedMessages(
 		const QVector<MTPMessage> &slice,
 		MsgId after,
 		MsgId before,
-		base::flat_set<MsgId> &restored) {
+		base::flat_set<MsgId> &restored,
+		MsgId topicId) {
 	constexpr auto kPerPage = 300;
 	constexpr auto kSavedOut = 0x00000002;
 
@@ -159,7 +160,7 @@ QVector<MTPMessage> withDeletedMessages(
 	const auto owner = &history->owner();
 	const auto saved = getDeletedMessages(
 		peer,
-		0,
+		topicId.bare,
 		after.bare,
 		before.bare,
 		kPerPage);
@@ -192,6 +193,27 @@ QVector<MTPMessage> withDeletedMessages(
 		} else {
 			from = peerFromUser(UserId(BareId(message.fromId)));
 		}
+		// A topic message points at its topic, or the topic will not show it.
+		const auto topic = (peer->isForum() && message.topicId > 1)
+			? MsgId(message.topicId)
+			: MsgId();
+		using ReplyFlag = MTPDmessageReplyHeader::Flag;
+		const auto reply = topic
+			? MTP_messageReplyHeader(
+				MTP_flags(ReplyFlag::f_reply_to_msg_id
+					| ReplyFlag::f_forum_topic),
+				MTP_int(topic.bare),
+				MTPPeer(), // reply_to_peer_id
+				MTPMessageFwdHeader(), // reply_from
+				MTPMessageMedia(), // reply_media
+				MTPint(), // reply_to_top_id
+				MTPstring(), // quote_text
+				MTPVector<MTPMessageEntity>(), // quote_entities
+				MTPint(), // quote_offset
+				MTPint(), // todo_item_id
+				MTPbytes(), // poll_option
+				MTPVector<MTPRichText>()) // quote_rich
+			: MTPMessageReplyHeader();
 		const auto entities = message.textEntities.empty()
 			? MTPVector<MTPMessageEntity>()
 			: AyuMapper::deserializeTextWithEntities(message.textEntities);
@@ -199,6 +221,7 @@ QVector<MTPMessage> withDeletedMessages(
 			| (out ? Flag::f_out : Flag())
 			| (post ? Flag::f_post : Flag())
 			| (from ? Flag::f_from_id : Flag())
+			| (topic ? Flag::f_reply_to : Flag())
 			| (entities.v.isEmpty() ? Flag() : Flag::f_entities)
 			| (message.postAuthor.empty() ? Flag() : Flag::f_post_author);
 		result.push_back(MTP_message(
@@ -213,7 +236,7 @@ QVector<MTPMessage> withDeletedMessages(
 			MTPlong(), // via_bot_id
 			MTPlong(), // via_business_bot_id
 			MTPPeer(), // guestchat_via_from
-			MTPMessageReplyHeader(),
+			reply,
 			MTP_int(message.date),
 			MTP_string(QString::fromStdString(message.text)),
 			MTPMessageMedia(),
@@ -239,6 +262,11 @@ QVector<MTPMessage> withDeletedMessages(
 			MTPRichMessage()));
 		restored.emplace(id);
 	}
+	LOG(("Komaru Deleted: %1 saved between %2 and %3, %4 put back."
+		).arg(saved.size()
+		).arg(after.bare
+		).arg(before.bare
+		).arg(restored.size()));
 	if (restored.empty()) {
 		return slice;
 	}

@@ -29,6 +29,7 @@ void clearDeletedMessages(not_null<PeerData*> peer, ID topicId);
 	const QVector<MTPMessage> &slice,
 	MsgId after,
 	MsgId before,
-	base::flat_set<MsgId> &restored);
+	base::flat_set<MsgId> &restored,
+	MsgId topicId = 0);
 
 }
