@@ -2287,6 +2287,49 @@ bool UpdateChecker::percent() const {
 //	return QString::fromWCharArray(errMsg);
 //}
 
+bool WriteUpdateVersionFile(
+		const QString &directory,
+		quint32 version,
+		quint64 canaryVersion) {
+	QDir dir;
+	dir.mkpath(directory + u"/tdata"_q);
+	std::wstring versionString = FormatVersionDisplay(version).toStdWString();
+
+	const auto versionNum = canaryVersion
+		? VersionInt(kVersionFileCanaryMarker)
+		: VersionInt(version);
+	const auto versionLen = VersionInt(versionString.size() * sizeof(VersionChar));
+	VersionChar versionStr[32];
+	memcpy(versionStr, versionString.c_str(), versionLen);
+
+	QFile fVersion(directory + u"/tdata/version"_q);
+	if (!fVersion.open(QIODevice::WriteOnly)) {
+		LOG(("Update Error: cant write version file '%1'").arg(directory + u"/version"_q));
+		return false;
+	}
+	fVersion.write((const char*)&versionNum, sizeof(VersionInt));
+	if (canaryVersion) {
+		fVersion.write((const char*)&canaryVersion, sizeof(quint64));
+	} else {
+		fVersion.write((const char*)&versionLen, sizeof(VersionInt));
+		fVersion.write((const char*)&versionStr[0], versionLen);
+	}
+	fVersion.close();
+	return true;
+}
+
+#if defined Q_OS_MACOS || defined Q_OS_WIN
+ReadyUpdateInstall prepareReadyUpdate() {
+#ifndef TDESKTOP_DISABLE_AUTOUPDATE
+	const auto ready = QFile::exists(cWorkingDir() + u"tupdates/temp/ready"_q)
+		|| QDir(cWorkingDir() + u"tupdates/ready"_q).exists();
+	return ready ? ReadyUpdateInstall::Unpacked : ReadyUpdateInstall::Failed;
+#else // TDESKTOP_DISABLE_AUTOUPDATE
+	return ReadyUpdateInstall::Failed;
+#endif // TDESKTOP_DISABLE_AUTOUPDATE
+}
+#endif // Q_OS_MACOS || Q_OS_WIN
+
 bool checkReadyUpdate() {
 	QString readyFilePath = cWorkingDir() + u"tupdates/temp/ready"_q, readyPath = cWorkingDir() + u"tupdates/temp"_q;
 	if (!QFile(readyFilePath).exists() || cExeName().isEmpty()) {

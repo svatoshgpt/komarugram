@@ -276,7 +276,7 @@ auto GenerateCodes() {
 		Ui::Toast::Show(":)");
 	});
 
-#ifdef Q_OS_MAC
+#ifdef Q_OS_MACOS
 	codes.emplace(u"customicon"_q, [](SessionController *window) {
 		const auto iconFilters = u"Icon files (*.icns *.png);;"_q + FileDialog::AllFilesFilter();
 		const auto change = [](const QString &path) {
@@ -297,7 +297,7 @@ auto GenerateCodes() {
 			change(QString());
 		});
 	});
-#endif // Q_OS_MAC
+#endif // Q_OS_MACOS
 
 	return codes;
 }
