@@ -13,6 +13,11 @@ using "ui/widgets/widgets.style";
 using "dialogs/dialogs.style";
 
 ayuGhostIcon: icon {{ "ayu/ghost", menuIconColor }};
+ayuNowPlayingIcon: icon {{ "ayu/now_playing", menuIconColor }};
+ayuExteraBadgePerkIcon: icon {{ "ayu/extera_badge", profileVerifiedCheckBg }};
+// Telegram 7.3.4 dropped menuIconTTLAny, the icon file stays.
+ayuMenuIconTTLAny: icon {{ "menu/auto_delete_plain", menuIconColor }};
+ayuPluginsIcon: icon {{ "menu/plugins", menuIconColor }};
 ayuGhostModeGlobalIcon: icon {{ "ayu/ghost_mode_global", historyPeerUserpicFg }};
 ayuEditsHistoryIcon: icon {{ "ayu/edits_history", menuIconColor }};
 ayuLReadMenuIcon: icon {{ "ayu/lread", menuIconColor }};

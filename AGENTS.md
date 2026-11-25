@@ -6,26 +6,6 @@ Avoid building the project.
 
 If you're asked to create a Pull Request, then clearly state in PR description that it was AI generated.
 
-## Working from Codex on Windows + WSL
-
-This checkout may be opened in Codex Desktop through the Windows UNC path `\\wsl.localhost\{distro}\home\{user}\Telegram\tdesktop`, while the real Linux path is `/home/{user}/Telegram/tdesktop`. Treat it as a WSL/Linux checkout first, not as a native Windows checkout.
-
-- Prefer running repository-aware commands through WSL:
-
-```powershell
-wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- <command>
-```
-
-- PowerShell can read and write files through the UNC path, but native Windows tools may see different ownership, path, executable, or line-ending behavior than Linux tools.
-- Git from PowerShell over `\\wsl.localhost\...` can fail with `detected dubious ownership`. Use WSL Git instead. Do not change global Git `safe.directory` settings unless the user explicitly asks for that.
-- Keep path styles matched to the shell. Use `/home/{user}/Telegram/tdesktop/...` with WSL commands, and quoted `\\wsl.localhost\{distro}\home\{user}\Telegram\tdesktop\...` paths with native Windows commands. Avoid passing UNC paths to Linux tools or Linux paths to native Windows tools unless the tool explicitly supports them.
-- If a command behaves strangely from the PowerShell UNC working directory, retry the same command through `wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- ...` before concluding the repository or command is broken.
-- Recursive searches and repo inspection are usually faster and more faithful through WSL, for example `wsl.exe -d {distro} --cd /home/{user}/Telegram/tdesktop -- rg ...`.
-- Do not assume the WSL host has the build toolchain installed directly. In this setup, WSL may not have `cmake`, while Windows may have `cmake`, and the configured `out/` tree may still target the Linux Docker toolchain. Do not run native Windows `cmake --build out` against a Linux/Docker build tree.
-- For WSL/Linux builds, use the Docker build entry point from the repository root: `Telegram/build/docker/centos_env/build_debug.sh`. The Docker daemon must be reachable from WSL; checking `docker info` is fine, but do not start a build unless the user asked for one.
-- Existing build outputs may be Linux binaries, for example `out/Debug/Telegram` as an ELF executable, not `Telegram.exe`. Verify the build tree before assuming which platform produced it.
-- Be careful with text file line endings. In a WSL/Linux checkout, files should remain LF-only unless the file already uses another convention. CRLF finishing applies only to native, non-WSL Windows runs/checkouts. Do not let PowerShell or Windows tools silently rewrite WSL files to CRLF. If a file becomes mixed, normalize it back to the convention appropriate for the current checkout, without adding a UTF-8 BOM.
-- When using the local `perform-task` skill from this WSL checkout, keep external AI task artifacts and edited project text files LF-only. Treat its Windows text-normalization phase as not applicable to WSL, except to record that line endings were checked and kept LF/no-BOM. Run CRLF normalization only in a native, non-WSL Windows checkout.
 
 ## Build System Structure
 
@@ -44,7 +24,7 @@ Dependencies are located relative to the repository: `../Libraries`, `../win64/L
 ## Dependency backports
 
 For explicitly requested dependency updates and backports, use the dependency
-repositories' `master` branches directly. Do not create `codex/*` or other topic
+repositories' `master` branches directly. Do not create topic
 branches in `Libraries/patches`, `Libraries/tg_owt`, or `Libraries/tg_angle`.
 The scheduled dependency monitor remains advisory and does not implement fixes.
 
@@ -93,7 +73,21 @@ Telegram/build/docker/centos_env/build_debug.sh
 cmake --build "l:\Telegram\tx64\out" --config Debug --target Telegram
 ```
 
-**Never build Release** - it's extremely heavy and not needed for testing changes.
+**Test changes with Debug builds.** Build Release only to measure
+performance, and only without link-time optimization: `out/CMakeCache.txt`
+must read `DESKTOP_APP_ENABLE_LTO:BOOL=OFF` before the build, and nothing may
+configure it ON. Build it with:
+
+```bash
+cmake --build out --config Release --target Telegram
+```
+
+The app lands in `out/Release`. To drive it with the `-testagent` harness,
+follow "Release builds with the harness" in
+`Telegram/SourceFiles/test/docs/launch.md`; on macOS reconfigure with
+`env -u QT cmake -S . -B out -DTDESKTOP_RELEASE_TEST_HARNESS=ON`, and switch it
+back OFF the same way when the measurement is done. A Release build never
+replaces the Debug build that proves a change compiles.
 
 **On macOS, never run an Xcode clean against `out/`** - not `--target clean`,
 not `--clean-first` with any target, not `xcodebuild ... clean` and not a
@@ -237,8 +231,9 @@ user to close that checkout's Telegram/debugger before rebuilding.
 
 ## Best Practices
 
-1. **Always use Debug builds** - Release builds are extremely heavy
-2. **Don't build Release configuration** - it's too heavy for testing
+1. **Always use Debug builds** to build and test changes
+2. **Build Release only to measure performance**, without LTO, as
+   "### Build Commands" describes
 
 ## Text File Format
 
@@ -294,9 +289,13 @@ is in `.agents/skills/code-health/SKILL.md`.
 
 ## Coding Style
 
-**Do NOT write comments in code:**
+**Comments:**
 
-This is important! Do not write single-line comments that describe what the next line does - they are bloat. Comments are allowed ONLY to describe complex algorithms in detail, when the explanation requires at least 4-5 lines. Self-documenting code with clear variable and function names is preferred.
+Add no comments. A one-line comment carrying a reason is acceptable, at most two such lines per commit; anything longer only to carry a reference URL. `Telegram/SourceFiles/test/` is exempt.
+
+Do not remove existing comments just to satisfy this rule. Preserve comments unless your change makes them incorrect or truly obsolete; when moving or refactoring code, move the useful comment with it. Inline comments that label positional arguments for generated or schema-driven APIs (for example TL/MTP constructors) are useful because the field names are not visible in the call itself.
+
+**Never cite line numbers** in comments, `README.md` files or other checked-in text. Name the function, member, constant or type, and its file when that helps: write `Runner::finish()` in `test_runner.cpp`, not `test_runner.cpp:NNN` or `:NNN-MMM`. Line numbers drift with every edit and nothing updates them. This covers submodule, Qt and other third-party sources too. Quoted log or crash text stays verbatim.
 
 ```cpp
 // BAD - don't do this:
@@ -309,12 +308,12 @@ if (user->isPremium()) {
 auto name = user->name();
 if (user->isPremium()) {
 
-// ACCEPTABLE - complex algorithm explanation (4+ lines):
-// The algorithm works by first collecting all visible messages
-// in the viewport, then calculating their intersection with
-// the clip rectangle. Messages are grouped by date headers,
-// and we need to account for sticky headers that may overlap
-// with the first message in each group.
+// ACCEPTABLE - one line, and it carries a reason:
+_limit = kDefaultLimit; // the server rejects anything larger
+
+// ACCEPTABLE - longer, and it carries a reference URL:
+// The flag is ignored until the server rolls out the scheme
+// described at https://core.telegram.org/api/updates
 ```
 
 **Style and formatting rules** are in `REVIEW.md` — see that file for empty-line-before-closing-brace, operator placement in multi-line expressions, if-with-initializer, and other mechanical style rules.
@@ -719,6 +718,8 @@ As of 2026-10-20, `Qt::ImhDate` and `Qt::ImhTime` do nothing anywhere tdesktop r
 ## Localization
 
 ### String Definitions
+
+New KomaruGram strings go to `kStrings` in `Telegram/SourceFiles/ayu/komaru_strings.cpp` (English and Russian) and are read with `Komaru::Text(key)` or `Komaru::TextValue(key)`. A new `lang.strings` key regenerates `lang_auto.h`, which most of the client includes, so it rebuilds hundreds of files.
 
 Strings are defined in `Telegram/Resources/langs/lang.strings`:
 

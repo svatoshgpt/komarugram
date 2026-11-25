@@ -21,7 +21,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/profile/tabs/info_profile_tabs_host.h"
 #include "info/profile/info_profile_icon.h"
 #include "info/profile/info_profile_members.h"
-#include "info/profile/info_profile_music_button.h"
 #include "info/profile/info_profile_shared_media_classic.h"
 #include "info/profile/info_profile_top_bar.h"
 #include "info/profile/info_profile_actions.h"
@@ -29,22 +28,23 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "info/saved/info_saved_music_widget.h"
 #include "data/data_changes.h"
 #include "data/data_channel.h"
-#include "data/data_document.h"
 #include "data/data_forum_topic.h"
 #include "data/data_peer.h"
 #include "data/data_photo.h"
 #include "data/data_file_origin.h"
 #include "data/data_user.h"
-#include "data/data_saved_music.h"
 #include "data/data_saved_sublist.h"
-#include "info/saved/info_saved_music_common.h"
+#include "data/data_saved_music.h"
+#include "data/data_session.h"
+#include "data/data_document.h"
+#include "history/history_item.h"
+#include "data/data_media_types.h"
 #include "info_profile_actions.h"
 #include "main/main_session.h"
 #include "apiwrap.h"
 #include "api/api_peer_photo.h"
 #include "lang/lang_keys.h"
 #include "ui/text/custom_emoji_helper.h"
-#include "ui/text/format_song_document_name.h"
 #include "ui/widgets/buttons.h"
 #include "ui/widgets/checkbox.h"
 #include "ui/widgets/labels.h"
@@ -61,6 +61,13 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 // AyuGram includes
 #include "ayu/ayu_settings.h"
+#include "ayu/features/komaru/extera_now_playing.h"
+#include "ayu/features/komaru/now_playing.h"
+#include "ayu/ui/components/saved_music.h"
+#include "info/profile/info_profile_music_button.h"
+#include "styles/style_ayu_styles.h"
+#include "styles/style_layers.h"
+#include "ui/basic_click_handlers.h"
 
 
 namespace Info {
@@ -69,6 +76,183 @@ namespace Profile {
 namespace {
 
 constexpr auto kMembersInlineMax = 5;
+
+using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
+
+// Another KomaruGram user's track, from the "🎧 Artist — Title | bio" they publish.
+[[nodiscard]] NowPlayingTrack TrackFromBio(const QString &about) {
+	const auto prefix = u"🎧 "_q;
+	if (!about.startsWith(prefix)) {
+		return std::nullopt;
+	}
+	const auto song = about.mid(prefix.size()).section(u" | "_q, 0, 0);
+	const auto dash = song.indexOf(u" — "_q);
+	if (dash <= 0) {
+		return std::nullopt;
+	}
+	auto result = KomaruNowPlaying::Track{
+		.title = song.mid(dash + 3).trimmed(),
+		.artist = song.left(dash).trimmed(),
+	};
+	if (result.title.isEmpty() || result.title.endsWith(QChar(0x2026))) {
+		return std::nullopt;
+	}
+	result.url = u"https://open.spotify.com/search/"_q
+		+ QString::fromUtf8(QUrl::toPercentEncoding(
+			result.artist + ' ' + result.title));
+	return result;
+}
+
+[[nodiscard]] QString SearchUrl(const QString &artist, const QString &title) {
+	return u"https://open.spotify.com/search/"_q
+		+ QString::fromUtf8(QUrl::toPercentEncoding(artist + ' ' + title));
+}
+
+// The first track pinned to the profile, the one Telegram shows on top.
+[[nodiscard]] rpl::producer<NowPlayingTrack> ProfileMusicTrackValue(
+		not_null<UserData*> user) {
+	const auto savedMusic = &user->owner().savedMusic();
+	const auto peerId = user->id;
+	return rpl::single(
+		peerId
+	) | rpl::then(
+		savedMusic->changed() | rpl::filter(rpl::mappers::_1 == peerId)
+	) | rpl::map([=]() -> NowPlayingTrack {
+		const auto &list = savedMusic->list(peerId);
+		const auto media = list.empty() ? nullptr : list.front()->media();
+		const auto document = media ? media->document() : nullptr;
+		const auto song = document ? document->song() : nullptr;
+		if (!song || song->title.trimmed().isEmpty()) {
+			return std::nullopt;
+		}
+		const auto title = song->title.trimmed();
+		const auto artist = song->performer.trimmed();
+		return KomaruNowPlaying::Track{
+			.title = title,
+			.artist = artist,
+			.url = SearchUrl(artist, title),
+		};
+	});
+}
+
+// What exteraGram knows the user plays, else the bio, else the profile music.
+[[nodiscard]] rpl::producer<NowPlayingTrack> OtherTrackValue(
+		not_null<UserData*> user) {
+	return rpl::combine(
+		KomaruExteraNowPlaying::Value(
+			uint64(user->id.value & PeerId::kChatTypeMask)),
+		AboutValue(user),
+		ProfileMusicTrackValue(user)
+	) | rpl::map([](
+			const KomaruExteraNowPlaying::Track &extera,
+			const TextWithEntities &about,
+			const NowPlayingTrack &music) -> NowPlayingTrack {
+		if (!extera.empty()) {
+			return KomaruNowPlaying::Track{
+				.title = extera.title,
+				.artist = extera.artist,
+				.url = extera.url,
+				.cover = extera.cover,
+			};
+		} else if (auto bio = TrackFromBio(about.text)) {
+			return bio;
+		}
+		return music;
+	});
+}
+
+// What we play now, else the music pinned to our profile.
+[[nodiscard]] rpl::producer<NowPlayingTrack> SelfTrackValue(
+		not_null<UserData*> user) {
+	return rpl::combine(
+		KomaruNowPlaying::Value(),
+		ProfileMusicTrackValue(user)
+	) | rpl::map([](
+			const NowPlayingTrack &playing,
+			const NowPlayingTrack &music) {
+		return playing ? playing : music;
+	});
+}
+
+// The official art for the track, whatever cover the file has.
+[[nodiscard]] rpl::producer<QImage> OfficialCoverValue(
+		rpl::producer<NowPlayingTrack> tracks) {
+	return std::move(
+		tracks
+	) | rpl::map([](const NowPlayingTrack &track) {
+		return track
+			? KomaruExteraNowPlaying::CoverValue(
+				track->title,
+				track->artist,
+				(track->cover.contains(u"mzstatic.com"_q)
+					? track->cover
+					: QString()))
+			: rpl::single(QImage());
+	}) | rpl::flatten_latest();
+}
+
+[[nodiscard]] Section NowPlayingSection(
+		not_null<Ui::RpWidget*> parent,
+		rpl::producer<NowPlayingTrack> tracks,
+		rpl::producer<QImage> covers) {
+	// The stack only places separators by `shown`; a block hides itself.
+	auto wrap = object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
+		parent,
+		object_ptr<Ui::VerticalLayout>(parent));
+	const auto result = wrap->entity();
+	const auto track = wrap->lifetime().make_state<
+		rpl::variable<NowPlayingTrack>>(std::move(tracks));
+	const auto url = std::make_shared<QString>();
+	const auto button = result->add(
+		object_ptr<AyuMusicButton>(
+			result,
+			MusicButtonData{
+				.name = Ui::Text::FormatSongName(QString(), QString(), QString()),
+			},
+			std::nullopt,
+			[=] {
+				if (!url->isEmpty()) {
+					UrlClickHandler::Open(*url);
+				}
+			}),
+		QMargins(
+			st::boxRowPadding.left(),
+			st::infoProfileSkip,
+			st::boxRowPadding.right(),
+			st::infoProfileSkip));
+	button->setCornerRadius(st::roundRadiusLarge);
+	button->setPadding(st::ayuNowPlayingPadding);
+	button->setThemeColors(true);
+	button->setPlayIconShown(true);
+	rpl::combine(
+		track->value(),
+		std::move(covers)
+	) | rpl::filter([](const NowPlayingTrack &track, const QImage &) {
+		return track.has_value();
+	}) | rpl::on_next([=](const NowPlayingTrack &track, QImage cover) {
+		*url = track->url;
+		button->setExternalCover(std::move(cover));
+		button->updateData({
+			.name = Ui::Text::FormatSongName(
+				QString(),
+				track->title,
+				track->artist),
+			.title = track->title,
+			.performer = track->artist,
+		});
+	}, button->lifetime());
+	const auto shown = [=] {
+		return track->value() | rpl::map([](const NowPlayingTrack &track) {
+			return track.has_value();
+		});
+	};
+	wrap->setDuration(st::infoSlideDuration)->toggleOn(shown());
+	wrap->finishAnimating();
+	return {
+		.widget = std::move(wrap),
+		.shown = shown(),
+	};
+}
 
 [[nodiscard]] rpl::producer<bool> MembersInTabValue(not_null<PeerData*> peer) {
 	const auto channel = peer->asChannel();
@@ -79,24 +263,6 @@ constexpr auto kMembersInlineMax = 5;
 	}) | rpl::map([](int count) {
 		return (count > kMembersInlineMax);
 	}) | rpl::take(1);
-}
-
-void AddSavedMusic(
-		not_null<Ui::VerticalLayout*> layout,
-		not_null<Controller*> controller,
-		not_null<PeerData*> peer,
-		rpl::producer<std::optional<QColor>> topBarColor) {
-	const auto wrap = layout->add(
-		object_ptr<Ui::SlideWrap<Ui::VerticalLayout>>(
-			layout,
-			object_ptr<Ui::VerticalLayout>(layout)));
-	wrap->toggleOn(
-		Info::Saved::SetupSavedMusic(
-			wrap->entity(),
-			controller,
-			peer,
-			std::move(topBarColor)),
-		anim::type::instant);
 }
 
 void AddUnofficialSecurityRiskWarning(
@@ -191,14 +357,6 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 	auto result = object_ptr<Ui::VerticalLayout>(parent);
 
 	if (!_savedMessages) {
-		const auto musicPeer = _sublist
-			? _sublist->sublistPeer().get()
-			: _peer.get();
-		AddSavedMusic(
-			result.data(),
-			_controller,
-			musicPeer,
-			_topBarColor.value());
 		if (const auto user = _peer->asUser()) {
 			AddUnofficialSecurityRiskWarning(result.data(), user);
 		}
@@ -208,6 +366,24 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 	if (_topic && _topic->creating()) {
 		stack.finalize();
 		return result;
+	}
+
+	const auto user = _peer->asUser();
+	if (!_savedMessages
+		&& user
+		&& !user->isBot()
+		&& !_topic
+		&& !_sublist) {
+		auto tracks = (user->isSelf()
+			? SelfTrackValue(user)
+			: OtherTrackValue(user)
+		) | rpl::start_spawning(result->lifetime());
+		auto covers = OfficialCoverValue(rpl::duplicate(tracks));
+		stack.add(NowPlayingSection(
+			result.data(),
+			std::move(tracks),
+			std::move(covers)));
+		stack.addPlainSeparator();
 	}
 
 	if (!_savedMessages) {
@@ -549,18 +725,22 @@ bool InnerWidget::hasFlexibleTopBar() const {
 
 base::weak_qptr<Ui::RpWidget> InnerWidget::createPinnedToTop(
 		not_null<Ui::RpWidget*> parent) {
+	const auto shown = _sublist ? _sublist->sublistPeer().get() : _peer.get();
 	const auto content = Ui::CreateChild<TopBar>(
 		parent,
 		TopBar::Descriptor{
 			.controller = _controller->parentController(),
 			.key = _controller->key(),
 			.wrap = _controller->wrapValue(),
-			.peer = _sublist ? _sublist->sublistPeer().get() : nullptr,
+			.peer = _sublist ? shown : nullptr,
 			.backToggles = _backToggles.value(),
 			.showFinished = _showFinished.events(),
 			.customStatus = (_savedMessages
 				? SavedChatsCountStatus(&_peer->session())
 				: rpl::producer<TextWithEntities>()),
+			.showSavedMusic = [controller = _controller, shown] {
+				controller->showSection(Info::Saved::MakeMusic(shown));
+			},
 		});
 	content->backRequest(
 	) | rpl::start_to_stream(_backClicks, content->lifetime());
@@ -581,7 +761,6 @@ base::weak_qptr<Ui::RpWidget> InnerWidget::createPinnedToTop(
 				members->setGroupByRole(grouped);
 			}));
 	}
-	_topBarColor = content->edgeColor();
 	_topBar = content;
 	return base::make_weak(not_null<Ui::RpWidget*>{ content });
 }

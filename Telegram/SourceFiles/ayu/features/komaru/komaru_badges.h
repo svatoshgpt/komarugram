@@ -9,10 +9,7 @@
 // at paint time, including selection and theme changes. Channels are listed
 // by their bare id, without -100.
 //
-// statuses.txt puts an emoji status in the custom badge slot, one person
-// per line as "id,status[,popup text]". The status is a custom emoji id, or
-// an emoji pack link with a 1-based position, like
-// https://t.me/addemoji/EmojiKomaru/1 or just EmojiKomaru/1.
+// statuses.txt lines are "id,status|Pack/3|Pack/random...[,10s][,popup text]".
 #pragma once
 
 #include <crl/crl_time.h>
@@ -46,9 +43,18 @@ void Start();
 [[nodiscard]] const Entry *Developer(uint64 peerId);
 [[nodiscard]] const Entry *Supporter(uint64 peerId);
 
-// The emoji status from statuses.txt, 0 if none or its pack is not loaded.
-[[nodiscard]] uint64 Status(uint64 peerId);
+inline constexpr auto kMaxStatuses = size_t(20);
+
+// What shows now: all in a row, or the current one of a rotating line.
+[[nodiscard]] std::vector<uint64> Statuses(uint64 peerId);
 [[nodiscard]] QString StatusText(uint64 peerId);
+
+// Whether the person has a status and the bot that changes it is known.
+[[nodiscard]] bool CanEditStatus(uint64 peerId);
+[[nodiscard]] QString EditBot();
+
+// Shows the change at once, before the list catches up; no id resets it.
+void SetLocalStatus(uint64 peerId, uint64 documentId, const QString &text);
 
 // Fires when a list or the rate changes.
 [[nodiscard]] rpl::producer<> Updated();

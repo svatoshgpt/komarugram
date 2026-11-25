@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "ui/effects/thanos_effect_controller.h"
 
+#include "ayu/ayu_settings.h"
 #include "ui/effects/thanos_effect.h"
 #include "ui/chat/chat_style.h"
 #include "ui/painter.h"
@@ -51,6 +52,7 @@ ThanosEffectController::~ThanosEffectController() {
 void ThanosEffectController::captureItemsBatch(
 		const std::vector<not_null<HistoryItem*>> &items) {
 	if (!ThanosEffect::Supported()
+		|| AyuSettings::getInstance().disableDeleteAnimation()
 		|| !ThanosEffect::WindowVisible(_delegate.window())) {
 		return;
 	}
@@ -113,7 +115,8 @@ void ThanosEffectController::commitAnnouncedRemovals(
 
 void ThanosEffectController::captureOnRemoval(
 		not_null<const HistoryItem*> item) {
-	if (!ThanosEffect::Supported()) {
+	if (!ThanosEffect::Supported()
+		|| AyuSettings::getInstance().disableDeleteAnimation()) {
 		return;
 	} else if (!ThanosEffect::WindowVisible(_delegate.window())) {
 		clearPreCaptured();
@@ -129,6 +132,7 @@ void ThanosEffectController::captureOnRemoval(
 		const auto saved = it->second;
 		_preCaptured.erase(it);
 		if (saved.top >= 0) {
+			ensureScrollBaseline();
 			notePendingRemoval(saved.height, saved.top, saved.dateHeight);
 		}
 		return;
@@ -439,6 +443,12 @@ void ThanosEffectController::shiftGaps(int delta) {
 		// The content above the gaps moved, so the scroll position that
 		// keeps the same content visible moved by the same delta. Without
 		// this the next animation frame forces the pre-shift coordinate.
+		_savedScrollTop += delta;
+	}
+}
+
+void ThanosEffectController::shiftScrollBaseline(int delta) {
+	if (_restoreScrollPending && !_wasAtBottom) {
 		_savedScrollTop += delta;
 	}
 }

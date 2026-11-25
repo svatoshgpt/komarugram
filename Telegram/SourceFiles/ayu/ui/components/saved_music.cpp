@@ -26,6 +26,7 @@
 #include "window/themes/window_theme.h"
 
 #include <QSvgRenderer>
+#include <QtGui/QPainterPath>
 
 namespace Info::Profile {
 
@@ -95,7 +96,7 @@ QPixmap MakeNoCoverImage(const QSize &size) {
 		svgIcon.render(&p, QRect(0, 0, size.width(), size.height()));
 	}
 	const auto img = Image(std::move(image));
-	result = img.pix(size, Images::PrepareArgs{.options = Images::Option::RoundSmall});
+	result = img.pix(size, Images::PrepareArgs{.options = Images::Option::RoundLarge});
 	return result;
 }
 
@@ -120,7 +121,7 @@ Cover GetCurrentCover(
 		return image->size().scaled(targetSize, aspectRatio);
 	};
 	const auto args = Images::PrepareArgs{
-		.options = Images::Option::RoundSmall,
+		.options = Images::Option::RoundLarge,
 		.outer = size,
 	};
 	if (const auto normal = dataMedia->thumbnail()) {
@@ -223,6 +224,37 @@ void AyuMusicButton::updateData(MusicButtonData data) {
 	resizeToWidth(widthNoMargins());
 }
 
+void AyuMusicButton::setPadding(QMargins padding) {
+	_padding = padding;
+	resizeToWidth(widthNoMargins());
+	update();
+}
+
+void AyuMusicButton::setCornerRadius(int radius) {
+	_radius = radius;
+	update();
+}
+
+void AyuMusicButton::setPlayIconShown(bool shown) {
+	_playIcon = shown;
+	resizeToWidth(widthNoMargins());
+	update();
+}
+
+void AyuMusicButton::setThemeColors(bool theme) {
+	if (_themeColors == theme) {
+		return;
+	}
+	_themeColors = theme;
+	if (_currentCover) {
+		makeCover();
+	}
+}
+
+void AyuMusicButton::setExternalCover(QImage image) {
+	_externalCover = std::move(image);
+}
+
 void AyuMusicButton::downloadAndMakeCover(FullMsgId msgId) {
 	if (_mediaView && _mediaView->owner()->isSongWithCover() && !_mediaView->thumbnail()) {
 		const auto settings = &_mediaView->owner()->session().settings().autoDownload();
@@ -249,21 +281,31 @@ void AyuMusicButton::downloadAndMakeCover(FullMsgId msgId) {
 void AyuMusicButton::makeCover() {
 	const auto weak = base::make_weak(this);
 	crl::async(
-		[=, mediaView = _mediaView, performerText = _performerText, titleText = _titleText, overrideBg = _overrideBg]()
+		[=, mediaView = _mediaView, performerText = _performerText, titleText = _titleText, overrideBg = _overrideBg, external = _externalCover, themeColors = _themeColors]()
 		{
 			const auto &settings = AyuSettings::getInstance();
+			const auto adaptiveColor = !themeColors && settings.adaptiveCoverColor();
 			const auto &font = st::infoMusicButtonTitle.style.font;
 			const auto skip = st::normalFont->spacew / 2;
 			const auto size = font->height + skip + font->height;
 
 			auto cover = GetCurrentCover(mediaView, QSize(size, size));
 
-			if (cover.noCover) {
+			if (external && !external->isNull()) {
+				const auto img = Image(QImage(*external));
+				const auto args = Images::PrepareArgs{
+					.options = Images::Option::RoundLarge,
+					.outer = QSize(size, size),
+				};
+				cover.pixToDraw = img.pix(QSize(size, size), args);
+				cover.pixToBg = QPixmap::fromImage(*external);
+				cover.noCover = false;
+			} else if (cover.noCover && !external) {
 				const auto pix = Ayu::Ui::Itunes::FetchCover(performerText, titleText, size);
 				if (!pix.isNull()) {
 					const auto img = Image(pix.toImage());
 					const auto args = Images::PrepareArgs{
-						.options = Images::Option::RoundSmall,
+						.options = Images::Option::RoundLarge,
 						.outer = QSize(size, size),
 					};
 					cover.pixToDraw = img.pix(QSize(size, size), args);
@@ -273,7 +315,7 @@ void AyuMusicButton::makeCover() {
 			}
 
 			QColor bgColor;
-			if (cover.noCover || !settings.adaptiveCoverColor()) {
+			if (cover.noCover || !adaptiveColor) {
 				bgColor = GetNoCoverBgColor(overrideBg);
 			} else {
 				if (const auto extractedColor = ExtractColorFromCover(cover.pixToBg)) {
@@ -285,7 +327,7 @@ void AyuMusicButton::makeCover() {
 				}
 			}
 
-			crl::on_main([weak, cover = std::move(cover), bgColor, overrideBg]() mutable
+			crl::on_main([weak, cover = std::move(cover), bgColor, overrideBg, adaptiveColor]() mutable
 			{
 				const auto strong = weak.get();
 				if (!strong) {
@@ -298,16 +340,17 @@ void AyuMusicButton::makeCover() {
 					.noCover = cover.noCover,
 				};
 
-				const auto &settings2 = AyuSettings::getInstance();
 				const auto &cover2 = *strong->_currentCover;
 
-				if (!cover2.noCover && settings2.adaptiveCoverColor() && !cover2.pix.isNull()) {
+				if (!cover2.noCover && adaptiveColor && !cover2.pix.isNull()) {
 					strong->_title->setTextColorOverride(Qt::white);
 					strong->_performer->setTextColorOverride(performerColor);
+				} else if (overrideBg) {
+					strong->_title->setTextColorOverride(st::groupCallMembersFg->c);
+					strong->_performer->setTextColorOverride(st::groupCallMembersFg->c);
 				} else {
-					strong->_title->setTextColorOverride(overrideBg ? st::groupCallMembersFg->c : st::windowBoldFg->c);
-					strong->_performer->setTextColorOverride(
-						overrideBg ? st::groupCallMembersFg->c : st::windowBoldFg->c);
+					strong->_title->setTextColorOverride(std::nullopt);
+					strong->_performer->setTextColorOverride(std::nullopt);
 				}
 
 				strong->repaint();
@@ -330,10 +373,20 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 	const auto skip = st::normalFont->spacew / 2;
 	const auto size = font->height + skip + font->height;
 
+	if (_radius > 0) {
+		auto path = QPainterPath();
+		path.addRoundedRect(rect(), _radius, _radius);
+		p.setClipPath(path);
+	}
+
 	const auto &settings = AyuSettings::getInstance();
 	const auto cover = _currentCover.value();
-	if (cover.noCover || !settings.adaptiveCoverColor()) {
-		p.fillRect(e->rect(), cover.bg);
+	const auto adaptive = !cover.noCover
+		&& !_themeColors
+		&& settings.adaptiveCoverColor();
+	if (!adaptive) {
+		// A surface container of the current theme, as in Material 3.
+		p.fillRect(e->rect(), _overrideBg ? cover.bg : st::windowBgOver->c);
 		paintRipple(p, QPoint());
 	} else {
 		QRadialGradient gradient(rect().topRight(), rect().width() * 2.0);
@@ -344,13 +397,47 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 
 	if (!cover.pix.isNull()) {
 		auto hq = PainterHighQualityEnabler(p);
-		const auto coverRect = QRect(st::infoMusicButtonPadding.left(), st::infoMusicButtonPadding.top(), size, size);
+		const auto padding = _padding.value_or(st::infoMusicButtonPadding);
+		const auto coverRect = QRect(padding.left(), padding.top(), size, size);
 		p.drawPixmap(coverRect, cover.pix);
+	}
+
+	if (_playIcon) {
+		auto hq = PainterHighQualityEnabler(p);
+		// Material 3 tonal icon button in the theme accent.
+		const auto fg = adaptive
+			? QColor(Qt::white)
+			: _overrideBg
+			? st::groupCallMembersFg->c
+			: st::windowBgActive->c;
+		auto bg = fg;
+		bg.setAlphaF(adaptive ? 0.2 : 0.16);
+		const auto circle = QRectF(
+			width() - _padding.value_or(st::infoMusicButtonPadding).left() - size,
+			(height() - size) / 2.,
+			size,
+			size);
+		p.setPen(Qt::NoPen);
+		p.setBrush(bg);
+		p.drawEllipse(circle);
+
+		const auto unit = size / 40.;
+		const auto c = circle.center();
+		auto triangle = QPainterPath();
+		triangle.moveTo(c + QPointF(-4.5 * unit, -7. * unit));
+		triangle.lineTo(c + QPointF(7. * unit, 0.));
+		triangle.lineTo(c + QPointF(-4.5 * unit, 7. * unit));
+		triangle.closeSubpath();
+		auto pen = QPen(fg, 2.5 * unit);
+		pen.setJoinStyle(Qt::RoundJoin);
+		p.setPen(pen);
+		p.setBrush(fg);
+		p.drawPath(triangle);
 	}
 }
 
 int AyuMusicButton::resizeGetHeight(int newWidth) {
-	const auto padding = st::infoMusicButtonPadding;
+	const auto padding = _padding.value_or(st::infoMusicButtonPadding);
 	const auto &font = st::infoMusicButtonTitle.style.font;
 
 	const auto top = padding.top();
@@ -358,11 +445,12 @@ int AyuMusicButton::resizeGetHeight(int newWidth) {
 
 	const auto coverSize = font->height + skip + font->height;
 
-	const auto available = newWidth - padding.left() - padding.right() - coverSize;
+	const auto available = newWidth - padding.left() - padding.right() - coverSize
+		- (_playIcon ? (coverSize + padding.left()) : 0);
 	_title->resizeToNaturalWidth(available);
-	_title->moveToLeft(st::infoMusicButtonPadding.left() + padding.left() + coverSize, top);
+	_title->moveToLeft(padding.left() * 2 + coverSize, top);
 	_performer->resizeToNaturalWidth(available);
-	_performer->moveToLeft(st::infoMusicButtonPadding.left() + padding.left() + coverSize, top + font->height + skip);
+	_performer->moveToLeft(padding.left() * 2 + coverSize, top + font->height + skip);
 
 	return padding.top() + font->height + skip + font->height + padding.bottom();
 }

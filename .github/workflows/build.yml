@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: write
+  # The Linux build environment image lives in GHCR.
+  packages: write
 
 jobs:
 
@@ -24,7 +26,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [x64, x64_x86]
+        # Test builds need only x64; releases ship x86 as well.
+        arch: ${{ fromJSON((startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')) && '["x64", "x64_x86"]' || '["x64"]') }}
 
     env:
       UPLOAD_ARTIFACT: "true"
@@ -36,22 +39,15 @@ jobs:
         shell: cmd
 
     steps:
-      - name: Free up runner disk space.
-        uses: hugoalh/disk-space-optimizer-ghaction@v0.8.1
-        with:
-          operate_async: "True"
-          general_include: ".+"
-          general_exclude: "^(VisualStudio/(2022|All)|DotNet|VCPkg)"
+      - name: Get repository name.
+        shell: bash
+        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - name: Prepare directories.
         run: |
           mkdir %userprofile%\TBuild\Libraries
           mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
           echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
-
-      - name: Get repository name.
-        shell: bash
-        run: echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
 
       - name: Configure git auth for private repo.
         shell: bash
@@ -63,6 +59,62 @@ jobs:
         with:
           submodules: recursive
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}
+
+      # Telegram/rust/komaru_tools: the helpers the steps below call.
+      # Not bash: Git's /usr/bin/link would stand in for MSVC's link.exe.
+      - name: KomaruGram tools.
+        shell: pwsh
+        run: |
+          $target = "$env:RUNNER_TEMP/komaru_tools" -replace '\\', '/'
+          cargo build -q --release --locked `
+            --manifest-path "$env:TBUILD/$env:REPO_NAME/Telegram/rust/komaru_tools/Cargo.toml" `
+            --target-dir $target
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          "KOMARU=$target/release/komaru.exe" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      # Everything has to stay on C: for real: prepare.py finds its root
+      # from the resolved path of its own script and keys every library by
+      # resolved paths, and tar replaces a junction with a plain folder when
+      # it restores the build cache. C: lacks room for the libraries and the
+      # build together, so big preinstalled tools the build never uses go.
+      # A full Qt rebuild did not fit in 36.6 GB; the whole list frees ~51.
+      # It runs in the background while the caches come in and stops once
+      # 48 GB are free; "Wait for disk space" waits for it before the build.
+      - name: Free disk space on C:.
+        shell: pwsh
+        run: |
+          $paths = @(
+            'C:\Android',
+            'C:\Program Files (x86)\Android',
+            'C:\ghcup',
+            'C:\Program Files\MongoDB',
+            'C:\Program Files\Microsoft SQL Server',
+            'C:\Program Files\PostgreSQL',
+            'C:\Program Files\R',
+            'C:\rtools45',
+            'C:\rtools44',
+            'C:\Strawberry',
+            'C:\Julia',
+            'C:\Miniconda',
+            'C:\SeleniumWebDrivers',
+            'C:\Program Files\Google\Chrome',
+            'C:\Program Files\Mozilla Firefox',
+            'C:\hostedtoolcache\windows\go',
+            'C:\hostedtoolcache\windows\PyPy',
+            'C:\hostedtoolcache\windows\Ruby',
+            'C:\hostedtoolcache\windows\node',
+            'C:\hostedtoolcache\windows\CodeQL',
+            'C:\hostedtoolcache\windows\stack'
+          )
+          $komaru = $env:KOMARU -replace '/', '\'
+          $log = "$env:RUNNER_TEMP\free-disk.log"
+          $line = "`"$komaru`" ci free-disk --timeout 900 --min-free 48"
+          foreach ($path in $paths) { $line += " --path `"$path`"" }
+          # The runner ends what a step starts; WMI's processes live on.
+          $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create `
+            -Arguments @{ CommandLine = "cmd /c `"$line > `"$log`" 2>&1`"" }
+          if ($created.ReturnValue -ne 0) { exit 1 }
+          "FREE_DISK_PID=$($created.ProcessId)" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: First set up.
         shell: bash
@@ -76,6 +128,8 @@ jobs:
           echo "$(sha256sum $TBUILD/$REPO_NAME/$PREPARE_PATH | awk '{ print $1 }')" >> CACHE_KEY.txt
           echo "$SDK" >> CACHE_KEY.txt
           echo "CACHE_KEY=$(sha256sum CACHE_KEY.txt | awk '{ print $1 }')" >> $GITHUB_ENV
+          # prepare.py rebuilds tdesktop_rust when this crate changes, so the libraries are saved again.
+          echo "RUST_KEY=$(git -C "$TBUILD/$REPO_NAME" rev-parse HEAD:Telegram/rust/komaru_core | cut -c1-16)" >> $GITHUB_ENV
 
           echo "Configurate git for cherry-picks."
           git config --global user.email "you@example.com"
@@ -119,8 +173,18 @@ jobs:
         uses: actions/cache/restore@v6
         with:
           path: ${{ env.TBUILD }}\Libraries
-          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
-          restore-keys: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-
+          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}-${{ env.RUST_KEY }}
+          restore-keys: |
+            ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
+            ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-
+
+      - name: Wait for disk space.
+        shell: pwsh
+        run: |
+          $process = Get-Process -Id $env:FREE_DISK_PID -ErrorAction SilentlyContinue
+          if ($process) { $process.WaitForExit() }
+          Get-Content "$env:RUNNER_TEMP\free-disk.log" -ErrorAction SilentlyContinue
+          "C: free: {0:N1} GB" -f ((Get-PSDrive C).Free / 1GB)
 
       - name: Libraries.
         run: |
@@ -154,7 +218,7 @@ jobs:
 
       - name: Free up some disk space.
         shell: bash
-        run: find TBuild/Libraries '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name 'Makefile' -o -name '*.pc' -o -path '*/include/*' -o -path '*/src/wallet_engine/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' ')' -type f ')' -o -empty ')' -delete
+        run: '"$KOMARU" ci prune-libs --dir "$TBUILD/Libraries"'
 
       - name: Save ThirdParty cache.
         if: steps.cache-third-party.outputs.cache-hit != 'true'
@@ -168,7 +232,7 @@ jobs:
         uses: actions/cache/save@v6
         with:
           path: ${{ env.TBUILD }}\Libraries
-          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}
+          key: ${{ runner.OS }}-${{ matrix.arch }}-libs-v2-${{ env.CACHE_KEY }}-${{ env.RUST_KEY }}
 
       - name: Build cache.
         id: cache-build
@@ -180,6 +244,17 @@ jobs:
           restore-keys: |
             ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-
             ${{ runner.OS }}-${{ matrix.arch }}-build-
+
+      # Checkout gives every file a new date, so MSBuild rebuilt everything
+      # despite the cached objects. Files unchanged since the cached build
+      # get an old date and only the changed ones are compiled again.
+      - name: Keep file dates for the cached build.
+        if: env.ONLY_CACHE == 'false' && steps.cache-build.outputs.cache-matched-key != ''
+        shell: bash
+        env:
+          MATCHED: ${{ steps.cache-build.outputs.cache-matched-key }}
+        run: |
+          "$KOMARU" ci keep-dates --repo "$TBUILD/$REPO_NAME" --old "${MATCHED##*-}"
 
       - name: Update signing setup.
         if: env.ONLY_CACHE == 'false'
@@ -199,22 +274,15 @@ jobs:
             exit 1
           fi
           echo "BUILD_PACKER=ON" >> $GITHUB_ENV
-          python - <<'EOF'
-          import json, os
-          key = os.environ['UPDATE_PRIVATE_KEY'].replace('\r\n', '\n').strip()
-          def lit(s):
-              return json.dumps(s + chr(10))
-          path = os.path.join(os.environ['TBUILD'], os.environ['REPO_NAME'],
-                              'Telegram', 'SourceFiles', '_other', 'packer_private.h')
-          with open(path, 'w', newline='\n') as f:
-              f.write('// Generated in CI from a secret. Never commit.\n')
-              f.write('const char *PrivateKey = ' + lit(key) + ';\n')
-              f.write('const char *PrivateBetaKey = "";\n')
-              f.write('static const char *AlphaPrivateKey = "";\n')
-          EOF
+          "$KOMARU" ci packer-key \
+            --out "$TBUILD/$REPO_NAME/Telegram/SourceFiles/_other/packer_private.h"
 
       - name: KomaruGram build.
         if: env.ONLY_CACHE == 'false'
+        env:
+          KOMARU_BUILD_COMMIT: ${{ github.sha }}
+          # Folding identical functions takes most of the link, so only releases do it.
+          LINK_OPT: ${{ (startsWith(github.ref, 'refs/tags/') || inputs.release_tag != '') && '/OPT:ICF' || '/OPT:NOICF' }}
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
 
@@ -224,11 +292,12 @@ jobs:
           %TDESKTOP_BUILD_API% ^
           -D CMAKE_CONFIGURATION_TYPES=MinSizeRel ^
           -D CMAKE_MSVC_DEBUG_INFORMATION_FORMAT= ^
+          -D CMAKE_EXE_LINKER_FLAGS_MINSIZEREL=%LINK_OPT% ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=OFF ^
           -D KOMARUGRAM_BUILD_PACKER=%BUILD_PACKER% ^
           %TDESKTOP_BUILD_DEFINE%
 
-          cmake --build ..\out --config MinSizeRel --parallel 1 -- /p:CL_MPCount=3 /p:UseMultiToolTask=true /p:EnforceProcessCountAcrossBuilds=true
+          cmake --build ..\out --config MinSizeRel --parallel 1 -- /p:CL_MPCount=4 /p:UseMultiToolTask=true /p:EnforceProcessCountAcrossBuilds=true
 
       - name: Pack update.
         if: env.ONLY_CACHE == 'false' && env.BUILD_PACKER == 'ON'
@@ -270,13 +339,6 @@ jobs:
         shell: bash
         run: du -sm TBuild/$REPO_NAME/out || true
 
-      - name: Save build cache.
-        if: env.ONLY_CACHE == 'false'
-        uses: actions/cache/save@v6
-        with:
-          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
-          key: ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-${{ github.sha }}
-
       - name: Move artifact.
         if: (env.UPLOAD_ARTIFACT == 'true') || (github.ref == 'refs/heads/nightly')
         run: |
@@ -307,7 +369,7 @@ jobs:
 
           # Updater.exe must sit next to the client or updates cannot apply.
           ZIP="KomaruGram-$TAG-windows-$SUFFIX.zip"
-          python -c "import zipfile,sys; z=zipfile.ZipFile(sys.argv[1],'w',zipfile.ZIP_DEFLATED); [z.write('artifact/'+n, n) for n in ('KomaruGram.exe','Updater.exe')]" "$ZIP"
+          (cd artifact && 7z a -tzip -mx=9 "../$ZIP" KomaruGram.exe Updater.exe >/dev/null)
 
           # Not marked latest yet: the update feed is served from the latest
           # release, so the feed job promotes it once current6 is in place.
@@ -316,8 +378,18 @@ jobs:
           fi
           gh release upload "$TAG" -R "$REPO" --clobber "$ZIP" update/*
 
+      # After the upload, so the client can be downloaded and released while this runs.
+      - name: Save build cache.
+        if: env.ONLY_CACHE == 'false'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
+          key: ${{ runner.OS }}-${{ matrix.arch }}-build-${{ env.CACHE_KEY }}-${{ github.sha }}
+
   linux:
     name: Linux
+    # Releases only: test builds are Windows x64.
+    if: startsWith(github.ref, 'refs/tags/') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
     runs-on: ubuntu-latest
     env:
       IMAGE_TAG: komarugram:build
@@ -335,22 +407,56 @@ jobs:
 
       - name: Prepare Dockerfile.
         run: |
-          python3 -m venv "$RUNNER_TEMP/dockerfile-generator"
-          "$RUNNER_TEMP/dockerfile-generator/bin/python" -m pip install Jinja2==3.1.6
-          cd Telegram/build/docker/centos_env
-          DEBUG= LTO= "$RUNNER_TEMP/dockerfile-generator/bin/python" gen_dockerfile.py > Dockerfile.generated
-          grep -q '^FROM ' Dockerfile.generated
+          T=Telegram/build/docker/centos_env
+          DEBUG= LTO= cargo run -q --release --locked \
+            --manifest-path Telegram/rust/komaru_tools/Cargo.toml \
+            --target-dir "$RUNNER_TEMP/komaru_tools" -- \
+            ci dockerfile --template $T/Dockerfile > $T/Dockerfile.generated
+          grep -q '^FROM ' $T/Dockerfile.generated
 
       - name: Set up Docker Buildx.
         uses: docker/setup-buildx-action@v3
 
+      - name: Log in to GHCR.
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Building the image takes well over an hour, so it is pushed to GHCR
+      # under a hash of its recipe and only pulled while that stays the same.
+      - name: Find the build environment image.
+        id: env_image
+        run: |
+          HASH=$(cat Telegram/build/docker/centos_env/Dockerfile.generated \
+            Telegram/build/docker/centos_env/build.sh \
+            | sha256sum | cut -c1-16)
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE="ghcr.io/$OWNER/komarugram-build-env:$HASH"
+          echo "image=$IMAGE" >> $GITHUB_OUTPUT
+          if docker pull "$IMAGE"; then
+            docker tag "$IMAGE" "$IMAGE_TAG"
+            echo "cached=true" >> $GITHUB_OUTPUT
+          else
+            echo "cached=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build Docker image.
+        if: steps.env_image.outputs.cached != 'true'
         uses: docker/build-push-action@v7
         with:
           context: Telegram/build/docker/centos_env
           file: Telegram/build/docker/centos_env/Dockerfile.generated
           load: true
           tags: ${{ env.IMAGE_TAG }}
+
+      - name: Push the build environment image.
+        if: steps.env_image.outputs.cached != 'true'
+        continue-on-error: true
+        run: |
+          docker tag "$IMAGE_TAG" "${{ steps.env_image.outputs.image }}"
+          docker push "${{ steps.env_image.outputs.image }}"
 
       - name: Update signing setup.
         env:
@@ -367,27 +473,27 @@ jobs:
             exit 1
           fi
           echo "BUILD_PACKER=ON" >> $GITHUB_ENV
-          python3 - <<'EOF'
-          import json, os
-          key = os.environ['UPDATE_PRIVATE_KEY'].replace('\r\n', '\n').strip()
-          def lit(s):
-              return json.dumps(s + chr(10))
-          path = os.path.join('Telegram', 'SourceFiles', '_other', 'packer_private.h')
-          with open(path, 'w', newline='\n') as f:
-              f.write('// Generated in CI from a secret. Never commit.\n')
-              f.write('const char *PrivateKey = ' + lit(key) + ';\n')
-              f.write('const char *PrivateBetaKey = "";\n')
-              f.write('static const char *AlphaPrivateKey = "";\n')
-          EOF
+          cargo run -q --release --locked \
+            --manifest-path Telegram/rust/komaru_tools/Cargo.toml \
+            --target-dir "$RUNNER_TEMP/komaru_tools" -- \
+            ci packer-key --out Telegram/SourceFiles/_other/packer_private.h
 
+      # The image has no Rust: the runner's rustup is mounted instead.
       - name: KomaruGram build.
         run: |
+          rustc --version
           docker run --rm \
           -u $(id -u) \
           -v $PWD:/usr/src/tdesktop \
+          -v $HOME/.cargo:/opt/cargo \
+          -v $HOME/.rustup:/opt/rustup \
+          -e CARGO_HOME=/opt/cargo \
+          -e RUSTUP_HOME=/opt/rustup \
           -w /usr/src/tdesktop \
           $IMAGE_TAG \
           /usr/src/tdesktop/Telegram/build/docker/centos_env/build.sh \
+          -D Rust_COMPILER=/opt/cargo/bin/rustc \
+          -D Rust_CARGO=/opt/cargo/bin/cargo \
           -D CMAKE_CONFIGURATION_TYPES=Release \
           -D CMAKE_INSTALL_PREFIX="/usr" \
           -D TDESKTOP_API_ID=${{ secrets.TDESKTOP_API_ID }} \
@@ -430,7 +536,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
         run: |
           TAG="${RELEASE_TAG:-$GITHUB_REF_NAME}"
-          # Branch names like codex/foo would otherwise point into a folder.
+          # Branch names like claude/foo would otherwise point into a folder.
           TAG="${TAG//\//-}"
           mkdir -p dist
 
@@ -506,8 +612,9 @@ jobs:
             echo "::warning::Linux is left out of the update feed"
           fi
 
-          printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s"}}%s}\n' \
-            "$V" "$V" "$V" "$V" "$LINUX" > current6
+          # Windows builds know their commit and update to any release from another one.
+          printf '{"win64":{"stable":{"released":"%s","link":"/tx64upd%s","commit":"%s"}},"win":{"stable":{"released":"%s","link":"/tupdate%s","commit":"%s"}}%s}\n' \
+            "$V" "$V" "$GITHUB_SHA" "$V" "$V" "$GITHUB_SHA" "$LINUX" > current6
           cat current6
           gh release upload "$TAG" -R "$REPO" --clobber current6
           gh release edit "$TAG" -R "$REPO" --latest

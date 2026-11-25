@@ -6,6 +6,7 @@ scriptPath = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(scriptPath + '/..')
 import qt_version
 import build_mac
+import msvc
 
 def finish(code):
     global executePath
@@ -236,6 +237,8 @@ def computeCacheKey(stage):
         stage['version'],
         stage['commands']
     ]
+    if winarm and stage['name'] == 'ffmpeg':
+        objects.append('MSVC=' + str(stage['msvc_version']))
     for pattern in stage['dependencies']:
         pathlist = glob.glob(os.path.join(libsDir, pattern))
         items = [pattern]
@@ -373,7 +376,9 @@ def printCommands(commands):
     print(commands, end='')
     print('--------------------------------------------------------------------------------')
 
-def run(commands):
+def run(commands, env = None):
+    if env is None:
+        env = modifiedEnv
     printCommands(commands)
     if win:
         if os.path.exists("command.bat"):
@@ -381,14 +386,14 @@ def run(commands):
         with open("command.bat", 'w') as file:
             file.write('@echo OFF\r\nset "NoDefaultCurrentDirectoryInExePath="\r\n' + winFailOnEach(commands))
         batPath = os.path.abspath("command.bat")
-        result = subprocess.run(batPath, shell=True, env=modifiedEnv).returncode == 0
+        result = subprocess.run(batPath, shell=True, env=env).returncode == 0
         if result and os.path.exists("command.bat"):
             os.remove("command.bat")
         return result
     elif re.search(r'\%', commands):
         error('Bad command: ' + commands)
     else:
-        return subprocess.run("set -e\n" + commands, shell=True, env=modifiedEnv).returncode == 0
+        return subprocess.run("set -e\n" + commands, shell=True, env=env).returncode == 0
 
 # Thanks https://stackoverflow.com/a/510364
 class _Getch:
@@ -449,6 +454,12 @@ def runStages():
     for stage in stages:
         if len(onlyStages) > 0 and not stage['name'] in onlyStages:
             continue
+        stageEnvironment = modifiedEnv
+        if winarm and stage['name'] == 'ffmpeg':
+            try:
+                stageEnvironment, stage['msvc_version'] = msvc.ffmpeg_environment(modifiedEnv)
+            except RuntimeError as exception:
+                error(str(exception))
         index = index + 1
         version = ('#' + str(stage['version'])) if (stage['version'] != '0') else ''
         prefix = '[' + str(index) + '/' + str(count) + '](' + stage['location'] + '/' + stage['name'] + version + ')'
@@ -494,7 +505,7 @@ def runStages():
         clearCacheKey(stage)
         print('BUILDING:')
         os.chdir(stage['directory'])
-        if not run(commands):
+        if not run(commands, stageEnvironment):
             print(prefix + ': FAILED')
             finish(1)
         writeCacheKey(stage)
@@ -521,7 +532,7 @@ if customRunCommand:
 stage('patches', """
     git clone https://github.com/desktop-app/patches.git
     cd patches
-    git checkout a895fef40eaa7d66481cff542c623b039b7ce494
+    git checkout e47f8669a2c144e13a2bc828b09abe6bfe89336e
 mac:
     sed -i '' "s/10.13/$MACOSX_DEPLOYMENT_TARGET/g" macos_meson_*.txt
     git clone https://github.com/desktop-app/qt6_highsierra_patches.git qt6_highsierra
@@ -1023,8 +1034,13 @@ mac:
 """)
 
 stage('libjxl', """
-    git clone -b v0.12.0 --recursive --shallow-submodules https://github.com/libjxl/libjxl.git
+    git clone -b v0.12.0 --recursive https://github.com/libjxl/libjxl.git
     cd libjxl
+    cd third_party
+    cd brotli
+    git checkout v1.2.1
+    cd ..
+    cd ..
 """ + setVar("cmake_defines", """
     -DBUILD_SHARED_LIBS=OFF
     -DBUILD_TESTING=OFF
@@ -1161,18 +1177,29 @@ mac:
     lipo -create build.arm64/liblcms2.a build/liblcms2.a -output ${USED_PREFIX}/lib/liblcms2.a
 """)
 
+# Version 2 of these source-only stages re-clones them once over a cache the
+# CI prune had stripped; the prune keeps their trees from now on.
 stage('nv-codec-headers', """
+version: 2
 win:
     git clone -b n12.1.14.0 https://github.com/FFmpeg/nv-codec-headers.git
 """)
 
 stage('regex', """
+version: 2
     git clone -b boost-1.83.0 https://github.com/boostorg/regex.git
 """)
 
 stage('ffmpeg', """
     git clone -b n8.1.3 https://github.com/FFmpeg/FFmpeg.git ffmpeg
     cd ffmpeg
+depends:patches/ffmpeg/*.patch
+win:
+    for %%i in (..\\patches\\ffmpeg\\*.patch) do (
+        git apply "%%i" || exit /b 1
+    )
+mac:
+    find ../patches/ffmpeg -type f -name '*.patch' -print0 | sort -z | xargs -0 git apply
 win:
 depends:patches/ffmpeg.patch
     git apply ../patches/ffmpeg.patch
@@ -1582,6 +1609,7 @@ release:
 if win and qt >= '6':
     # Windows 7 and 8 support for qtbase, and the ANGLE backend Qt 6 dropped.
     stage('qt6_windows7', """
+version: 2
 win32_win64:
     git clone https://github.com/desktop-app/qt6_windows7_patches.git qt6_windows7
     cd qt6_windows7
@@ -1608,6 +1636,7 @@ if qt < '6':
     cd qt_$QT
     git submodule update --init --recursive --progress qtbase qtimageformats qtsvg
 depends:patches/qtbase_""" + qt + """/*.patch
+depends:patches/qtsvg_""" + qt + """/*.patch
 win:
     cd qtbase
     setlocal enabledelayedexpansion
@@ -1618,6 +1647,8 @@ win:
             exit /b 1
         )
     )
+    cd ..\\qtsvg
+    for %%i in (..\\..\\patches\\qtsvg_%QT%\\*) do git apply %%i -v || exit /b 1
     cd ..
 
     SET CONFIGURATIONS=-debug
@@ -1830,7 +1861,7 @@ win:
 stage('tg_owt', """
     git clone https://github.com/desktop-app/tg_owt.git
     cd tg_owt
-    git checkout 07fb35bc33b3e79125a1beab7690e830f183f5d8
+    git checkout 020feec5c040fdae2cf752c2c2be62ddde7c236d
     git submodule update --init --recursive
 win:
     SET MOZJPEG_PATH=$LIBS_DIR/mozjpeg
@@ -2029,18 +2060,20 @@ release:
 # down to their headers while their stage keys stayed valid, leaving a cache
 # that skips them and cannot rebuild tdesktop_rust. The version re-clones
 # them once over such a cache. The revisions are named here because the
-# umbrella stage has to see them, see there.
+# umbrella stage has to see them, see there. Version 3 re-clones them once
+# more: the prune had stripped them again, and komaru_core now rebuilds the
+# umbrella whenever it changes, so the CI prune keeps both trees from now on.
 tlottieRevision = '92df98dc20'
 walletEngineRevision = 'e59e0d89d7ee90c388bf36e3334c5b276f396697'
 stage('tlottie', """
-version: 2
+version: 6
     git clone https://github.com/dkaraush/tlottie.git
     cd tlottie
     git checkout """ + tlottieRevision + """
 """)
 
 stage('wallet-engine', """
-version: 2
+version: 6
 depends:patches/wallet-engine.patch
 win:
     SET "GIT_LFS_SKIP_SMUDGE=1"
@@ -2068,8 +2101,24 @@ win_mac:
 # revisions ride in the version for that, and the counter in front of them
 # flushes a cache whose generated source the CI prune had already deleted.
 # The wallet-engine patch rewrites those sources, so it is a dependency here.
+# KomaruGram's own crate joins them from this repository, so a hash of its
+# sources rides in the version too.
+komaruCorePath = os.path.realpath(
+    os.path.join(scriptPath, '..', '..', 'rust', 'komaru_core'))
+def komaruCoreHash():
+    sha1 = hashlib.sha1()
+    for folder, dirs, files in sorted(os.walk(komaruCorePath)):
+        dirs[:] = sorted(d for d in dirs if d != 'target')
+        for name in sorted(files):
+            path = os.path.join(folder, name)
+            relative = os.path.relpath(path, komaruCorePath)
+            sha1.update(relative.replace(os.sep, '/').encode())
+            with open(path, 'rb') as f:
+                sha1.update(f.read().replace(b'\r\n', b'\n'))
+    return sha1.hexdigest()[:16]
+
 stage('tdesktop_rust', """
-version: 2.""" + tlottieRevision + '.' + walletEngineRevision + """
+version: 3.""" + tlottieRevision + '.' + walletEngineRevision + '.' + komaruCoreHash() + """
 depends:patches/wallet-engine.patch
 win:
     SET "RUSTUP_HOME=%THIRDPARTY_DIR%\\rust\\rustup"
@@ -2092,8 +2141,10 @@ win:
     cd tdesktop_rust
     echo pub use ::tlottie;> src\\lib.rs
     echo pub use ::wallet_engine;>> src\\lib.rs
+    echo pub use ::komaru_core;>> src\\lib.rs
     cargo add --path ..\\tlottie --features c-api
     cargo add --path ..\\wallet-engine
+    cargo add --path """ + komaruCorePath + """
     cargo rustc --lib --release ^
         --crate-type staticlib --crate-type cdylib ^
         %RUST_BUILD_STD% ^
@@ -2119,9 +2170,10 @@ mac:
     export PATH=$CARGO_HOME/bin:$PATH
     cargo new --lib --vcs none tdesktop_rust
     cd tdesktop_rust
-    printf 'pub use ::tlottie;\\npub use ::wallet_engine;\\n' > src/lib.rs
+    printf 'pub use ::tlottie;\\npub use ::wallet_engine;\\npub use ::komaru_core;\\n' > src/lib.rs
     cargo add --path ../tlottie --features c-api
     cargo add --path ../wallet-engine
+    cargo add --path """ + komaruCorePath + """
     buildOneArch() {
         cargo rustc --lib --release \\
             --crate-type staticlib --crate-type cdylib \\

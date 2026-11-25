@@ -55,6 +55,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "history/history_item.h"
 #include "history/history_item_components.h"
 #include "history/history_item_helpers.h"
+#include "history/history_location_manager.h"
 #include "history/view/history_view_item_preview.h"
 #include "history/view/reactions/history_view_reactions_list.h"
 #include "info/bot/earn/info_bot_earn_widget.h"
@@ -120,6 +121,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ui/utils/ayu_profile_values.h"
 #include "ayu/utils/telegram_helpers.h"
+#include "ayu/ayu_settings.h"
+#include "ayu/komaru_strings.h"
+#include "lang/lang_tag.h"
 #include "styles/style_ayu_styles.h"
 #include "ui/widgets/tooltip.h"
 #include "ui/text/text_entity.h"
@@ -1404,6 +1408,37 @@ bool SetClickContext(
 	return false;
 }
 
+// KomaruGram: how many messages a chat has, asked as a one message slice.
+[[nodiscard]] rpl::producer<TextWithEntities> MessagesCountValue(
+		not_null<PeerData*> peer) {
+	return [=](auto consumer) {
+		auto lifetime = rpl::lifetime();
+		const auto api = &peer->session().api();
+		const auto requestId = api->request(MTPmessages_GetHistory(
+			peer->input(),
+			MTP_int(0),
+			MTP_int(0),
+			MTP_int(0),
+			MTP_int(1),
+			MTP_int(0),
+			MTP_int(0),
+			MTP_long(0)
+		)).done([=](const MTPmessages_Messages &result) {
+			const auto count = result.match([](
+					const MTPDmessages_messages &data) {
+				return int(data.vmessages().v.size());
+			}, [](const auto &data) {
+				return int(data.vcount().v);
+			});
+			consumer.put_next(TextWithEntities{
+				Lang::FormatCountDecimal(count),
+			});
+		}).send();
+		lifetime.add([=] { api->request(requestId).cancel(); });
+		return lifetime;
+	};
+}
+
 void AddRegistrationOrCreationButton(
 		not_null<Window::SessionController*> controller,
 		not_null<PeerData*> peer,
@@ -1902,6 +1937,12 @@ Section DetailsFiller::makeInfo() {
 			});
 			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
 		}
+		if (!_topic && AyuSettings::getInstance().showMessagesCount()) {
+			addInfoOneLine(
+				Komaru::TextValue("messages_count"),
+				MessagesCountValue(_peer),
+				QString());
+		}
 	} else {
 		const auto topicRootId = _topic ? _topic->rootId() : 0;
 		const auto addToLink = topicRootId
@@ -2017,6 +2058,12 @@ Section DetailsFiller::makeInfo() {
 				return false;
 			});
 			AddRegistrationOrCreationButton(controller, _peer, idInfo, fitLabelToButton);
+		}
+		if (!_topic && AyuSettings::getInstance().showMessagesCount()) {
+			addInfoOneLine(
+				Komaru::TextValue("messages_count"),
+				MessagesCountValue(_peer),
+				QString());
 		}
 
 		if (_topic) {
@@ -2440,12 +2487,16 @@ void DetailsFiller::addMainApp(not_null<UserData*> user) {
 		}
 		return text;
 	});
-	auto setup = [url](not_null<Ui::FlatLabel*> label) {
+	auto setup = [url, controller](not_null<Ui::FlatLabel*> label) {
 		label->setClickHandlerFilter([=](
 				const ClickHandlerPtr &link,
 				Qt::MouseButton) {
 			if (link && link->url() == url) {
-				UrlClickHandler::Open(url);
+				HiddenUrlClickHandler::OpenTranslated(
+					tr::lng_mini_apps_tos_url,
+					QVariant::fromValue(ClickHandlerContext{
+						.sessionWindow = controller,
+					}));
 				return false;
 			}
 			return true;
@@ -2902,9 +2953,7 @@ Section DetailsFiller::makeTopicsList(not_null<Data::Forum*> forum) {
 	raw->toggleOn(rpl::duplicate(showTopicsVisible));
 	AddMainButton(
 		raw->entity(),
-		(forum->peer()->isBot()
-			? tr::lng_bot_show_threads_list()
-			: tr::lng_forum_show_topics_list()),
+		tr::lng_forum_show_topics_list(),
 		std::move(showTopicsVisible),
 		callback,
 		nullptr,
@@ -3229,7 +3278,10 @@ void ActionsFiller::addBotCommandActions(not_null<UserData*> user) {
 			}
 		}
 		if (!sendBotCommand(u"privacy"_q)) {
-			openUrl(tr::lng_profile_bot_privacy_url(tr::now));
+			HiddenUrlClickHandler::OpenTranslatedWithIv(
+				&user->session(),
+				tr::lng_profile_bot_privacy_url,
+				makeOtherContext());
 		}
 	};
 	AddActionButton(

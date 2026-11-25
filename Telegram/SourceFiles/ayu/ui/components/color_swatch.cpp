@@ -7,6 +7,8 @@
 
 #include <QtCore/QRegularExpression>
 
+#include <algorithm>
+
 namespace AyuUi {
 namespace {
 
@@ -52,7 +54,7 @@ public:
 			context.position + QPoint(st::colorSwatchSkip, top),
 			QSize(size, size));
 		auto hq = PainterHighQualityEnabler(p);
-		auto border = context.textColor;
+		auto border = QColor(context.textColor);
 		border.setAlphaF(border.alphaF() * 0.35);
 		auto pen = QPen(border);
 		pen.setWidthF(st::colorSwatchBorder);
@@ -163,8 +165,8 @@ TextWithEntities AddColorSwatches(TextWithEntities text) {
 	}
 	if (!positions.empty()) {
 		std::stable_sort(
-			begin(text.entities),
-			end(text.entities),
+			text.entities.begin(),
+			text.entities.end(),
 			[](const EntityInText &a, const EntityInText &b) {
 				return a.offset() < b.offset();
 			});

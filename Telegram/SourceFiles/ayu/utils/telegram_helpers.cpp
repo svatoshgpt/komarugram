@@ -16,6 +16,8 @@
 #include "ayu/data/messages_storage.h"
 #include "ayu/features/filters/filters_controller.h"
 #include "ayu/features/komaru/komaru_badges.h"
+#include "ayu/ui/boxes/extera_badge_box.h"
+#include "ayu/ui/boxes/komaru_badge_box.h"
 #include "ayu/ui/toasts.h"
 #include "ayu/utils/rc_manager.h"
 #include "core/core_settings.h"
@@ -53,6 +55,7 @@
 #include "ui/text/text_entity.h"
 #include "ui/toast/toast.h"
 #include "window/window_controller.h"
+#include "window/window_session_controller.h"
 
 #include <atomic>
 #include <functional>
@@ -60,6 +63,8 @@
 #include <QTimer>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+
+#include <komaru_core.h>
 
 namespace {
 
@@ -218,10 +223,10 @@ CustomBadge getCustomBadge(ID peerId) {
 	// KomaruGram faces go in front of the arrow, or stand alone.
 	result.komaruDeveloper = (KomaruBadges::Developer(id) != nullptr);
 	result.komaruSupporter = (KomaruBadges::Supporter(id) != nullptr);
-	result.komaruStatus = KomaruBadges::Status(id);
+	result.komaruStatuses = KomaruBadges::Statuses(id);
 	if (result.komaruDeveloper
 		|| result.komaruSupporter
-		|| result.komaruStatus) {
+		|| !result.komaruStatuses.empty()) {
 		result.komaruPeer = id;
 		if (result.badge == BadgeType::None) {
 			result.badge = BadgeType::Komaru;
@@ -251,11 +256,38 @@ Fn<void()> badgeClickHandler(
 		const auto badge = source
 			? source->clickedContent()
 			: ComputeExteraBadgeContent(peer);
+		if (badge.badge == Info::Profile::BadgeType::None) {
+			return;
+		}
 		const auto isCustomBadge = isCustomBadgePeer(getBareID(peer));
 		const auto isExtera = isExteraPeer(getBareID(peer));
 		const auto isSupporter = isSupporterPeer(getBareID(peer));
 		const auto komaruDeveloper = badge.komaruDeveloper;
 		const auto komaruSupporter = badge.komaruSupporter;
+
+		// A supporter arrow opens what it gives, like in exteraGram.
+		const auto arrow = (badge.badge == Info::Profile::BadgeType::ExteraSupporter)
+			|| (badge.badge == Info::Profile::BadgeType::ExteraCustom && !isExtera);
+		if (arrow && !komaruDeveloper && !komaruSupporter) {
+			if (const auto window = Core::App().activeWindow()) {
+				if (const auto controller = window->sessionController()) {
+					controller->show(Box(Ui::FillExteraBadgeBox, controller, peer));
+					return;
+				}
+			}
+		}
+
+		// Your own status opens its editor.
+		if (peer->isSelf()
+			&& !badge.komaruStatuses.empty()
+			&& KomaruBadges::CanEditStatus(getBareID(peer))) {
+			if (const auto window = Core::App().activeWindow()) {
+				if (const auto controller = window->sessionController()) {
+					controller->show(Box(Ui::FillKomaruBadgeBox, controller));
+					return;
+				}
+			}
+		}
 
 		TextWithEntities text;
 		if (komaruDeveloper) {
@@ -277,12 +309,14 @@ Fn<void()> badgeClickHandler(
 				lt_item,
 				TextWithEntities{peer->name()},
 				tr::rich);
-		} else if (badge.komaruStatus
+		} else if (!badge.komaruStatuses.empty()
 			&& badge.badge == Info::Profile::BadgeType::Komaru) {
-			const auto custom = KomaruBadges::StatusText(getBareID(peer));
+			const auto custom = KomaruBadges::StatusText(
+				getBareID(peer)
+			).replace(u"{name}"_q, peer->name());
 			text = !custom.isEmpty()
 				? tr::rich(custom)
-				: tr::ayu_KomaruSupporterPopup(
+				: tr::ayu_KomaruStatusPopup(
 					tr::now,
 					lt_item,
 					TextWithEntities{peer->name()},
@@ -891,7 +925,7 @@ void searchPeerInner(const QString &peerId, Main::Session *session, const Userna
 				{
 					return QString();
 				},
-				[&](const MTPDbotInlineMessageRichMessage &data)
+				[&](const auto &data)
 				{
 					return QString();
 				});
@@ -1027,17 +1061,9 @@ void searchChatById(ID chatId, Main::Session *session, const UsernameResolverCal
 		});
 }
 
+// The pack id carries its creator for known serial ranges, as in KomaruGram Go: https://github.com/komarugif/komarugram-go/blob/main/internal/messenger/model/sticker_set.go
 ID getUserIdFromPackId(uint64 id) {
-	// https://github.com/TDesktop-x64/tdesktop/pull/218/commits/844e5f0ab116e7639cfc79633a68afe8fdcbc463
-	auto ownerId = id >> 32;
-	if ((id >> 16 & 0xff) == 0x3f) {
-		ownerId |= 0x80000000;
-	}
-	if (id >> 24 & 0xff) {
-		ownerId += 0x100000000;
-	}
-
-	return ownerId;
+	return komaru_pack_owner_id(id);
 }
 
 TextWithTags extractText(not_null<HistoryItem*> item) {
@@ -1412,7 +1438,7 @@ void getUserRegistrationDateInner(
 				{
 					return QString();
 				},
-				[&](const MTPDbotInlineMessageRichMessage &data)
+				[&](const auto &data)
 				{
 					return QString();
 				});

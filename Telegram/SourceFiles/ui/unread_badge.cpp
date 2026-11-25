@@ -33,7 +33,14 @@ namespace Ui {
 namespace {
 
 constexpr auto kPlayStatusLimit = 12;
+
+// Our statuses stand in a row, so each gets the same gap before it.
+[[nodiscard]] int CustomStatusWidth() {
+	return style::ConvertScale(2)
+		+ Ui::Text::AdjustCustomEmojiSize(st::emojiSize);
+}
 constexpr auto kBotVerifiedScale = 0.88;
+constexpr auto kKomaruPlayDuration = crl::time(4000);
 
 class ScaledBotVerifiedEmoji final : public Ui::Text::CustomEmoji {
 public:
@@ -121,6 +128,18 @@ bool ScaledBotVerifiedEmoji::readyInDefaultState() {
 
 } // namespace
 
+std::unique_ptr<Text::CustomEmoji> CreateBotVerifiedEmoji(
+		DocumentId iconId,
+		Text::CustomEmojiFactory factory,
+		Fn<void()> repaint) {
+	const auto outer = st::emojiSize;
+	const auto inner = int(base::SafeRound(outer * kBotVerifiedScale));
+	return MakeWrappedEmoji<ScaledBotVerifiedEmoji>(
+		factory(Data::SerializeCustomEmojiId(iconId), { .repaint = repaint }),
+		inner,
+		outer);
+}
+
 struct PeerBadge::EmojiStatus {
 	EmojiStatusId id;
 	std::unique_ptr<Ui::Text::CustomEmoji> emoji;
@@ -140,6 +159,7 @@ struct PeerBadge::KomaruAnimation {
 
 	Fn<void()> repaint;
 	base::Timer timer;
+	crl::time started = 0;
 };
 
 struct PeerBadge::BotVerifiedData {
@@ -274,7 +294,8 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 		&& peer->session().premiumBadgesShown();
 	const auto emojiStatus = premiumMark
 		&& peer->emojiStatusId()
-		&& (peer->isPremium() || peer->isChannel());
+		&& (peer->isPremium() || peer->isChannel())
+		&& !peer->hideEmojiStatus();
 	const auto premiumStar = premiumMark
 		&& !emojiStatus
 		&& peer->isPremium();
@@ -321,16 +342,14 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 	const auto komaruSupporter = hideExteraBadges
 		? nullptr
 		: KomaruBadges::Supporter(getBareID(peer));
-	const auto komaruStatus = hideExteraBadges
-		? uint64()
-		: KomaruBadges::Status(getBareID(peer));
-	const auto customEmojiSkip = (st::emojiSize
-		- Ui::Text::AdjustCustomEmojiSize(st::emojiSize)) / 2;
-	const auto customEmojiWidth = descriptor.premium->width()
-		- 4 * customEmojiSkip;
+	const auto komaruStatuses = hideExteraBadges
+		? std::vector<uint64>()
+		: KomaruBadges::Statuses(getBareID(peer));
+	const auto customEmojiWidth = CustomStatusWidth();
 	const auto exteraCustomWidth = paintExteraCustom ? customEmojiWidth : 0;
 	const auto komaruSize = descriptor.exteraSupporter->width();
-	const auto komaruStatusWidth = komaruStatus ? customEmojiWidth : 0;
+	const auto komaruStatusWidth = customEmojiWidth
+		* int(komaruStatuses.size());
 	const auto komaruWidth = (komaruDeveloper ? komaruSize : 0)
 		+ (komaruSupporter ? komaruSize : 0)
 		+ komaruStatusWidth;
@@ -399,13 +418,15 @@ int PeerBadge::drawGetWidth(Painter &p, Descriptor &&descriptor) {
 				return drawKomaru(p, descriptor, *komaruSupporter);
 			});
 		}
-		if (komaruStatus) {
-			drawKeeping(afterKomaru, [&] {
+		_komaruStatuses.resize(komaruStatuses.size());
+		for (auto i = 0; i != int(komaruStatuses.size()); ++i) {
+			const auto later = int(komaruStatuses.size()) - i - 1;
+			drawKeeping(later * customEmojiWidth + afterKomaru, [&] {
 				return drawCustomStatus(
 					p,
 					descriptor,
-					EmojiStatusId{ .documentId = komaruStatus },
-					_komaruStatus);
+					EmojiStatusId{ .documentId = komaruStatuses[i] },
+					_komaruStatuses[i]);
 			});
 		}
 		if (paintExteraCustom) {
@@ -544,9 +565,11 @@ int PeerBadge::drawCustomStatus(
 		std::unique_ptr<EmojiStatus> &slot) {
 	const auto peer = descriptor.peer;
 	const auto rectForName = descriptor.rectForName;
-	const auto iconw = descriptor.premium->width();
+	const auto iconw = CustomStatusWidth();
+	const auto emojiSize = Ui::Text::AdjustCustomEmojiSize(st::emojiSize);
 	const auto iconx = rectForName.x()
-		+ qMin(descriptor.nameWidth, rectForName.width() - iconw);
+		+ qMin(descriptor.nameWidth, rectForName.width() - iconw)
+		+ (iconw - emojiSize);
 	const auto icony = rectForName.y();
 	if (!slot) {
 		slot = std::make_unique<EmojiStatus>();
@@ -567,12 +590,10 @@ int PeerBadge::drawCustomStatus(
 	slot->emoji->paint(p, {
 		.textColor = (*descriptor.premiumFg)->c,
 		.now = descriptor.now,
-		.position = QPoint(
-			iconx - 2 * slot->skip,
-			icony + slot->skip),
+		.position = QPoint(iconx, icony + slot->skip),
 		.paused = descriptor.paused || On(PowerSaving::kEmojiStatus),
 	});
-	return iconw - 4 * slot->skip;
+	return iconw;
 }
 
 int PeerBadge::drawPremiumStar(Painter &p, const Descriptor &descriptor) {
@@ -620,16 +641,23 @@ int PeerBadge::drawKomaru(
 	const auto left = rectForName.x()
 		+ std::min(descriptor.nameWidth, rectForName.width() - iconw);
 	const auto now = descriptor.now ? descriptor.now : crl::now();
+	const auto animated = !descriptor.paused && KomaruBadges::Animated();
+	if (animated && !_komaruAnimation) {
+		_komaruAnimation = std::make_unique<KomaruAnimation>();
+		_komaruAnimation->started = now;
+	}
+	// Like emoji statuses, a face plays for a while and then stays still.
+	const auto playedTill = _komaruAnimation
+		? (_komaruAnimation->started + kKomaruPlayDuration)
+		: now;
+	const auto playing = animated && (now < playedTill);
 	KomaruBadges::Paint(
 		p,
 		QRect(left, rectForName.y(), iconw, icon->height()),
 		entry,
-		now,
+		std::min(now, playedTill),
 		(*descriptor.premiumFg)->c);
-	if (!descriptor.paused && KomaruBadges::Animated()) {
-		if (!_komaruAnimation) {
-			_komaruAnimation = std::make_unique<KomaruAnimation>();
-		}
+	if (playing) {
 		_komaruAnimation->repaint = descriptor.customEmojiRepaint;
 		if (!_komaruAnimation->timer.isActive()) {
 			_komaruAnimation->timer.callOnce(KomaruBadges::kFrameDelay);
@@ -703,15 +731,10 @@ void PeerBadge::set(
 		_botVerifiedData = std::make_unique<BotVerifiedData>();
 	}
 	if (details->iconId) {
-		const auto outer = st::emojiSize;
-		const auto inner = int(base::SafeRound(
-			st::emojiSize * kBotVerifiedScale));
-		_botVerifiedData->icon = MakeWrappedEmoji<ScaledBotVerifiedEmoji>(
-			factory(
-				Data::SerializeCustomEmojiId(details->iconId),
-				{ .repaint = repaint }),
-			inner,
-			outer);
+		_botVerifiedData->icon = CreateBotVerifiedEmoji(
+			details->iconId,
+			std::move(factory),
+			std::move(repaint));
 	}
 }
 

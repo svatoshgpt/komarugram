@@ -54,8 +54,6 @@ InfoTopBar {
 	storiesUnpin: IconButton;
 	search: IconButton;
 	searchRow: SearchFieldRow;
-	highlightBg: color;
-	highlightDuration: int;
 	radius: pixels;
 }
 
@@ -261,8 +259,6 @@ infoTopBar: InfoTopBar {
 	storiesUnpin: infoTopBarUnpinStories;
 	search: infoTopBarSearch;
 	searchRow: infoTopBarSearchRow;
-	highlightBg: windowBgOver;
-	highlightDuration: 240;
 	radius: 0px;
 }
 infoTopBarScale: 0.7;
@@ -1349,6 +1345,7 @@ collectionSubTabs: SubTabs(defaultSubTabs) {
 earnTonIconSize: 16px;
 earnTonIconMargin: margins(0px, 2px, 0px, 0px);
 
+// KomaruGram: the saved music button of the AyuGram profile.
 infoMusicButtonRipple: universalRippleAnimation;
 infoMusicButtonPadding: margins(12px, 8px, 24px, 8px);
 infoMusicButtonPerformer: FlatLabel(defaultFlatLabel) {

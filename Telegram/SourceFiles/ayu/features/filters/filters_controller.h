@@ -8,6 +8,8 @@
 
 #include "unicode/regex.h"
 
+#include <komaru_core.h>
+
 #include <memory>
 #include <optional>
 #include <string>
@@ -28,6 +30,8 @@ struct ReversiblePattern
 {
 	std::shared_ptr<icu::RegexPattern> pattern;
 	bool reversed;
+	// The Rust engine when it can run the pattern, ICU above otherwise.
+	std::shared_ptr<KomaruFilter> fast;
 };
 
 struct HashablePattern

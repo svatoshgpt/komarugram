@@ -206,6 +206,18 @@ void BuildAppearance(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setMaterialSwitches,
 	});
 	ayu.addSettingToggle({
+		.id = u"ayu/disableSendAnimation"_q,
+		.title = tr::ayu_DisableSendAnimation(),
+		.getter = &AyuSettings::disableSendAnimation,
+		.setter = &AyuSettings::setDisableSendAnimation,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/disableDeleteAnimation"_q,
+		.title = tr::ayu_DisableDeleteAnimation(),
+		.getter = &AyuSettings::disableDeleteAnimation,
+		.setter = &AyuSettings::setDisableDeleteAnimation,
+	});
+	ayu.addSettingToggle({
 		.id = u"ayu/disableCustomBackgrounds"_q,
 		.altIds = { u"ayu/customThemes"_q },
 		.title = tr::ayu_DisableCustomBackgrounds(),
@@ -417,6 +429,13 @@ struct DrawerItem {
 			{ &st::menuIconProfile },
 			&AyuSettings::showMyProfileInDrawer,
 			&AyuSettings::setShowMyProfileInDrawer);
+	} else if (id == u"plugins"_q) {
+		return toggle(
+			u"ayu/showPluginsInDrawer"_q,
+			tr::ayu_PluginsTitle(),
+			{ &st::ayuPluginsIcon },
+			&AyuSettings::showPluginsInDrawer,
+			&AyuSettings::setShowPluginsInDrawer);
 	} else if (id == u"bots"_q) {
 		return toggle(
 			u"ayu/showBotsInDrawer"_q,
@@ -540,6 +559,8 @@ struct DrawerItem {
 			st::settingsButton.iconLeft / 2,
 			(size.height() - handle->height()) / 2);
 	}, handle->lifetime());
+	// Rows added after the list is shown would keep their children hidden.
+	handle->show();
 	return handle;
 }
 
@@ -575,6 +596,7 @@ struct DrawerItem {
 			rowSize.width());
 	}, button->lifetime());
 	button->setClickedCallback(std::move(callback));
+	button->show();
 	return button;
 }
 
@@ -762,6 +784,7 @@ void BuildDrawerElements(SectionBuilder &builder, AyuSectionBuilder &) {
 			}
 			const auto wrap = rows->list->add(MakeSeparatorRow(rows->list));
 			setupSeparator(wrap);
+			wrap->show(anim::type::instant);
 			rows->ids.push_back(u"separator"_q);
 			saveOrder();
 			rows->reorder->cancel();

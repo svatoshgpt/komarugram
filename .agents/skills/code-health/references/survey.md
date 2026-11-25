@@ -37,10 +37,8 @@ returning file:line evidence. None sees another's report.
 
 Before anything is written down, a separate verifier re-checks every claim the
 proposals or the map rely on: re-run the count, re-read the lines, confirm
-"unused" has no callers. Use the other provider for the verifier, because
-same-model reviewers share blind spots: on Claude Code a Codex CLI leaf under
-[Codex CLI leaves](../../../shared/codex-cli-leaves.md) (`--cwd <scan worktree>
---sandbox read-only`), elsewhere a fresh native agent. Claims that were not
+"unused" has no callers. The verifier is a fresh read-only agent in the
+scan worktree that never saw the proposals being written. Claims that were not
 re-checked are marked `(inferred)`.
 
 ## Outputs

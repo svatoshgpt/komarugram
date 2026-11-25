@@ -7,6 +7,8 @@
 #include "ayu/ui/boxes/plugin_info_box.h"
 
 #include "apiwrap.h"
+#include "ayu/ui/settings/settings_plugins.h"
+#include "base/zlib_help.h"
 #include "ayu/ayu_url_handlers.h"
 #include "core/file_utilities.h"
 #include "core/ui_integration.h"
@@ -28,6 +30,7 @@
 #include "ui/painter.h"
 #include "ui/rect.h"
 #include "ui/vertical_list.h"
+#include "ui/boxes/confirm_box.h"
 #include "ui/layers/generic_box.h"
 #include "ui/text/text_utilities.h"
 #include "ui/widgets/buttons.h"
@@ -36,6 +39,7 @@
 #include "ui/widgets/scroll_area.h"
 #include "window/window_session_controller.h"
 
+#include <QFileInfo>
 #include <QPainterPath>
 #include <QRegularExpression>
 
@@ -134,6 +138,85 @@ TextWithEntities ParsePluginDescription(const QString &text) {
 		offset = match.capturedEnd();
 	}
 	result.append(ParsePluginDescriptionLinks(text.mid(offset)));
+	return result;
+}
+
+constexpr auto kMaxElyxEntry = 1024 * 1024;
+
+[[nodiscard]] QString YamlScalar(QString value) {
+	value = value.trimmed();
+	if (value.size() > 1
+		&& (value.front() == '\'' || value.front() == '"')
+		&& value.back() == value.front()) {
+		const auto single = (value.front() == '\'');
+		value = value.mid(1, value.size() - 2);
+		if (single) {
+			value.replace(u"''"_q, u"'"_q);
+		}
+	}
+	return value;
+}
+
+// Top-level scalars and lists of a metainfo or refmap file, which is all
+// the box needs.
+[[nodiscard]] QHash<QString, QString> ParseYamlTop(const QByteArray &data) {
+	auto result = QHash<QString, QString>();
+	auto lastKey = QString();
+	for (auto line : QString::fromUtf8(data).split('\n')) {
+		line.remove('\r');
+		const auto trimmed = line.trimmed();
+		if (trimmed.isEmpty() || trimmed.startsWith('#')) {
+			continue;
+		}
+		if (line[0].isSpace()) {
+			if (trimmed.startsWith(u"- "_q) && !lastKey.isEmpty()) {
+				auto &list = result[lastKey];
+				list += (list.isEmpty() ? QString() : u","_q)
+					+ YamlScalar(trimmed.mid(2));
+			}
+			continue;
+		}
+		const auto colon = trimmed.indexOf(':');
+		if (colon <= 0) {
+			continue;
+		}
+		lastKey = trimmed.left(colon).trimmed();
+		auto value = trimmed.mid(colon + 1).trimmed();
+		if (value.startsWith('[') && value.endsWith(']')) {
+			auto parts = QStringList();
+			for (const auto &part : value.mid(1, value.size() - 2).split(',')) {
+				parts.push_back(YamlScalar(part));
+			}
+			value = parts.join(',');
+		} else {
+			value = YamlScalar(value);
+		}
+		result.insert(lastKey, value);
+	}
+	return result;
+}
+
+[[nodiscard]] QHash<QString, QByteArray> ReadZipEntries(
+		const QByteArray &bytes,
+		const QStringList &wanted) {
+	auto result = QHash<QString, QByteArray>();
+	auto zip = zlib::FileToRead(bytes);
+	if (zip.goToFirstFile() != UNZ_OK) {
+		return result;
+	}
+	do {
+		const auto name = zip.getCurrentFileName();
+		if (wanted.contains(name)) {
+			const auto content = zip.readCurrentFileContent(kMaxElyxEntry);
+			if (zip.error() != UNZ_OK) {
+				return {};
+			}
+			result.insert(name, content);
+		}
+		if (zip.goToNextFile() != UNZ_OK) {
+			break;
+		}
+	} while (true);
 	return result;
 }
 
@@ -415,28 +498,53 @@ void FillPluginInfoBox(
 
 	Ui::AddSkip(box->verticalLayout());
 
-	box->verticalLayout()->add(
-		object_ptr<Ui::FlatLabel>(
-			box->verticalLayout(),
-			tr::ayu_PluginsNotAvailable(),
-			st::boxDividerLabel),
-		st::boxRowPadding);
-
-	Ui::AddSkip(box->verticalLayout());
-
-	const auto closeButton = box->addButton(
-		tr::lng_close(),
-		[=] { box->closeBox(); });
-	const auto buttonWidth = box->width()
-		- rect::m::sum::h(st::starrefFooterBox.buttonPadding);
-	closeButton->widthValue() | rpl::filter([=]
-	{
-		return (closeButton->widthNoMargins() != buttonWidth);
-	}) | rpl::on_next([=]
-					  {
-						  closeButton->resizeToWidth(buttonWidth);
-					  },
-					  closeButton->lifetime());
+	// The buttons follow the install state: Install while the plugin is
+	// not there, Delete and Update once it is.
+	const auto id = metadata.id;
+	const auto installed = box->lifetime().make_state<rpl::variable<bool>>(
+		::Settings::PluginInstalled(id));
+	const auto weak = base::make_weak(box);
+	const auto install = [=] {
+		::Settings::InstallPluginFile(controller, pluginPath, [=] {
+			if (weak.get()) {
+				*installed = true;
+			}
+		});
+	};
+	const auto remove = [=] {
+		controller->show(Ui::MakeConfirmBox({
+			.text = tr::ayu_PluginDeleteSure(),
+			.confirmed = [=](Fn<void()> &&close) {
+				::Settings::UninstallPlugin(id, [=] {
+					if (weak.get()) {
+						*installed = false;
+					}
+				});
+				close();
+			},
+			.confirmText = tr::ayu_PluginDelete(),
+			.confirmStyle = &st::attentionBoxButton,
+		}));
+	};
+	installed->value(
+	) | rpl::on_next([=](bool value) {
+		box->clearButtons();
+		if (value) {
+			box->addLeftButton(tr::ayu_PluginDelete(), remove);
+			box->addButton(tr::ayu_PluginUpdateButton(), install);
+			return;
+		}
+		const auto button = box->addButton(
+			tr::ayu_PluginInstallButton(),
+			install);
+		const auto buttonWidth = box->width()
+			- rect::m::sum::h(st::starrefFooterBox.buttonPadding);
+		button->widthValue() | rpl::filter([=] {
+			return (button->widthNoMargins() != buttonWidth);
+		}) | rpl::on_next([=] {
+			button->resizeToWidth(buttonWidth);
+		}, button->lifetime());
+	}, box->lifetime());
 }
 
 }
@@ -477,6 +585,97 @@ PluginMetadata ParsePluginMetadata(const QByteArray &data) {
 		return {};
 	}
 
+	return metadata;
+}
+
+PluginMetadata ParseElyxMetadata(const QByteArray &bytes) {
+	const auto refmapNames = QStringList{
+		u"refmap.yml"_q,
+		u"refmap.yaml"_q,
+	};
+	const auto refmaps = ReadZipEntries(bytes, refmapNames);
+	auto metainfo = QString();
+	for (const auto &name : refmapNames) {
+		if (refmaps.contains(name)) {
+			metainfo = ParseYamlTop(refmaps.value(name)).value(u"metainfo"_q);
+			break;
+		}
+	}
+	const auto candidates = metainfo.isEmpty()
+		? QStringList{ u"metainfo.yml"_q, u"metainfo.yaml"_q }
+		: QStringList{ metainfo };
+	const auto files = ReadZipEntries(bytes, candidates);
+	if (files.isEmpty()) {
+		return {};
+	}
+	const auto fields = ParseYamlTop(files.begin().value());
+	auto metadata = PluginMetadata();
+	metadata.id = fields.value(u"id"_q);
+	metadata.name = fields.value(u"name"_q).left(100);
+	metadata.description = fields.value(u"description"_q).left(8000);
+	metadata.author = fields.value(u"author"_q).left(200);
+	metadata.version = fields.value(u"version"_q).left(32);
+	metadata.icon = fields.value(u"icon"_q);
+	metadata.minVersion = fields.value(u"min_version"_q);
+	for (const auto &part : fields.value(u"requirements"_q).split(',')) {
+		if (const auto trimmed = part.trimmed(); !trimmed.isEmpty()) {
+			metadata.requirements.append(trimmed);
+		}
+	}
+	if (metadata.version.isEmpty()) {
+		metadata.version = u"1.0"_q;
+	}
+	static const auto idRegex = QRegularExpression(
+		u"^[a-zA-Z][a-zA-Z0-9_-]{1,31}$"_q);
+	if (!idRegex.match(metadata.id).hasMatch()) {
+		return {};
+	}
+	if (metadata.name.isEmpty()) {
+		metadata.name = metadata.id;
+	}
+	return metadata;
+}
+
+bool IsPluginFileName(const QString &name) {
+	return name.endsWith(u".plugin"_q, Qt::CaseInsensitive)
+		|| name.endsWith(u".elyx"_q, Qt::CaseInsensitive)
+		|| name.endsWith(u".eaf"_q, Qt::CaseInsensitive)
+		|| name.endsWith(u".py"_q, Qt::CaseInsensitive);
+}
+
+bool IsUserbotSource(const QByteArray &bytes) {
+	static const auto imports = QRegularExpression(
+		uR"(^\s*(?:import|from)\s+(?:telethon|pyrogram|kurigram|komaru|base_plugin)\b)"_q,
+		QRegularExpression::MultilineOption);
+	return imports.match(QString::fromUtf8(bytes)).hasMatch();
+}
+
+PluginMetadata ParsePluginFile(const QString &name, const QByteArray &bytes) {
+	if (name.endsWith(u".elyx"_q, Qt::CaseInsensitive)
+		|| name.endsWith(u".eaf"_q, Qt::CaseInsensitive)) {
+		return ParseElyxMetadata(bytes);
+	} else if (!name.endsWith(u".py"_q, Qt::CaseInsensitive)) {
+		return ParsePluginMetadata(bytes);
+	} else if (!IsUserbotSource(bytes)) {
+		return {};
+	}
+	// A userbot script may have no metadata; the host names it after the
+	// file the same way.
+	auto metadata = ParsePluginMetadata(bytes);
+	if (metadata.id.isEmpty()) {
+		const auto stem = QFileInfo(name).completeBaseName();
+		auto id = stem;
+		id.replace(QRegularExpression(u"[^A-Za-z0-9_-]"_q), u"_"_q);
+		id = id.left(32);
+		if (id.isEmpty() || !id[0].isLetter() || id[0].unicode() > 127) {
+			id = (u"py_"_q + id).left(32);
+		}
+		metadata.id = id;
+		metadata.name = stem.left(100);
+		metadata.version = u"1.0"_q;
+		metadata.description = ExtractField(bytes, u"description"_q).left(8000);
+		metadata.author = ExtractField(bytes, u"author"_q).left(200);
+	}
 	return metadata;
 }
 

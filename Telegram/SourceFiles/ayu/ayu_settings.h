@@ -45,6 +45,12 @@ enum class TranslationProvider {
 	Native = 3,
 };
 
+enum class NowPlayingService {
+	None = 0,
+	LastFm = 1,
+	StatsFm = 2,
+};
+
 enum class SendWithoutSoundOption {
 	Never = 0,
 	InGhostMode = 1,
@@ -74,6 +80,12 @@ NLOHMANN_JSON_SERIALIZE_ENUM(TranslationProvider, {
 	{TranslationProvider::Google, "google"},
 	{TranslationProvider::Yandex, "yandex"},
 	{TranslationProvider::Native, "native"},
+})
+
+NLOHMANN_JSON_SERIALIZE_ENUM(NowPlayingService, {
+	{NowPlayingService::None, 0},
+	{NowPlayingService::LastFm, 1},
+	{NowPlayingService::StatsFm, 2},
 })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(SendWithoutSoundOption, {
@@ -280,6 +292,7 @@ public:
 	[[nodiscard]] bool hidePremiumStatuses() const { return _hidePremiumStatuses.current(); }
 	[[nodiscard]] bool hideExteraBadges() const { return _hideExteraBadges.current(); }
 	[[nodiscard]] bool showOnlyAddedEmojisAndStickers() const { return _showOnlyAddedEmojisAndStickers.current(); }
+	[[nodiscard]] bool hidePaidStickers() const { return _hidePaidStickers.current(); }
 	[[nodiscard]] bool collapseSimilarChannels() const { return _collapseSimilarChannels.current(); }
 	[[nodiscard]] bool hideSimilarChannels() const { return _hideSimilarChannels.current(); }
 	[[nodiscard]] int messageBubbleRadius() const { return _messageBubbleRadius.current(); }
@@ -326,6 +339,10 @@ public:
 	[[nodiscard]] bool showCallsInDrawer() const { return _showCallsInDrawer.current(); }
 	[[nodiscard]] bool showSavedMessagesInDrawer() const { return _showSavedMessagesInDrawer.current(); }
 	[[nodiscard]] bool showWalletInDrawer() const { return _showWalletInDrawer.current(); }
+	[[nodiscard]] bool showPluginsInDrawer() const { return _showPluginsInDrawer.current(); }
+	[[nodiscard]] bool disableSendAnimation() const { return _disableSendAnimation.current(); }
+	[[nodiscard]] bool disableDeleteAnimation() const { return _disableDeleteAnimation.current(); }
+	[[nodiscard]] bool smoothScroll() const { return _smoothScroll.current(); }
 	[[nodiscard]] bool showLReadToggleInDrawer() const { return _showLReadToggleInDrawer.current(); }
 	[[nodiscard]] bool showSReadToggleInDrawer() const { return _showSReadToggleInDrawer.current(); }
 	[[nodiscard]] bool showNightModeToggleInDrawer() const { return _showNightModeToggleInDrawer.current(); }
@@ -353,6 +370,7 @@ public:
 	[[nodiscard]] bool disableGreetingSticker() const { return _disableGreetingSticker.current(); }
 	[[nodiscard]] PeerIdDisplay showPeerId() const { return _showPeerId.current(); }
 	[[nodiscard]] bool showMessageSeconds() const { return _showMessageSeconds.current(); }
+	[[nodiscard]] bool showMessagesCount() const { return _showMessagesCount.current(); }
 	[[nodiscard]] bool showMessageShot() const { return _showMessageShot.current(); }
 	[[nodiscard]] bool filterZalgo() const { return _filterZalgo.current(); }
 	[[nodiscard]] bool stickerConfirmation() const { return _stickerConfirmation.current(); }
@@ -365,6 +383,12 @@ public:
 	[[nodiscard]] bool crashReporting() const { return _crashReporting.current(); }
 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
+	[[nodiscard]] NowPlayingService nowPlayingService() const { return _nowPlayingService.current(); }
+	[[nodiscard]] const QString &nowPlayingUsername() const { return _nowPlayingUsername.current(); }
+	[[nodiscard]] const QString &nowPlayingLastFmKey() const { return _nowPlayingLastFmKey.current(); }
+	[[nodiscard]] bool nowPlayingProfileMusic() const { return _nowPlayingProfileMusic.current(); }
+	[[nodiscard]] bool nowPlayingKeepMusic() const { return _nowPlayingKeepMusic.current(); }
+	[[nodiscard]] bool nowPlayingBio() const { return _nowPlayingBio.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
 
 	void setSaveDeletedMessages(bool val);
@@ -380,6 +404,7 @@ public:
 	void setHidePremiumStatuses(bool val);
 	void setHideExteraBadges(bool val);
 	void setShowOnlyAddedEmojisAndStickers(bool val);
+	void setHidePaidStickers(bool val);
 	void setCollapseSimilarChannels(bool val);
 	void setHideSimilarChannels(bool val);
 	void setMessageBubbleRadius(int val);
@@ -426,6 +451,10 @@ public:
 	void setShowCallsInDrawer(bool val);
 	void setShowSavedMessagesInDrawer(bool val);
 	void setShowWalletInDrawer(bool val);
+	void setShowPluginsInDrawer(bool val);
+	void setDisableSendAnimation(bool val);
+	void setDisableDeleteAnimation(bool val);
+	void setSmoothScroll(bool val);
 	void setShowLReadToggleInDrawer(bool val);
 	void setShowSReadToggleInDrawer(bool val);
 	void setShowNightModeToggleInDrawer(bool val);
@@ -445,6 +474,7 @@ public:
 	void setDisableGreetingSticker(bool val);
 	void setShowPeerId(PeerIdDisplay val);
 	void setShowMessageSeconds(bool val);
+	void setShowMessagesCount(bool val);
 	void setShowMessageShot(bool val);
 	void setFilterZalgo(bool val);
 	void setStickerConfirmation(bool val);
@@ -457,6 +487,12 @@ public:
 	void setCrashReporting(bool val);
 	void setAvatarCorners(int val);
 	void setSingleCornerRadius(bool val);
+	void setNowPlayingService(NowPlayingService val);
+	void setNowPlayingUsername(const QString &val);
+	void setNowPlayingLastFmKey(const QString &val);
+	void setNowPlayingProfileMusic(bool val);
+	void setNowPlayingKeepMusic(bool val);
+	void setNowPlayingBio(bool val);
 	void setStreamerMode(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
@@ -635,6 +671,11 @@ public:
 	[[nodiscard]] rpl::producer<int> avatarCornersChanges() const { return _avatarCorners.changes(); }
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusValue() const { return _singleCornerRadius.value(); }
 	[[nodiscard]] rpl::producer<bool> singleCornerRadiusChanges() const { return _singleCornerRadius.changes(); }
+	[[nodiscard]] rpl::producer<NowPlayingService> nowPlayingServiceValue() const { return _nowPlayingService.value(); }
+	[[nodiscard]] rpl::producer<QString> nowPlayingUsernameValue() const { return _nowPlayingUsername.value(); }
+	[[nodiscard]] rpl::producer<QString> nowPlayingLastFmKeyValue() const { return _nowPlayingLastFmKey.value(); }
+	[[nodiscard]] rpl::producer<bool> nowPlayingProfileMusicValue() const { return _nowPlayingProfileMusic.value(); }
+	[[nodiscard]] rpl::producer<bool> nowPlayingBioValue() const { return _nowPlayingBio.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeValue() const { return _streamerMode.value(); }
 	[[nodiscard]] rpl::producer<bool> streamerModeChanges() const { return _streamerMode.changes(); }
 
@@ -658,6 +699,7 @@ private:
 	rpl::variable<bool> _disableStories = false;
 	rpl::variable<bool> _disableCustomBackgrounds = false;
 	rpl::variable<bool> _showOnlyAddedEmojisAndStickers = false;
+	rpl::variable<bool> _hidePaidStickers = false;
 	rpl::variable<bool> _collapseSimilarChannels = true;
 	rpl::variable<bool> _hideSimilarChannels = true;
 	rpl::variable<int> _messageBubbleRadius = 16;
@@ -704,6 +746,10 @@ private:
 	rpl::variable<bool> _showCallsInDrawer = true;
 	rpl::variable<bool> _showSavedMessagesInDrawer = true;
 	rpl::variable<bool> _showWalletInDrawer = true;
+	rpl::variable<bool> _showPluginsInDrawer = true;
+	rpl::variable<bool> _disableSendAnimation = false;
+	rpl::variable<bool> _disableDeleteAnimation = false;
+	rpl::variable<bool> _smoothScroll = true;
 	rpl::variable<bool> _showLReadToggleInDrawer = false;
 	rpl::variable<bool> _showSReadToggleInDrawer = true;
 	rpl::variable<bool> _showNightModeToggleInDrawer = true;
@@ -725,6 +771,7 @@ private:
 	rpl::variable<bool> _disableGreetingSticker = false;
 	rpl::variable<PeerIdDisplay> _showPeerId = PeerIdDisplay::BotApi;
 	rpl::variable<bool> _showMessageSeconds = false;
+	rpl::variable<bool> _showMessagesCount = true;
 	rpl::variable<bool> _showMessageShot = true;
 	rpl::variable<bool> _filterZalgo = false;
 	rpl::variable<bool> _stickerConfirmation = false;
@@ -737,6 +784,12 @@ private:
 	rpl::variable<bool> _crashReporting = true;
 	rpl::variable<int> _avatarCorners = 23;
 	rpl::variable<bool> _singleCornerRadius = false;
+	rpl::variable<NowPlayingService> _nowPlayingService = NowPlayingService::None;
+	rpl::variable<QString> _nowPlayingUsername;
+	rpl::variable<QString> _nowPlayingLastFmKey;
+	rpl::variable<bool> _nowPlayingProfileMusic = true;
+	rpl::variable<bool> _nowPlayingKeepMusic = false;
+	rpl::variable<bool> _nowPlayingBio = false;
 	rpl::variable<bool> _streamerMode = false;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;

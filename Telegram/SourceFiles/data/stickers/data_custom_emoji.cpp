@@ -39,6 +39,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ui/dynamic_thumbnails.h"
 #include "ui/ui_utility.h"
 #include "apiwrap.h"
+#include "ayu/features/komaru/color_swatch.h"
 #include "styles/style_chat.h"
 
 namespace Data {
@@ -591,6 +592,8 @@ std::unique_ptr<Ui::Text::CustomEmoji> CustomEmojiManager::create(
 			FrameSizeFromTag(tag) / style::DevicePixelRatio());
 	} else if (const auto parsed = Data::ParseTopicIconEmojiEntity(data)) {
 		return MakeTopicIconEmoji(parsed, std::move(update), tag);
+	} else if (KomaruColorSwatch::IsSwatchData(data)) {
+		return KomaruColorSwatch::MakeSwatch(data);
 	}
 	const auto parsed = ParseCustomEmojiData(data);
 	return parsed

@@ -30,12 +30,9 @@ branch-sync operation inside this command.
 Delegate phases with synchronous foreground Agent calls per the adapter; leaf
 phase agents receive self-contained prompts and are not told to read the
 adapter. Use the Agent tool for delegation; do not start Claude subprocesses
-through Bash. Reviews and assessments run as Codex CLI leaves per the
-adapter's review and assessment provider, unless the arguments below ask not
-to use Codex or a scheduler prompt says `Review provider: native`; such an
-opt-out is not part of the task name.
+through Bash. Reviews and assessments are Agent leaves too.
 
-Task short name or full id, optionally followed by a Codex opt-out:
+Task short name or full id, optionally followed by a review provider choice:
 
 ```text
 $ARGUMENTS

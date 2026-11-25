@@ -1,0 +1,22 @@
+[package]
+name = "komaru_core"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Native parts of KomaruGram written in Rust"
+
+# regex runs the message filters; libsqlite3-sys builds the SQLite the
+# database uses from its bundled amalgamation.
+
+[lib]
+# rlib: prepare.py builds the crate into tdesktop_rust on Windows and macOS.
+crate-type = ["staticlib", "rlib"]
+
+[profile.release]
+opt-level = "s"
+codegen-units = 1
+debug = false
+
+[dependencies]
+libsqlite3-sys = { version = "0.39.1", features = ["bundled"] }
+regex = "1"

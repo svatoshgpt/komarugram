@@ -7,12 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "window/window_main_menu.h"
 
+#include "ayu/ui/settings/settings_plugins.h"
+
 #include "apiwrap.h"
 #include "base/event_filter.h"
 #include "base/qt_signal_producer.h"
 #include "boxes/about_box.h"
 #include "core/update_channel.h"
-#include "boxes/peer_list_controllers.h"
+#include "boxes/contacts_box.h"
 #include "boxes/premium_preview_box.h"
 #include "calls/group/calls_group_common.h"
 #include "calls/calls_box_controller.h"
@@ -719,6 +721,15 @@ void MainMenu::setupMenu() {
 					Info::Stories::MakeMyProfile(controller->session().user()));
 			});
 
+		} else if (id == u"plugins"_q) {
+			if (settings.showPluginsInDrawer())
+			addAction(
+				tr::ayu_PluginsTitle(),
+				{ &st::ayuPluginsIcon }
+			)->setClickedCallback([=] {
+				controller->showSettings(Settings::KomaruPluginsId());
+			});
+
 		} else if (id == u"bots"_q) {
 			if (settings.showBotsInDrawer())
 			SetupMenuBots(_menu, controller);
@@ -780,10 +791,6 @@ void MainMenu::setupMenu() {
 						tr::lng_wallet_menu(),
 						st::mainMenuButton,
 						{ &st::walletMenuIcon })));
-			Ui::NewBadge::AddAfterButtonText(
-				wallet->entity(),
-				tr::lng_wallet_menu(),
-				st::mainMenuButton);
 			wallet->toggleOn(rpl::combine(
 				session->appConfig().value() | rpl::map([=] {
 					return session->appConfig().walletAvailable();

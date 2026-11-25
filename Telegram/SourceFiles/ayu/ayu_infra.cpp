@@ -11,8 +11,11 @@
 #include "ayu/ayu_ui_settings.h"
 #include "ayu/ayu_worker.h"
 #include "ayu/features/komaru/komaru_badges.h"
+#include "ayu/features/komaru/now_playing.h"
+#include "ayu/features/plugins/komaru_plugins.h"
 #include "ayu/data/ayu_database.h"
 #include "ayu/ui/ayu_logo.h"
+#include "ayu/ui/middle_autoscroll.h"
 #include "features/translator/ayu_translator.h"
 #include "lang/lang_instance.h"
 #include "ui/chat/chat_style_radius.h"
@@ -45,6 +48,7 @@ void initUiSettings() {
 	AyuUiSettings::setWideMultiplier(settings.wideMultiplier());
 	AyuUiSettings::setMaterialSwitches(settings.materialSwitches());
 	AyuUiSettings::setAvatarCorners(settings.avatarCorners());
+	AyuUiSettings::setSmoothScroll(settings.smoothScroll());
 	Ui::SetAppliedBubbleRadius(settings.messageBubbleRadius());
 }
 
@@ -92,6 +96,9 @@ void init() {
 	initWorker();
 	initRCManager();
 	KomaruBadges::Start();
+	KomaruNowPlaying::Start();
+	KomaruPlugins::Start();
+	KomaruAutoscroll::Install();
 	initTranslator();
 	QDir(cWorkingDir() + u"tdata/komaru_analytics"_q).removeRecursively();
 }

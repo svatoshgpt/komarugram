@@ -34,6 +34,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QFileInfo>
 
+#include "ayu/features/komaru/send_metadata.h"
+
 namespace Storage {
 namespace {
 
@@ -684,7 +686,12 @@ QByteArray Uploader::readDocPart(not_null<Entry*> entry) {
 			return QByteArray();
 		}
 	}
-	return checked(entry->docFile->read(entry->docPartSize));
+	auto part = entry->docFile->read(entry->docPartSize);
+	KomaruMetadata::Scrub(
+		part,
+		int64(entry->docPartsSent) * entry->docPartSize,
+		entry->file->scrubRanges);
+	return checked(std::move(part));
 }
 
 bool Uploader::canAddDcIndex() const {
@@ -862,6 +869,7 @@ auto Uploader::sendSlicedPart(not_null<Entry*> entry, uchar dcIndex)
 	), {
 		.itemId = itemId,
 		.bytes = partBytes,
+		.part = index,
 		.dcIndex = dcIndex,
 	});
 	return SendResult::Success;

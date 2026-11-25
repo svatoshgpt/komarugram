@@ -610,6 +610,12 @@ void AyuSettings::setShowOnlyAddedEmojisAndStickers(bool val) {
 	save();
 }
 
+void AyuSettings::setHidePaidStickers(bool val) {
+	if (_hidePaidStickers.current() == val) return;
+	_hidePaidStickers = val;
+	save();
+}
+
 void AyuSettings::setCollapseSimilarChannels(bool val) {
 	if (_collapseSimilarChannels.current() == val) return;
 	_collapseSimilarChannels = val;
@@ -885,6 +891,39 @@ void AyuSettings::setShowSavedMessagesInDrawer(bool val) {
 	save();
 }
 
+void AyuSettings::setShowPluginsInDrawer(bool val) {
+	if (_showPluginsInDrawer.current() == val) {
+		return;
+	}
+	_showPluginsInDrawer = val;
+	save();
+}
+
+void AyuSettings::setDisableSendAnimation(bool val) {
+	if (_disableSendAnimation.current() == val) {
+		return;
+	}
+	_disableSendAnimation = val;
+	save();
+}
+
+void AyuSettings::setDisableDeleteAnimation(bool val) {
+	if (_disableDeleteAnimation.current() == val) {
+		return;
+	}
+	_disableDeleteAnimation = val;
+	save();
+}
+
+void AyuSettings::setSmoothScroll(bool val) {
+	if (_smoothScroll.current() == val) {
+		return;
+	}
+	_smoothScroll = val;
+	AyuUiSettings::setSmoothScroll(val);
+	save();
+}
+
 void AyuSettings::setShowWalletInDrawer(bool val) {
 	if (_showWalletInDrawer.current() == val) {
 		return;
@@ -938,6 +977,7 @@ void AyuSettings::setShowStreamerToggleInTray(bool val) {
 const std::vector<QString> &AyuSettings::DefaultDrawerOrder() {
 	static const auto result = std::vector<QString>{
 		u"myProfile"_q,
+		u"plugins"_q,
 		u"bots"_q,
 		u"separator"_q,
 		u"newGroup"_q,
@@ -1157,6 +1197,12 @@ void AyuSettings::setShowMessageSeconds(bool val) {
 	save();
 }
 
+void AyuSettings::setShowMessagesCount(bool val) {
+	if (_showMessagesCount.current() == val) return;
+	_showMessagesCount = val;
+	save();
+}
+
 void AyuSettings::setShowMessageShot(bool val) {
 	if (_showMessageShot.current() == val) return;
 	_showMessageShot = val;
@@ -1231,6 +1277,42 @@ void AyuSettings::setAvatarCorners(int val) {
 	save();
 }
 
+void AyuSettings::setNowPlayingService(NowPlayingService val) {
+	if (_nowPlayingService.current() == val) return;
+	_nowPlayingService = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingUsername(const QString &val) {
+	if (_nowPlayingUsername.current() == val) return;
+	_nowPlayingUsername = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingLastFmKey(const QString &val) {
+	if (_nowPlayingLastFmKey.current() == val) return;
+	_nowPlayingLastFmKey = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingProfileMusic(bool val) {
+	if (_nowPlayingProfileMusic.current() == val) return;
+	_nowPlayingProfileMusic = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingKeepMusic(bool val) {
+	if (_nowPlayingKeepMusic.current() == val) return;
+	_nowPlayingKeepMusic = val;
+	save();
+}
+
+void AyuSettings::setNowPlayingBio(bool val) {
+	if (_nowPlayingBio.current() == val) return;
+	_nowPlayingBio = val;
+	save();
+}
+
 void AyuSettings::setSingleCornerRadius(bool val) {
 	if (_singleCornerRadius.current() == val) return;
 	_singleCornerRadius = val;
@@ -1268,6 +1350,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"hidePremiumStatuses", s._hidePremiumStatuses.current()},
 		{"hideExteraBadges", s._hideExteraBadges.current()},
 		{"showOnlyAddedEmojisAndStickers", s._showOnlyAddedEmojisAndStickers.current()},
+		{"hidePaidStickers", s._hidePaidStickers.current()},
 		{"collapseSimilarChannels", s._collapseSimilarChannels.current()},
 		{"hideSimilarChannels", s._hideSimilarChannels.current()},
 		{"messageBubbleRadius", s._messageBubbleRadius.current()},
@@ -1314,6 +1397,10 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"showCallsInDrawer", s._showCallsInDrawer.current()},
 		{"showSavedMessagesInDrawer", s._showSavedMessagesInDrawer.current()},
 		{"showWalletInDrawer", s._showWalletInDrawer.current()},
+		{"showPluginsInDrawer", s._showPluginsInDrawer.current()},
+		{"disableSendAnimation", s._disableSendAnimation.current()},
+		{"disableDeleteAnimation", s._disableDeleteAnimation.current()},
+		{"smoothScroll", s._smoothScroll.current()},
 		{"showLReadToggleInDrawer", s._showLReadToggleInDrawer.current()},
 		{"showSReadToggleInDrawer", s._showSReadToggleInDrawer.current()},
 		{"showNightModeToggleInDrawer", s._showNightModeToggleInDrawer.current()},
@@ -1333,6 +1420,7 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"disableGreetingSticker", s._disableGreetingSticker.current()},
 		{"showPeerId", s._showPeerId.current()},
 		{"showMessageSeconds", s._showMessageSeconds.current()},
+		{"showMessagesCount", s._showMessagesCount.current()},
 		{"showMessageShot", s._showMessageShot.current()},
 		{"filterZalgo", s._filterZalgo.current()},
 		{"stickerConfirmation", s._stickerConfirmation.current()},
@@ -1345,6 +1433,12 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"crashReporting", s._crashReporting.current()},
 		{"avatarCorners", s._avatarCorners.current()},
 		{"singleCornerRadius", s._singleCornerRadius.current()},
+		{"nowPlayingService", s._nowPlayingService.current()},
+		{"nowPlayingUsername", s._nowPlayingUsername.current()},
+		{"nowPlayingLastFmKey", s._nowPlayingLastFmKey.current()},
+		{"nowPlayingProfileMusic", s._nowPlayingProfileMusic.current()},
+		{"nowPlayingKeepMusic", s._nowPlayingKeepMusic.current()},
+		{"nowPlayingBio", s._nowPlayingBio.current()},
 		{"streamerMode", s._streamerMode.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
@@ -1377,6 +1471,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._hidePremiumStatuses = j.value("hidePremiumStatuses", defaults._hidePremiumStatuses.current());
 	s._hideExteraBadges = j.value("hideExteraBadges", defaults._hideExteraBadges.current());
 	s._showOnlyAddedEmojisAndStickers = j.value("showOnlyAddedEmojisAndStickers", defaults._showOnlyAddedEmojisAndStickers.current());
+	s._hidePaidStickers = j.value("hidePaidStickers", defaults._hidePaidStickers.current());
 	s._collapseSimilarChannels = j.value("collapseSimilarChannels", defaults._collapseSimilarChannels.current());
 	s._hideSimilarChannels = j.value("hideSimilarChannels", defaults._hideSimilarChannels.current());
 	s._messageBubbleRadius = j.value("messageBubbleRadius", defaults._messageBubbleRadius.current());
@@ -1423,6 +1518,10 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._showCallsInDrawer = j.value("showCallsInDrawer", defaults._showCallsInDrawer.current());
 	s._showSavedMessagesInDrawer = j.value("showSavedMessagesInDrawer", defaults._showSavedMessagesInDrawer.current());
 	s._showWalletInDrawer = j.value("showWalletInDrawer", defaults._showWalletInDrawer.current());
+	s._showPluginsInDrawer = j.value("showPluginsInDrawer", defaults._showPluginsInDrawer.current());
+	s._disableSendAnimation = j.value("disableSendAnimation", defaults._disableSendAnimation.current());
+	s._disableDeleteAnimation = j.value("disableDeleteAnimation", defaults._disableDeleteAnimation.current());
+	s._smoothScroll = j.value("smoothScroll", defaults._smoothScroll.current());
 	s._showLReadToggleInDrawer = j.value("showLReadToggleInDrawer", defaults._showLReadToggleInDrawer.current());
 	s._showSReadToggleInDrawer = j.value("showSReadToggleInDrawer", defaults._showSReadToggleInDrawer.current());
 	s._showNightModeToggleInDrawer = j.value("showNightModeToggleInDrawer", defaults._showNightModeToggleInDrawer.current());
@@ -1442,6 +1541,7 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._disableGreetingSticker = j.value("disableGreetingSticker", defaults._disableGreetingSticker.current());
 	s._showPeerId = j.value("showPeerId", defaults._showPeerId.current());
 	s._showMessageSeconds = j.value("showMessageSeconds", defaults._showMessageSeconds.current());
+	s._showMessagesCount = j.value("showMessagesCount", defaults._showMessagesCount.current());
 	s._showMessageShot = j.value("showMessageShot", defaults._showMessageShot.current());
 	s._filterZalgo = j.value("filterZalgo", defaults._filterZalgo.current());
 	s._stickerConfirmation = j.value("stickerConfirmation", defaults._stickerConfirmation.current());
@@ -1454,6 +1554,12 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._crashReporting = j.value("crashReporting", defaults._crashReporting.current());
 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
+	s._nowPlayingService = j.value("nowPlayingService", defaults._nowPlayingService.current());
+	s._nowPlayingUsername = j.value("nowPlayingUsername", defaults._nowPlayingUsername.current());
+	s._nowPlayingLastFmKey = j.value("nowPlayingLastFmKey", defaults._nowPlayingLastFmKey.current());
+	s._nowPlayingProfileMusic = j.value("nowPlayingProfileMusic", defaults._nowPlayingProfileMusic.current());
+	s._nowPlayingKeepMusic = j.value("nowPlayingKeepMusic", defaults._nowPlayingKeepMusic.current());
+	s._nowPlayingBio = j.value("nowPlayingBio", defaults._nowPlayingBio.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {

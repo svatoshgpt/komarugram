@@ -3563,7 +3563,13 @@ void EmojiListWidget::refreshCustom() {
 	const auto session = &this->session();
 	const auto premiumPossible = session->premiumPossible();
 	const auto allCustomEmojiPremium = _features.allCustomEmojiPremium;
+	// KomaruGram: custom emoji leave the panel for those who cannot send them, if asked.
+	const auto hidePaid = (_mode == Mode::Full)
+		&& AyuSettings::getInstance().hidePaidStickers()
+		&& !session->premium()
+		&& !_allowWithoutPremium;
 	const auto onlyUnicodeEmoji = _onlyUnicodeEmoji
+		|| hidePaid
 		|| (!allCustomEmojiPremium && !premiumPossible);
 	const auto premiumMayBeBought = (!onlyUnicodeEmoji)
 		&& (allCustomEmojiPremium || premiumPossible)

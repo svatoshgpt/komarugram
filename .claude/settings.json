@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/tools/rules/hook.py\"",
+            "command": "sh \"$CLAUDE_PROJECT_DIR/tools/rules/hook.sh\"",
             "statusMessage": "Checking house rules"
           }
         ]

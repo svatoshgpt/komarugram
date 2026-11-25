@@ -1,0 +1,19 @@
+[package]
+name = "komaru_tools"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Command line helpers for KomaruGram development and CI"
+
+[[bin]]
+name = "komaru"
+path = "src/main.rs"
+
+[dependencies]
+minijinja = { version = "2", default-features = false, features = ["serde"] }
+regex = { version = "1", default-features = false, features = ["std", "unicode-perl"] }
+serde_json = "1"
+
+[profile.release]
+opt-level = 2
+debug = false

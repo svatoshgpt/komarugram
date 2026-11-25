@@ -2,6 +2,7 @@
 #include "ayu/features/komaru/komaru_badges.h"
 
 #include "apiwrap.h"
+#include "base/random.h"
 #include "core/application.h"
 #include "data/data_types.h"
 #include "main/main_domain.h"
@@ -48,21 +49,43 @@ constexpr auto kParticles = 4;
 constexpr auto kOrbitPeriod = 6000.;
 constexpr auto kTwinklePeriod = 1400.;
 
-// An emoji status from statuses.txt: either a custom emoji id, or a
-// 1-based position in an emoji pack that is looked up once per pack.
+// A custom emoji id, or a 1-based position in a pack like EmojiKomaru/1.
 struct StatusRef {
 	QString set;
 	int index = 0;
 	DocumentId id = 0;
+	bool random = false;
+};
+
+// A person's statuses: all in a row, or one at a time when a period is set.
+struct StatusLine {
+	std::vector<StatusRef> refs;
+	crl::time period = 0;
 	QString text;
 };
+
+// A change made here shows this long, until the shared list has it.
+constexpr auto kLocalFor = crl::time(20 * 60 * 1000);
+
+struct LocalStatus {
+	std::optional<StatusLine> line;
+	crl::time till = 0;
+};
+
+// How often a rotating status line is checked for its next status.
+constexpr auto kRotationCheck = crl::time(1000);
 
 struct State {
 	std::unordered_map<uint64, Entry> developers;
 	std::unordered_map<uint64, Entry> supporters;
 	std::map<Kind, QByteArray> raw;
-	std::unordered_map<uint64, StatusRef> statuses;
+	std::unordered_map<uint64, StatusLine> statuses;
+	crl::time rotationStep = -1;
 	QByteArray statusesRaw;
+	std::unordered_map<uint64, StatusLine> custom;
+	QByteArray customRaw;
+	std::unordered_map<uint64, LocalStatus> local;
+	QString bot;
 	base::flat_map<QString, std::vector<DocumentId>> sets;
 	base::flat_set<QString> requestedSets;
 	Main::Session *session = nullptr;
@@ -152,17 +175,31 @@ struct State {
 	}
 	static const auto expression = QRegularExpression(
 		u"^(?:(?:https?://)?(?:t|telegram)\\.me/addemoji/)?"
-		"([A-Za-z0-9_]+)/(\\d+)/?$"_q);
+		"([A-Za-z0-9_]+)/(\\d+|random)/?$"_q);
 	const auto match = expression.match(text);
-	const auto index = match.hasMatch() ? match.captured(2).toInt() : 0;
+	if (!match.hasMatch()) {
+		return {};
+	} else if (match.captured(2) == u"random"_q) {
+		return { .set = match.captured(1), .index = 1, .random = true };
+	}
+	const auto index = match.captured(2).toInt();
 	return (index > 0)
 		? StatusRef{ .set = match.captured(1), .index = index }
 		: StatusRef();
 }
 
-[[nodiscard]] std::unordered_map<uint64, StatusRef> ParseStatuses(
+// A rotation period like "10s", 0 for anything else.
+[[nodiscard]] crl::time ParsePeriod(const QString &text) {
+	static const auto expression = QRegularExpression(u"^(\\d+)s$"_q);
+	const auto match = expression.match(text.trimmed());
+	return match.hasMatch()
+		? crl::time(match.captured(1).toInt()) * 1000
+		: crl::time();
+}
+
+[[nodiscard]] std::unordered_map<uint64, StatusLine> ParseStatuses(
 		const QByteArray &data) {
-	auto result = std::unordered_map<uint64, StatusRef>();
+	auto result = std::unordered_map<uint64, StatusLine>();
 	for (const auto &raw : QString::fromUtf8(data).split('\n')) {
 		const auto line = raw.trimmed();
 		if (line.isEmpty() || line.startsWith('#')) {
@@ -173,14 +210,46 @@ struct State {
 		if (!id || parts.size() < 2) {
 			continue;
 		}
-		auto status = ParseStatusRef(parts[1].trimmed());
-		if (!status.id && !status.index) {
+		auto status = StatusLine();
+		for (const auto &text : parts[1].split('|')) {
+			const auto ref = ParseStatusRef(text.trimmed());
+			if ((ref.id || ref.index) && status.refs.size() < kMaxStatuses) {
+				status.refs.push_back(ref);
+			}
+		}
+		if (status.refs.empty()) {
 			continue;
 		}
-		if (parts.size() > 2) {
-			status.text = parts.mid(2).join(',').trimmed();
+		auto rest = parts.mid(2);
+		if (!rest.isEmpty() && ParsePeriod(rest.front())) {
+			status.period = ParsePeriod(rest.takeFirst());
+		} else if (!rest.isEmpty() && ParsePeriod(rest.back())) {
+			status.period = ParsePeriod(rest.takeLast());
 		}
+		status.text = rest.join(',').trimmed();
 		result.emplace(id, std::move(status));
+	}
+	return result;
+}
+
+[[nodiscard]] DocumentId Resolve(const State &state, const StatusRef &ref) {
+	if (ref.id) {
+		return ref.id;
+	}
+	const auto i = state.sets.find(ref.set);
+	return (i != end(state.sets) && ref.index <= int(i->second.size()))
+		? i->second[ref.index - 1]
+		: DocumentId();
+}
+
+// Which status of every rotating line shows now, to notice a change.
+[[nodiscard]] crl::time RotationStep(const State &state) {
+	auto result = crl::time();
+	const auto now = crl::now();
+	for (const auto &[peerId, line] : state.statuses) {
+		if (line.period > 0 && line.refs.size() > 1) {
+			result = result * 31 + now / line.period;
+		}
 	}
 	return result;
 }
@@ -260,9 +329,11 @@ void ResolveStatusSets() {
 	if (!state.session) {
 		return;
 	}
-	for (const auto &[peerId, status] : state.statuses) {
-		if (!status.set.isEmpty()) {
-			RequestSet(state.session, status.set);
+	for (const auto &[peerId, line] : state.statuses) {
+		for (const auto &ref : line.refs) {
+			if (!ref.set.isEmpty()) {
+				RequestSet(state.session, ref.set);
+			}
 		}
 	}
 }
@@ -303,6 +374,73 @@ void FetchStatuses() {
 	});
 }
 
+[[nodiscard]] QString ExtraPath(const QString &name) {
+	return cWorkingDir() + u"tdata/komaru_badges/"_q + name;
+}
+
+// What people set themselves through the bot, over the statuses list.
+bool ApplyCustom(const QByteArray &data) {
+	auto &state = Instance();
+	if (state.customRaw == data) {
+		return false;
+	}
+	state.customRaw = data;
+	state.custom = ParseStatuses(data);
+	return true;
+}
+
+bool ApplyBot(const QByteArray &data) {
+	static const auto expression = QRegularExpression(
+		u"^[A-Za-z0-9_]{5,32}$"_q);
+	auto name = QString::fromUtf8(data).trimmed().remove('@');
+	if (!expression.match(name).hasMatch()) {
+		name = QString();
+	}
+	auto &state = Instance();
+	if (state.bot == name) {
+		return false;
+	}
+	state.bot = name;
+	return true;
+}
+
+void FetchExtra(const QString &name, bool (*apply)(const QByteArray &)) {
+	const auto reply = Get(QString::fromLatin1(kGistRaw) + name);
+	QObject::connect(reply, &QNetworkReply::finished, [=] {
+		reply->deleteLater();
+		// The file may not exist yet, that is not an error.
+		if (reply->error() != QNetworkReply::NoError) {
+			return;
+		}
+		const auto data = reply->readAll();
+		if (!apply(data)) {
+			return;
+		}
+		QDir().mkpath(cWorkingDir() + u"tdata/komaru_badges"_q);
+		auto file = QFile(ExtraPath(name));
+		if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+			file.write(data);
+		}
+		Instance().updated.fire({});
+		RepaintAll();
+	});
+}
+
+[[nodiscard]] const StatusLine *FindStatus(
+		const State &state,
+		uint64 peerId) {
+	const auto base = state.statuses.find(peerId);
+	if (base == end(state.statuses)) {
+		return nullptr;
+	}
+	const auto local = state.local.find(peerId);
+	if (local != end(state.local) && local->second.till > crl::now()) {
+		return local->second.line ? &*local->second.line : &base->second;
+	}
+	const auto custom = state.custom.find(peerId);
+	return (custom != end(state.custom)) ? &custom->second : &base->second;
+}
+
 void LoadCachedLists() {
 	auto any = false;
 	for (const auto kind : { Kind::Developer, Kind::Supporter }) {
@@ -313,6 +451,14 @@ void LoadCachedLists() {
 	}
 	if (auto file = QFile(StatusesPath()); file.open(QIODevice::ReadOnly)) {
 		any = ApplyStatuses(file.readAll()) || any;
+	}
+	const auto custom = u"custom.txt"_q;
+	if (auto file = QFile(ExtraPath(custom)); file.open(QIODevice::ReadOnly)) {
+		any = ApplyCustom(file.readAll()) || any;
+	}
+	const auto bot = u"bot.txt"_q;
+	if (auto file = QFile(ExtraPath(bot)); file.open(QIODevice::ReadOnly)) {
+		any = ApplyBot(file.readAll()) || any;
 	}
 	if (any) {
 		Instance().updated.fire({});
@@ -415,6 +561,8 @@ void Refresh() {
 	FetchList(Kind::Developer);
 	FetchList(Kind::Supporter);
 	FetchStatuses();
+	FetchExtra(u"custom.txt"_q, ApplyCustom);
+	FetchExtra(u"bot.txt"_q, ApplyBot);
 	FetchRate();
 }
 
@@ -507,6 +655,18 @@ void Start() {
 	const auto timer = new QTimer(QCoreApplication::instance());
 	QObject::connect(timer, &QTimer::timeout, [] { Refresh(); });
 	timer->start(kRefreshInterval);
+
+	const auto rotation = new QTimer(QCoreApplication::instance());
+	QObject::connect(rotation, &QTimer::timeout, [] {
+		auto &state = Instance();
+		const auto step = RotationStep(state);
+		if (state.rotationStep != step) {
+			state.rotationStep = step;
+			state.updated.fire({});
+			RepaintAll();
+		}
+	});
+	rotation->start(kRotationCheck);
 }
 
 const Entry *Developer(uint64 peerId) {
@@ -521,25 +681,74 @@ const Entry *Supporter(uint64 peerId) {
 	return (i != end(list)) ? &i->second : nullptr;
 }
 
-uint64 Status(uint64 peerId) {
+std::vector<uint64> Statuses(uint64 peerId) {
 	const auto &state = Instance();
-	const auto i = state.statuses.find(peerId);
-	if (i == end(state.statuses)) {
-		return 0;
-	} else if (i->second.id) {
-		return i->second.id;
+	const auto line = FindStatus(state, peerId);
+	if (!line) {
+		return {};
 	}
-	const auto j = state.sets.find(i->second.set);
-	if (j == end(state.sets) || i->second.index > int(j->second.size())) {
-		return 0;
+	auto result = std::vector<uint64>();
+	for (const auto &ref : line->refs) {
+		if (!ref.random) {
+			if (const auto id = Resolve(state, ref)) {
+				result.push_back(id);
+			}
+			continue;
+		}
+		const auto j = state.sets.find(ref.set);
+		if (j == end(state.sets) || j->second.empty()) {
+			continue;
+		}
+		// Fixed for the session and different for every slot, no repeats.
+		static const auto seed = base::RandomValue<uint64>();
+		const auto &ids = j->second;
+		const auto size = ids.size();
+		auto mixed = seed ^ (peerId * 0x9E3779B97F4A7C15ULL);
+		mixed ^= uint64(result.size() + 1) * 0xBF58476D1CE4E5B9ULL;
+		const auto start = (mixed ^ (mixed >> 31)) % size;
+		for (auto k = size_t(); k != size; ++k) {
+			const auto id = ids[(start + k) % size];
+			if (id && !ranges::contains(result, id)) {
+				result.push_back(id);
+				break;
+			}
+		}
 	}
-	return j->second[i->second.index - 1];
+	const auto period = line->period;
+	if (period > 0 && result.size() > 1) {
+		const auto index = (crl::now() / period) % int64(result.size());
+		return { result[index] };
+	}
+	return result;
 }
 
 QString StatusText(uint64 peerId) {
+	const auto line = FindStatus(Instance(), peerId);
+	return line ? line->text : QString();
+}
+
+bool CanEditStatus(uint64 peerId) {
 	const auto &state = Instance();
-	const auto i = state.statuses.find(peerId);
-	return (i != end(state.statuses)) ? i->second.text : QString();
+	return !state.bot.isEmpty() && state.statuses.contains(peerId);
+}
+
+QString EditBot() {
+	return Instance().bot;
+}
+
+void SetLocalStatus(uint64 peerId, uint64 documentId, const QString &text) {
+	auto &state = Instance();
+	auto &local = state.local[peerId];
+	local.till = crl::now() + kLocalFor;
+	local.line = std::nullopt;
+	if (documentId) {
+		local.line = StatusLine{
+			.refs = { StatusRef{ .id = DocumentId(documentId) } },
+			.text = text,
+		};
+	}
+	state.updated.fire({});
+	RepaintAll();
 }
 
 rpl::producer<> Updated() {

@@ -70,6 +70,7 @@ exteraBadgeToastBadge: InfoPeerBadge(infoPeerBadge) {
 }
 
 supportLogoSize: 96px;
+ayuNowPlayingPadding: margins(14px, 12px, 24px, 12px);
 
 unreadPillPadding: 12px;
 

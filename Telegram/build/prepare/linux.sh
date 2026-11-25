@@ -6,8 +6,9 @@ pushd `dirname $0` > /dev/null
 FullScriptPath=`pwd`
 popd > /dev/null
 
-
-cd $FullScriptPath/../docker/centos_env
-poetry install
-poetry run gen_dockerfile | DOCKER_BUILDKIT=1 docker build -t komarugram:centos_env -
+Repo=$FullScriptPath/../../..
+cargo run -q --release --locked \
+    --manifest-path $Repo/Telegram/rust/komaru_tools/Cargo.toml -- \
+    ci dockerfile --template $Repo/Telegram/build/docker/centos_env/Dockerfile \
+    | DOCKER_BUILDKIT=1 docker build -t komarugram:centos_env -
 cd $FullExecPath

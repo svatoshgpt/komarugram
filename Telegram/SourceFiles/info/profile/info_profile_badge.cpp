@@ -128,8 +128,9 @@ void Badge::setContent(Content content) {
 	_content = content;
 	_emojiStatus = nullptr;
 	_komaruTimer = nullptr;
-	_komaruStatus = nullptr;
+	_komaruStatuses.clear();
 	_komaruStatusWidth = 0;
+	_komaruStatusesWidth = 0;
 	_view.destroy();
 	if (_content.badge == BadgeType::None) {
 		_updated.fire({});
@@ -161,37 +162,41 @@ void Badge::setContent(Content content) {
 	const auto faces = _content;
 	const auto facesOnlyWidth = KomaruFacesCount(_content)
 		* st::infoExteraSupporterBadge.width();
-	if (_content.komaruStatus) {
+	if (!_content.komaruStatuses.empty()) {
 		_komaruStatusWidth = Data::FrameSizeFromTag(sizeTag())
 			/ style::DevicePixelRatio();
-		_komaruStatus = _session->data().customEmojiManager().create(
-			Data::EmojiStatusCustomId(
-				EmojiStatusId{ .documentId = _content.komaruStatus }),
+		_komaruStatusesWidth = _komaruStatusWidth
+			* int(_content.komaruStatuses.size());
+	}
+	for (const auto id : _content.komaruStatuses) {
+		auto emoji = _session->data().customEmojiManager().create(
+			Data::EmojiStatusCustomId(EmojiStatusId{ .documentId = id }),
 			[raw = _view.data()] { raw->update(); },
 			sizeTag());
 		if (_customStatusLoopsLimit > 0) {
-			_komaruStatus = MakeWrappedEmoji<Ui::Text::LimitedLoopsEmoji>(
-				std::move(_komaruStatus),
+			emoji = MakeWrappedEmoji<Ui::Text::LimitedLoopsEmoji>(
+				std::move(emoji),
 				_customStatusLoopsLimit);
 		}
+		_komaruStatuses.push_back(std::move(emoji));
 	}
-	const auto facesWidth = facesOnlyWidth + _komaruStatusWidth;
+	const auto facesWidth = facesOnlyWidth + _komaruStatusesWidth;
 	const auto paintPrefix = [=](
 			QPainter &p,
 			int left,
 			int height,
 			QColor themeColor) {
 		PaintKomaruFaces(p, faces, left, height, themeColor);
-		if (_komaruStatus) {
-			_komaruStatus->paint(p, {
+		auto x = left + facesOnlyWidth;
+		for (const auto &emoji : _komaruStatuses) {
+			emoji->paint(p, {
 				.textColor = themeColor,
 				.now = crl::now(),
-				.position = QPoint(
-					left + facesOnlyWidth,
-					(height - _komaruStatusWidth) / 2),
+				.position = QPoint(x, (height - _komaruStatusWidth) / 2),
 				.paused = ((_animationPaused && _animationPaused())
 					|| On(PowerSaving::kEmojiStatus)),
 			});
+			x += _komaruStatusWidth;
 		}
 	};
 	if (facesOnlyWidth > 0) {
@@ -420,7 +425,7 @@ void Badge::move(int left, int top, int bottom) {
 Badge::Content Badge::clickedContent() const {
 	auto result = _content;
 	const auto faces = KomaruFacesCount(result);
-	const auto status = result.komaruStatus ? _komaruStatusWidth : 0;
+	const auto status = _komaruStatusesWidth;
 	if (!_view || (!faces && !status)) {
 		return result;
 	}
@@ -429,7 +434,12 @@ Badge::Content Badge::clickedContent() const {
 		? 0
 		: st::infoVerifiedCheckPosition.x();
 	const auto x = _view->mapFromGlobal(QCursor::pos()).x();
-	if (x < skip + faces * faceWidth) {
+	if (x < skip) {
+		// The gap before the first face or status, next to the premium
+		// emoji, belongs to nothing.
+		return {};
+	}
+	if (faces && x < skip + faces * faceWidth) {
 		// The developer face comes first when there is one.
 		const auto developer = result.komaruDeveloper
 			&& (x < skip + faceWidth);
@@ -437,7 +447,7 @@ Badge::Content Badge::clickedContent() const {
 		result.emojiStatusId = EmojiStatusId();
 		result.komaruDeveloper = developer;
 		result.komaruSupporter = !developer;
-		result.komaruStatus = 0;
+		result.komaruStatuses.clear();
 	} else if (x < skip + faces * faceWidth + status) {
 		result.badge = BadgeType::Komaru;
 		result.emojiStatusId = EmojiStatusId();
@@ -447,7 +457,7 @@ Badge::Content Badge::clickedContent() const {
 		result.komaruPeer = 0;
 		result.komaruDeveloper = false;
 		result.komaruSupporter = false;
-		result.komaruStatus = 0;
+		result.komaruStatuses.clear();
 	}
 	return result;
 }
@@ -470,7 +480,7 @@ rpl::producer<Badge::Content> BadgeContentForPeer(not_null<PeerData*> peer) {
 	const auto statusOnlyForPremium = peer->isUser();
 	return rpl::combine(
 		BadgeValue(peer),
-		EmojiStatusIdValue(peer)
+		ShownEmojiStatusIdValue(peer)
 	) | rpl::map([=](BadgeType badge, EmojiStatusId emojiStatusId) {
 		if (emojiStatusId.collectible && (badge == BadgeType::Verified)) {
 			return Badge::Content{ BadgeType::Premium, emojiStatusId };

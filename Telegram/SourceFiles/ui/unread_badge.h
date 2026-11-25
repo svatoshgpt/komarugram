@@ -50,6 +50,11 @@ struct BotVerifyDetails {
 		const BotVerifyDetails &) = default;
 };
 
+[[nodiscard]] std::unique_ptr<Text::CustomEmoji> CreateBotVerifiedEmoji(
+	DocumentId iconId,
+	Text::CustomEmojiFactory factory,
+	Fn<void()> repaint);
+
 class PeerBadge {
 public:
 	PeerBadge();
@@ -122,7 +127,7 @@ private:
 	std::unique_ptr<EmojiStatus> _emojiStatus;
 	std::unique_ptr<KomaruAnimation> _komaruAnimation;
 	std::unique_ptr<EmojiStatus> _exteraCustomStatus;
-	std::unique_ptr<EmojiStatus> _komaruStatus;
+	std::vector<std::unique_ptr<EmojiStatus>> _komaruStatuses;
 	mutable std::unique_ptr<BotVerifiedData> _botVerifiedData;
 
 };

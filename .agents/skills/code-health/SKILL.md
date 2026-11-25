@@ -27,7 +27,7 @@ decisions:
   the scanned commit, the totals and `run`, the latest run's directory;
 - `history.jsonl`: one line of totals per run;
 - `runs/<stamp>-<commit>/`: the scan's `report.md` and the run's
-  `summary.md` and `proposals.md`;
+  `summary.md` and `proposals.md`, plus `harness.md` and `harness.json`;
 - `ignored.json`: findings the owner declined, with the reason and date;
 - `audits.json`: audit results and suspended class and area pairs;
 - `surveys/<area>/<date>/` and `atlas/<stamp>-<commit>/`: drafts for the
@@ -60,13 +60,14 @@ Once a day, from any checkout:
 2. Claim the day with `health-publish --message "Record code health scan of
    <commit>" --drop-on-conflict`. `dropped: true` means another checkout
    published today's scan first: stop without routing anything.
-3. Audit, survey when one is due, then write the summary and proposals
+3. Read the daily harness inventory and follow
+   [helper lifecycle review](references/harness-lifecycle.md); review retirement
+   candidates at most once a week. Audit, survey when one is due, then write the summary and proposals
    (below) and route what the trust rules allow.
 4. Publish with `health-publish --message "Publish code health report for
    <date>"`.
 
-The scheduled run is `/code-health scan route` in Claude Code or
-`$code-health scan route` in Codex.
+The scheduled run is `/code-health scan route`.
 
 ## Scan
 
@@ -92,6 +93,10 @@ header, and what an edit to each header recompiles), include edges that
 cross CMake target boundaries, headless test coverage, stale area maps, and
 agent cost per area (hours from `Start` to `Approve` and review rounds of
 tasks whose commits touched the area, read from `../ai-tdesktop`).
+It also records harness helper age, independent archived task consumption,
+internal consumers, open-task references, source size and documentation weight.
+The [harness reference](references/harness-lifecycle.md) defines the coverage
+limits and the 90-day review triggers. Sparse use alone is never Q0 proof.
 
 Scan daily; propose when the code-health budget has room; survey at most
 one area a week. Surveys and audits read the code at the scanned commit, not
@@ -148,7 +153,19 @@ python3 .agents/skills/code-health/scripts/health.py verify --base <base> <findi
 ```
 
 `check` compares the change with its own base, so no stored baseline is
-needed; untracked files count as added. Errors: a new include into a CMake
+needed; untracked files count as added. It also reads changed top-level
+`Telegram/lib_*` submodules: their current working trees, including commits
+beyond the pin, edits and untracked files, are compared with their pins at
+the superproject base, and findings use `Telegram/lib_*/...` paths. An added
+submodule's files count as new. A changed submodule with no checkout or a
+base pin unavailable locally is named under warnings. With `--staged`,
+only gitlinks changed in the superproject index are named instead of
+reading submodule content; run without `--staged` to check that content.
+A read gap suppresses the clean line but does not itself change the exit
+code, including under `--strict`; inspect the named submodule or rerun with
+its base available before treating it as checked. Run from the
+superproject; `--repo` on a submodule without a `Telegram/` folder refuses
+in one line. Errors: a new include into a CMake
 target the including target does not link, when no include between those two
 targets exists yet, or a new file over the size limit. Warnings: one more
 include across an already crossed target pair, growing a file that is
@@ -229,10 +246,8 @@ the owner. Never route a class an audit has suspended in that area.
 Each scheduled run picks at random one code-health task approved since the
 previous audit. A fresh agent with no task context checks it against its
 class: the proof was run and supports the claim, behavior did not change, and
-the metric moved as stated. Use the other provider when the host can run
-one: on Claude Code a Codex CLI leaf under
-[Codex CLI leaves](../../shared/codex-cli-leaves.md) (`--cwd <scan worktree>
---sandbox read-only`); otherwise a fresh native agent. Mechanical tasks had one
+the metric moved as stated. The checker is a fresh read-only agent that
+starts in the scan worktree. Mechanical tasks had one
 reviewer, so this sample is their second look. Record the result in
 `audits.json` in `health_state`, with suspended class and area pairs. A
 failed audit suspends routing of that class in that area and becomes an
@@ -247,10 +262,14 @@ empty:
 1. **Got worse or needs a decision**: new layering violations, newly
    oversized files, build work up more than 1% since the previous run, new
    duplicated blocks of 20+ lines, failed audits, invariants or maps awaiting
-   approval, and this run's proposals with their routing state.
+   approval, new or changed harness retention/documentation findings, and this
+   run's proposals with their routing state. Link `harness.md` and name any
+   blocked or deferred helper review; unavailable usage is not zero use.
 2. **Trends**: changes in the totals since the previous run and over 30 days,
    the five areas with the highest agent cost, and progress of open
-   code-health tasks.
+   code-health tasks. Include helper count, source lines, mandatory README
+   bytes, on-demand documentation bytes and retention-candidate changes; the
+   first run of these metrics is a baseline, not growth from zero.
 
 End with one coverage line: scanned ref and commit, skipped submodules, and
 whether agent cost was available.

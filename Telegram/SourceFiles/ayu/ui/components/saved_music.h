@@ -34,6 +34,12 @@ public:
 	~AyuMusicButton();
 
 	void updateData(MusicButtonData data);
+	void setCornerRadius(int radius);
+	void setPadding(QMargins padding);
+	void setPlayIconShown(bool shown);
+	// Theme colors whatever the adaptive cover color setting says.
+	void setThemeColors(bool theme);
+	void setExternalCover(QImage image);
 
 	rpl::producer<> onReady() const {
 		return _onReady.events();
@@ -56,6 +62,11 @@ private:
 	QString _titleText;
 
 	std::optional<QColor> _overrideBg;
+	std::optional<QImage> _externalCover;
+	int _radius = 0;
+	std::optional<QMargins> _padding;
+	bool _playIcon = false;
+	bool _themeColors = false;
 
 };
 

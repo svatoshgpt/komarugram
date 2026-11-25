@@ -1,11 +1,9 @@
-# Cross-provider review loop
+# Cross review loop
 
-One stateful **runner** reviews a change through independent **reviewers**
-from another model provider, decides every finding, fixes what it accepts and
-reviews again until the loop converges. Today the runner is Claude Code
-(`.claude/commands/cross-review.md`) and the reviewers are Codex CLI leaves
-under [Codex CLI leaves](../codex-cli-leaves.md). The protocol does not depend
-on which provider plays which part.
+One stateful **runner** reviews a change through independent **reviewers**,
+decides every finding, fixes what it accepts and reviews again until the loop
+converges. The runner is Claude Code (`.claude/commands/cross-review.md`) and
+every reviewer is a fresh Claude `Agent` that starts blind.
 
 The reviewers are fresh and blind in every round. The runner alone remembers
 what was found, fixed, rejected or deliberately traded off, and it is the final
@@ -24,16 +22,15 @@ walked back and forth between two defensible designs.
 Freeze the scope once:
 
 ```bash
-python3 .agents/shared/scripts/cross_review_scope.py init \
-  --source-root SOURCE_ROOT [--commits N]
+komaru review init --source-root SOURCE_ROOT [--commits N]
 ```
 
-It creates the session directory, by default `<git common dir>/cross-review/
+`komaru` is the tool in `Telegram/rust/komaru_tools`. It creates the
+session directory, by default `<git common dir>/cross-review/
 <timestamp>/`, outside the working tree. Before each round, snapshot it:
 
 ```bash
-python3 .agents/shared/scripts/cross_review_scope.py snapshot \
-  --session SESSION --round R
+komaru review snapshot --session SESSION --round R
 ```
 
 The snapshot writes `roundR/scope.patch` (everything under review),

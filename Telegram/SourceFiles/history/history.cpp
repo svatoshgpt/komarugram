@@ -71,6 +71,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "storage/storage_shared_media.h"
 #include "storage/storage_account.h"
 #include "support/support_helper.h"
+#include "tgw/tgw_storage.h"
 #include "ui/image/image.h"
 #include "ui/text/text_options.h"
 #include "ui/text/text_utilities.h"
@@ -87,6 +88,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_state.h"
+#include "ayu/data/messages_storage.h"
 
 
 namespace {
@@ -765,6 +767,7 @@ void History::destroyMessage(not_null<HistoryItem*> item) {
 }
 
 void History::destroyMessagesByDates(TimeId minDate, TimeId maxDate) {
+	Tgw::ClearDatesStorage(this, minDate, maxDate);
 	auto toDestroy = std::vector<not_null<HistoryItem*>>();
 	toDestroy.reserve(_items.size());
 	for (const auto &message : _items) {
@@ -1908,24 +1911,51 @@ void History::addEdgesToSharedMedia() {
 	}
 }
 
-void History::addOlderSlice(const QVector<MTPMessage> &slice) {
-	if (slice.isEmpty()) {
-		_loadedAtTop = true;
-		checkLocalMessages();
-		return;
-	}
-	if (const auto newest = maxMsgId()) {
+void History::addOlderSlice(const QVector<MTPMessage> &server) {
+	if (const auto newest = maxMsgId(); newest && !server.isEmpty()) {
 		// WHY: a stale latest-page answer can arrive after older messages
 		// were loaded; prepending it would break the order of blocks.
 		const auto older = [&](const MTPMessage &message) {
 			return IdFromMessage(message) <= newest;
 		};
-		if (ranges::none_of(slice, older)) {
+		if (ranges::none_of(server, older)) {
 			return;
 		}
 	}
+	// Saved deleted messages come back between the page and what is loaded.
+	auto restored = base::flat_set<MsgId>();
+	auto after = MsgId();
+	auto before = minMsgId();
+	if (!server.isEmpty()) {
+		auto newest = MsgId();
+		for (const auto &message : server) {
+			const auto id = IdFromMessage(message);
+			after = after ? std::min(after, id) : id;
+			newest = std::max(newest, id);
+		}
+		const auto last = lastMessage();
+		if (!before && (!last || last->id > newest)) {
+			before = newest;
+		}
+	}
+	const auto slice = AyuMessages::withDeletedMessages(
+		this,
+		server,
+		after,
+		before,
+		restored);
+	if (slice.isEmpty()) {
+		_loadedAtTop = true;
+		checkLocalMessages();
+		return;
+	}
 
 	if (const auto added = createItems(slice); !added.empty()) {
+		for (const auto &item : added) {
+			if (restored.contains(item->id)) {
+				item->setDeleted();
+			}
+		}
 		addCreatedOlderSlice(added);
 	} else {
 		// If no items were added it means we've loaded everything old.
@@ -1957,20 +1987,50 @@ void History::addCreatedOlderSlice(
 	addToSharedMedia(items);
 }
 
-void History::addNewerSlice(const QVector<MTPMessage> &slice) {
+void History::addNewerSlice(const QVector<MTPMessage> &server) {
 	bool wasLoadedAtBottom = loadedAtBottom();
 
-	if (slice.isEmpty()) {
+	if (server.isEmpty()) {
 		_loadedAtBottom = true;
 		if (!lastMessage()) {
 			setLastMessage(lastAvailableMessage());
 		}
 	}
+	// Saved deleted messages come back between what is loaded and the page.
+	auto restored = base::flat_set<MsgId>();
+	auto after = maxMsgId();
+	auto before = MsgId();
+	if (!server.isEmpty()) {
+		auto oldest = MsgId();
+		for (const auto &message : server) {
+			const auto id = IdFromMessage(message);
+			oldest = oldest ? std::min(oldest, id) : id;
+			before = std::max(before, id);
+		}
+		const auto last = lastMessage();
+		if (last && last->id <= before) {
+			before = MsgId();
+		}
+		if (!after) {
+			after = oldest;
+		}
+	}
+	const auto slice = after
+		? AyuMessages::withDeletedMessages(
+			this,
+			server,
+			after,
+			before,
+			restored)
+		: server;
 
 	if (const auto added = createItems(slice); !added.empty()) {
 		Assert(!isBuildingFrontBlock());
 
 		for (const auto &item : added) {
+			if (restored.contains(item->id)) {
+				item->setDeleted();
+			}
 			addItemToBlock(item);
 		}
 
@@ -2002,8 +2062,8 @@ void History::checkLastMessage() {
 
 void History::addItemsToLists(
 		const std::vector<not_null<HistoryItem*>> &items) {
-	std::deque<not_null<UserData*>> *lastAuthors = nullptr;
-	base::flat_set<not_null<PeerData*>> *markupSenders = nullptr;
+	auto lastAuthors = (std::deque<not_null<UserData*>>*)nullptr;
+	auto markupSenders = (base::flat_set<not_null<PeerData*>>*)nullptr;
 	if (peer->isChat()) {
 		lastAuthors = &peer->asChat()->lastAuthors;
 		markupSenders = &peer->asChat()->markupSenders;
@@ -3497,8 +3557,13 @@ bool History::shouldBeInChatList() const {
 			return true;
 		}
 	}
+	const auto last = lastMessage();
 	return !lastMessageKnown()
-		|| (lastMessage() != nullptr);
+		|| (last != nullptr && !isNewPeerMessage(last));
+}
+
+bool History::isNewPeerMessage(not_null<HistoryItem*> item) const {
+	return (item == _newPeerPhotoChange) || (item == _newPeerNameChange);
 }
 
 void History::unknownMessageDeleted(MsgId messageId) {
@@ -4232,6 +4297,7 @@ void History::checkNewPeerMessages() {
 	if (name && !_newPeerNameChange) {
 		_newPeerNameChange = add(tr::lng_new_contact_updated_name, name);
 	}
+	updateChatListExistence();
 }
 
 void History::insertMessageToBlocks(not_null<HistoryItem*> item) {
@@ -4519,6 +4585,7 @@ void History::clear(ClearType type, bool markEmpty) {
 }
 
 void History::clearUpTill(MsgId availableMinId) {
+	Tgw::ClearHistoryStorage(this, availableMinId);
 	auto remove = std::vector<not_null<HistoryItem*>>();
 	remove.reserve(_items.size());
 	for (const auto &item : _items) {
@@ -4526,6 +4593,7 @@ void History::clearUpTill(MsgId availableMinId) {
 		if (!item->isRegular()) {
 			continue;
 		} else if (itemId == availableMinId) {
+			Tgw::DeleteMessageStorage(item.get());
 			owner().scheduleItemPhotoCacheClear(item.get());
 			item->applyEditionToHistoryCleared();
 		} else if (itemId < availableMinId) {
@@ -4647,6 +4715,7 @@ void History::refreshHiddenLinksItems() {
 	for (const auto &id : refresh) {
 		if (const auto item = owner->message(id)) {
 			item->setHasHiddenLinks(false);
+			item->updateDependentServiceText();
 			owner->requestItemViewRefresh(item);
 		}
 	}

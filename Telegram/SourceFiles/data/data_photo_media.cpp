@@ -7,12 +7,14 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "data/data_photo_media.h"
 
+#include "ayu/features/komaru/scroll_autoload.h"
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
 #include "history/history.h"
 #include "history/history_item.h"
 #include "main/main_session.h"
 #include "main/main_session_settings.h"
+#include "platform/platform_file_utilities.h"
 #include "storage/file_download.h"
 
 #include <QtGui/QGuiApplication>
@@ -176,10 +178,11 @@ void PhotoMedia::automaticLoad(
 	if (loaded() || _owner->cancelled()) {
 		return;
 	}
-	const auto loadFromCloud = Data::AutoDownload::Should(
-		_owner->session().settings().autoDownload(),
-		peer,
-		_owner);
+	const auto loadFromCloud = !KomaruAutoload::Paused()
+		&& Data::AutoDownload::Should(
+			_owner->session().settings().autoDownload(),
+			peer,
+			_owner);
 	_owner->load(
 		origin,
 		loadFromCloud ? LoadFromCloudOrLocal : LoadFromLocalOnly,
@@ -202,21 +205,25 @@ void PhotoMedia::collectLocalData(not_null<PhotoMedia*> local) {
 
 bool PhotoMedia::saveToFile(const QString &path) {
 	constexpr auto large = PhotoSize::Large;
-	if (const auto video = videoContent(large); !video.isEmpty()) {
-		QFile f(path);
-		return f.open(QIODevice::WriteOnly)
-			&& (f.write(video) == video.size());
-	} else if (const auto photo = imageBytes(large); !photo.isEmpty()) {
-		QFile f(path);
-		return f.open(QIODevice::WriteOnly)
-			&& (f.write(photo) == photo.size());
-	} else if (const auto loaded = image(large)) {
-		const auto fallback = loaded->original();
-		if (!fallback.isNull()) {
-			return fallback.save(path, "JPG");
+	const auto video = videoContent(large);
+	const auto bytes = video.isEmpty() ? imageBytes(large) : video;
+	if (!bytes.isEmpty()) {
+		auto file = QFile(path);
+		if (!file.open(QIODevice::WriteOnly)
+			|| file.write(bytes) != bytes.size()
+			|| !file.flush()) {
+			return false;
+		}
+		file.close();
+	} else {
+		const auto loaded = image(large);
+		if (!loaded || !loaded->original().save(path, "JPG")) {
+			return false;
 		}
 	}
-	return false;
+	Platform::File::PostprocessDownloaded(
+		QFileInfo(path).absoluteFilePath());
+	return true;
 }
 
 bool PhotoMedia::setToClipboard() {
