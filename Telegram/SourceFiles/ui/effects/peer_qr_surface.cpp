@@ -387,16 +387,122 @@ struct BackgroundRequest {
 	}
 }
 
+struct KomaruQrPalette {
+	QColor accent;
+	QColor cardCenter;
+	QColor cardEdge;
+	QColor qrSurface;
+	QColor dotFg;
+	QColor border;
+	QColor innerBorder;
+	QColor pillBg;
+};
+
+[[nodiscard]] KomaruQrPalette ComputeKomaruQrPalette(const QColor &ink) {
+	const auto baseBg = st::windowBg->c;
+	const auto isDark = (baseBg.lightness() < 128);
+	auto accent = ink.isValid() ? ink : st::windowBgActive->c;
+	if (isDark && accent.lightness() < 148) {
+		accent = QColor::fromHsl(
+			accent.hslHue(),
+			std::min(255, int(accent.hslSaturation() * 1.15)),
+			168);
+	} else if (!isDark && accent.lightness() > 125) {
+		accent = QColor::fromHsl(
+			accent.hslHue(),
+			std::min(255, int(accent.hslSaturation() * 1.1)),
+			105);
+	}
+	auto pillBg = accent;
+	pillBg.setAlphaF(isDark ? 0.16 : 0.12);
+	return {
+		.accent = accent,
+		.cardCenter = anim::color(baseBg, accent, isDark ? 0.20 : 0.14),
+		.cardEdge = baseBg,
+		.qrSurface = isDark ? baseBg.darker(122) : QColor(Qt::white),
+		.dotFg = isDark
+			? anim::color(QColor(Qt::white), accent, 0.14)
+			: anim::color(QColor(0x11, 0x24, 0x24), accent, 0.16),
+		.border = isDark ? QColor(255, 255, 255, 30) : QColor(0, 0, 0, 22),
+		.innerBorder = isDark ? QColor(255, 255, 255, 20) : QColor(0, 0, 0, 14),
+		.pillBg = pillBg,
+	};
+}
+
 [[nodiscard]] QImage GenerateFinalQr(
 		const Qr::Data &data,
 		int side,
 		const QColor &ink) {
-	const auto pixel = (kQrOversample * side + data.size - 1) / data.size;
-	return Qr::Generate(data, pixel, ink, Qt::transparent).scaled(
-		side,
-		side,
-		Qt::IgnoreAspectRatio,
-		Qt::SmoothTransformation);
+	auto result = QImage(side, side, QImage::Format_ARGB32_Premultiplied);
+	result.fill(Qt::transparent);
+	const auto count = data.size;
+	if (count <= 0 || int(data.values.size()) < count * count) {
+		return result;
+	}
+	const auto palette = ComputeKomaruQrPalette(ink);
+	const auto cell = side / float64(count);
+	const auto blankFrom = (count - Qr::ReplaceSize(data, 1)) / 2;
+	const auto blankTill = count - blankFrom;
+	const auto inFinder = [&](int row, int col) {
+		return (row < 7 && col < 7)
+			|| (row < 7 && col >= count - 7)
+			|| (row >= count - 7 && col < 7);
+	};
+
+	auto p = QPainter(&result);
+	auto hq = PainterHighQualityEnabler(p);
+
+	// Accent rounded finder eyes.
+	const std::array<QPoint, 3> corners = {
+		QPoint(0, 0),
+		QPoint(count - 7, 0),
+		QPoint(0, count - 7),
+	};
+	for (const auto &corner : corners) {
+		const auto x = corner.x() * cell;
+		const auto y = corner.y() * cell;
+		const auto outer = QRectF(
+			x + 0.5 * cell,
+			y + 0.5 * cell,
+			6.0 * cell,
+			6.0 * cell);
+		p.setBrush(Qt::NoBrush);
+		p.setPen(QPen(palette.accent, cell, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+		p.drawRoundedRect(outer, 1.55 * cell, 1.55 * cell);
+
+		const auto inner = QRectF(
+			x + 2.0 * cell,
+			y + 2.0 * cell,
+			3.0 * cell,
+			3.0 * cell);
+		p.setPen(Qt::NoPen);
+		p.setBrush(palette.accent);
+		p.drawRoundedRect(inner, 0.85 * cell, 0.85 * cell);
+	}
+
+	// Crisp circular MD3 dots for data modules.
+	p.setPen(Qt::NoPen);
+	p.setBrush(palette.dotFg);
+	const auto dotRadius = 0.41 * cell;
+	for (auto row = 0; row != count; ++row) {
+		for (auto col = 0; col != count; ++col) {
+			if (inFinder(row, col)) {
+				continue;
+			}
+			if (row >= blankFrom && row < blankTill
+				&& col >= blankFrom && col < blankTill) {
+				continue;
+			}
+			if (!data.values[row * count + col]) {
+				continue;
+			}
+			p.drawEllipse(
+				QPointF((col + 0.5) * cell, (row + 0.5) * cell),
+				dotRadius,
+				dotRadius);
+		}
+	}
+	return result;
 }
 
 [[nodiscard]] QImage PrepareQrImage(
@@ -434,17 +540,25 @@ struct BackgroundRequest {
 		anim::with_alpha(QColor(0, 0, 0), alpha));
 }
 
-[[nodiscard]] QImage PreparePlane(int side, int ratio) {
-	auto result = QImage(
+[[nodiscard]] QImage PreparePlane(int side, int ratio, const QColor &accent) {
+	auto mask = QImage(
 		QSize(side, side) * ratio,
 		QImage::Format_ARGB32_Premultiplied);
-	result.fill(Qt::transparent);
+	mask.fill(Qt::transparent);
 	{
-		auto p = QPainter(&result);
+		auto p = QPainter(&mask);
 		auto hq = PainterHighQualityEnabler(p);
-		auto svg = QSvgRenderer(u":/gui/plane_white.svg"_q);
-		svg.render(&p, QRectF(QPointF(), QSizeF(result.size())));
+		auto svg = QSvgRenderer(u":/gui/art/ayu/komaru_badge.svg"_q);
+		const auto inset = mask.width() * 0.06;
+		svg.render(
+			&p,
+			QRectF(
+				inset,
+				inset,
+				mask.width() - 2. * inset,
+				mask.height() - 2. * inset));
 	}
+	auto result = style::colorizeImage(std::move(mask), accent);
 	result.setDevicePixelRatio(ratio);
 	return result;
 }
@@ -456,6 +570,7 @@ struct BackgroundRequest {
 		int shadowRadius,
 		int shadowShift,
 		int ratio) {
+	const auto palette = ComputeKomaruQrPalette(ink);
 	auto data = link.isEmpty() ? Qr::Data() : Qr::Encode(link);
 	auto qr = PrepareQrImage(data, layout.qr.width(), ink, ratio);
 	return {
@@ -467,7 +582,7 @@ struct BackgroundRequest {
 			ratio),
 		.qr = std::move(qr),
 		.data = std::move(data),
-		.plane = PreparePlane(layout.logo.width(), ratio),
+		.plane = PreparePlane(layout.logo.width(), ratio, palette.accent),
 		.ink = ink,
 		.shadowPosition = QPoint(-shadowRadius, shadowShift - shadowRadius),
 	};
@@ -694,7 +809,7 @@ void PaintStreaks(QPainter &p, const QRect &logo, const PlaneState &state) {
 	}
 }
 
-void PaintPlane(
+[[maybe_unused]] void PaintPlane(
 		QPainter &p,
 		const QRect &logo,
 		const QImage &plane,
@@ -732,12 +847,34 @@ void PaintUsername(
 		const QRect &band,
 		const UsernameFit &username,
 		const QColor &ink) {
+	const auto palette = ComputeKomaruQrPalette(ink);
 	const auto metrics = QFontMetricsF(username.font);
 	const auto height = metrics.height();
 	const auto lines = int(username.lines.size());
-	auto top = band.y() + (band.height() - lines * height) / 2.;
+	auto maxLineWidth = 0.;
+	for (const auto &line : username.lines) {
+		maxLineWidth = std::max(maxLineWidth, metrics.horizontalAdvance(line));
+	}
+	const auto blockHeight = lines * height;
+	auto top = band.y() + (band.height() - blockHeight) / 2.;
+
+	if (maxLineWidth > 0.) {
+		const auto padX = std::max(height * 0.7, 12.);
+		const auto padY = std::max(height * 0.24, 4.);
+		const auto pillW = std::min(float64(band.width()), maxLineWidth + 2. * padX);
+		const auto pillH = blockHeight + 2. * padY;
+		const auto pillRect = QRectF(
+			band.x() + (band.width() - pillW) / 2.,
+			top - padY,
+			pillW,
+			pillH);
+		p.setPen(Qt::NoPen);
+		p.setBrush(palette.pillBg);
+		p.drawRoundedRect(pillRect, pillH / 2., pillH / 2.);
+	}
+
 	p.setFont(username.font);
-	p.setPen(ink);
+	p.setPen(palette.accent);
 	for (const auto &line : username.lines) {
 		const auto width = metrics.horizontalAdvance(line);
 		const auto left = band.x() + (band.width() - width) / 2.;
@@ -912,14 +1049,33 @@ void PaintCard(
 		const CardContent &content,
 		const CardFrame &frame,
 		bool paintUsername = true) {
+	const auto palette = ComputeKomaruQrPalette(content.ink);
 	p.drawImage(content.shadowPosition, content.shadow);
 	auto hq = PainterHighQualityEnabler(p);
-	p.setPen(Qt::NoPen);
-	p.setBrush(Qt::white);
+
+	const auto cardRect = QRectF(QPointF(), QSizeF(layout.size));
+	auto cardGrad = QRadialGradient(
+		QPointF(cardRect.width() * 0.9, cardRect.height() * 0.1),
+		cardRect.width() * 1.25);
+	cardGrad.setColorAt(0., palette.cardCenter);
+	cardGrad.setColorAt(1., palette.cardEdge);
+	p.setPen(QPen(palette.border, st::lineWidth));
+	p.setBrush(cardGrad);
 	p.drawRoundedRect(
-		QRect(QPoint(), layout.size),
+		cardRect.adjusted(0.5, 0.5, -0.5, -0.5),
 		layout.radius,
 		layout.radius);
+
+	// Inner concentric high-contrast MD3 QR surface.
+	const auto qrPad = std::max(layout.qr.width() / 16, 10);
+	const auto qrBox = QRectF(layout.qr).adjusted(-qrPad, -qrPad, qrPad, qrPad);
+	const auto innerRadius = std::max(
+		float64(layout.radius) - qrPad * 0.65,
+		14.);
+	p.setPen(QPen(palette.innerBorder, st::lineWidth));
+	p.setBrush(palette.qrSurface);
+	p.drawRoundedRect(qrBox, innerRadius, innerRadius);
+
 	if (frame.swap || !content.qr.isNull()) {
 		if (frame.swap) {
 			p.save();
@@ -931,9 +1087,17 @@ void PaintCard(
 		} else {
 			PaintBloom(p, layout.qr, content, frame.bloom);
 		}
-		p.setBrush(content.ink);
-		p.drawEllipse(layout.logo);
-		PaintPlane(p, layout.logo, content.plane, frame.plane);
+		// Clean Komaru SVG in the center cutout (no filled circle behind it).
+		const auto cutoutPad = std::max(layout.logo.width() / 10, 3);
+		const auto cutout = QRectF(layout.logo).adjusted(
+			-cutoutPad,
+			-cutoutPad,
+			cutoutPad,
+			cutoutPad);
+		p.setPen(Qt::NoPen);
+		p.setBrush(palette.qrSurface);
+		p.drawRoundedRect(cutout, cutout.width() * 0.28, cutout.width() * 0.28);
+		p.drawImage(layout.logo, content.plane);
 	}
 	if (paintUsername && !content.username.lines.isEmpty()) {
 		PaintUsername(p, layout.band, content.username, content.ink);
