@@ -97,6 +97,39 @@ void DrawMusicNote(
 	p.restore();
 }
 
+struct NowPlayingMetrics {
+	int padX = 0;
+	int padY = 0;
+	int gap = 0;
+	int coverSize = 0;
+	int btnSize = 0;
+	int radius = 0;
+	int innerRadius = 0;
+};
+
+[[nodiscard]] NowPlayingMetrics ComputeNowPlayingMetrics(int width, int baseRadius) {
+	const auto compact = (width > 0 && width < style::ConvertScale(300));
+	const auto wide = (width >= style::ConvertScale(420));
+	const auto padX = style::ConvertScale(compact ? 10 : wide ? 14 : 12);
+	const auto padY = style::ConvertScale(compact ? 10 : wide ? 14 : 12);
+	const auto gap = style::ConvertScale(compact ? 10 : wide ? 14 : 12);
+	const auto coverSize = style::ConvertScale(compact ? 48 : wide ? 64 : 56);
+	const auto btnSize = style::ConvertScale(compact ? 32 : wide ? 40 : 36);
+	const auto radius = (baseRadius > 0) ? baseRadius : style::ConvertScale(16);
+	const auto innerRadius = std::max(
+		radius - padX,
+		style::ConvertScale(compact ? 8 : 10));
+	return {
+		.padX = padX,
+		.padY = padY,
+		.gap = gap,
+		.coverSize = coverSize,
+		.btnSize = btnSize,
+		.radius = radius,
+		.innerRadius = innerRadius,
+	};
+}
+
 void DrawNowPlayingPattern(
 		QPainter &p,
 		const QRect &rect,
@@ -307,6 +340,13 @@ AyuMusicButton::AyuMusicButton(
 	_performer->setAttribute(Qt::WA_TransparentForMouseEvents);
 	_meta->setAttribute(Qt::WA_TransparentForMouseEvents);
 
+	style::PaletteChanged(
+	) | rpl::on_next([=] {
+		if (_currentCover) {
+			makeCover();
+		}
+	}, lifetime());
+
 	downloadAndMakeCover(data.msgId);
 
 	setClickedCallback(std::move(handler));
@@ -425,7 +465,7 @@ void AyuMusicButton::makeCover() {
 			const auto &font = st::infoMusicButtonTitle.style.font;
 			const auto skip = st::normalFont->spacew / 2;
 			const auto size = nowPlayingCard
-				? style::ConvertScale(60)
+				? style::ConvertScale(64)
 				: (font->height + skip + font->height);
 
 			auto cover = GetCurrentCover(mediaView, QSize(size, size));
@@ -518,13 +558,17 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 
 	const auto &font = st::infoMusicButtonTitle.style.font;
 	const auto skip = st::normalFont->spacew / 2;
+	const auto metrics = _nowPlayingCard
+		? ComputeNowPlayingMetrics(width(), _radius)
+		: NowPlayingMetrics{};
 	const auto size = _nowPlayingCard
-		? style::ConvertScale(60)
+		? metrics.coverSize
 		: (font->height + skip + font->height);
+	const auto radius = _nowPlayingCard ? metrics.radius : _radius;
 
-	if (_radius > 0) {
+	if (radius > 0) {
 		auto path = QPainterPath();
-		path.addRoundedRect(rect(), _radius, _radius);
+		path.addRoundedRect(rect(), radius, radius);
 		p.setClipPath(path);
 	}
 
@@ -534,7 +578,7 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		&& !_themeColors
 		&& (_nowPlayingCard || settings.adaptiveCoverColor());
 	if (!adaptive) {
-		// Material 3 surface container.
+		// Material 3 surface container adapting to current Light/Dark theme.
 		p.fillRect(e->rect(), _overrideBg ? cover.bg : st::windowBgOver->c);
 		if (_nowPlayingCard) {
 			DrawNowPlayingPattern(p, rect(), st::windowSubTextFg->c, 0.55);
@@ -557,7 +601,7 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		}
 	}
 
-	if (_nowPlayingCard && _radius > 0) {
+	if (_nowPlayingCard && radius > 0) {
 		// Subtle MD3 outlineVariant border.
 		auto border = adaptive ? QColor(255, 255, 255, 34) : st::shadowFg->c;
 		if (!adaptive) {
@@ -567,30 +611,30 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		p.setBrush(Qt::NoBrush);
 		p.drawRoundedRect(
 			QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
-			_radius,
-			_radius);
+			radius,
+			radius);
 	}
 
 	const auto padding = _padding.value_or(st::infoMusicButtonPadding);
 	if (!cover.pix.isNull()) {
+		const auto coverX = _nowPlayingCard ? metrics.padX : padding.left();
 		const auto coverY = _nowPlayingCard
 			? (height() - size) / 2
 			: padding.top();
-		const auto coverRect = QRect(padding.left(), coverY, size, size);
+		const auto coverRect = QRect(coverX, coverY, size, size);
 		p.drawPixmap(coverRect, cover.pix);
 		if (_nowPlayingCard) {
 			p.setPen(QPen(QColor(255, 255, 255, adaptive ? 38 : 22), st::lineWidth));
 			p.setBrush(Qt::NoBrush);
-			const auto innerRadius = std::max(_radius - padding.left(), st::roundRadiusSmall);
 			p.drawRoundedRect(
 				QRectF(coverRect).adjusted(0.5, 0.5, -0.5, -0.5),
-				innerRadius,
-				innerRadius);
+				metrics.innerRadius,
+				metrics.innerRadius);
 		}
 	}
 
 	if (_playIcon) {
-		const auto btnSize = _nowPlayingCard ? style::ConvertScale(36) : size;
+		const auto btnSize = _nowPlayingCard ? metrics.btnSize : size;
 		// Material 3 tonal / accent circular play button.
 		const auto fg = adaptive
 			? QColor(Qt::white)
@@ -603,7 +647,7 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		if (!(adaptive && _nowPlayingCard && cover.accent.isValid())) {
 			bg.setAlphaF(adaptive ? 0.22 : 0.16);
 		}
-		const auto rightInset = _nowPlayingCard ? padding.left() : padding.left();
+		const auto rightInset = _nowPlayingCard ? metrics.padX : padding.left();
 		const auto circle = QRectF(
 			width() - rightInset - btnSize,
 			(height() - btnSize) / 2.,
@@ -635,14 +679,15 @@ int AyuMusicButton::resizeGetHeight(int newWidth) {
 	const auto skip = st::normalFont->spacew / 2;
 
 	if (_nowPlayingCard) {
-		const auto coverSize = style::ConvertScale(60);
-		const auto btnSize = _playIcon ? style::ConvertScale(36) : 0;
-		const auto gap = padding.left();
-		const auto textLeft = padding.left() + coverSize + gap;
-		const auto rightReserve = padding.left() + (btnSize ? (btnSize + gap) : 0);
+		const auto metrics = ComputeNowPlayingMetrics(newWidth, _radius);
+		const auto coverSize = metrics.coverSize;
+		const auto btnSize = _playIcon ? metrics.btnSize : 0;
+		const auto textLeft = metrics.padX + coverSize + metrics.gap;
+		const auto rightReserve = metrics.padX + (btnSize ? (btnSize + metrics.gap) : 0);
 		const auto available = std::max(0, newWidth - textLeft - rightReserve);
 
-		const auto showMeta = !_metaText.isEmpty();
+		const auto showMeta = !_metaText.isEmpty()
+			&& (available >= style::ConvertScale(110));
 		_meta->setVisible(showMeta);
 
 		const auto lineGap = std::max(style::ConvertScale(2), skip / 2);
@@ -650,7 +695,7 @@ int AyuMusicButton::resizeGetHeight(int newWidth) {
 			+ lineGap + subFont->height
 			+ (showMeta ? (lineGap + subFont->height) : 0);
 		const auto contentHeight = std::max(coverSize, textHeight);
-		const auto totalHeight = padding.top() + contentHeight + padding.bottom();
+		const auto totalHeight = metrics.padY + contentHeight + metrics.padY;
 		const auto textTop = (totalHeight - textHeight) / 2;
 
 		_title->resizeToNaturalWidth(available);
