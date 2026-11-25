@@ -32,6 +32,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "qr/qr_generate.h"
 #include "platform/platform_webauthn.h"
 #include "styles/style_intro.h"
+#include "styles/palette.h"
+
+#include <QtSvg/QSvgRenderer>
 
 // AyuGram includes
 #include "main/main_domain.h"
@@ -41,8 +44,42 @@ namespace Intro {
 namespace details {
 namespace {
 
-[[nodiscard]] QImage TelegramQrExact(const Qr::Data &data, int pixel) {
-	return Qr::Generate(data, pixel, Qt::black);
+struct LoginQrPalette {
+	QColor accent;
+	QColor cardCenter;
+	QColor cardEdge;
+	QColor qrSurface;
+	QColor dotFg;
+	QColor border;
+	QColor innerBorder;
+};
+
+[[nodiscard]] LoginQrPalette ComputeLoginQrPalette() {
+	const auto baseBg = st::windowBg->c;
+	const auto isDark = (baseBg.lightness() < 128);
+	auto accent = st::windowBgActive->c;
+	if (isDark && accent.lightness() < 148) {
+		accent = QColor::fromHsl(
+			accent.hslHue(),
+			std::min(255, int(accent.hslSaturation() * 1.15)),
+			168);
+	} else if (!isDark && accent.lightness() > 125) {
+		accent = QColor::fromHsl(
+			accent.hslHue(),
+			std::min(255, int(accent.hslSaturation() * 1.1)),
+			105);
+	}
+	return {
+		.accent = accent,
+		.cardCenter = anim::color(baseBg, accent, isDark ? 0.20 : 0.14),
+		.cardEdge = baseBg,
+		.qrSurface = isDark ? baseBg.darker(122) : QColor(Qt::white),
+		.dotFg = isDark
+			? anim::color(QColor(Qt::white), accent, 0.14)
+			: anim::color(QColor(0x11, 0x24, 0x24), accent, 0.16),
+		.border = isDark ? QColor(255, 255, 255, 30) : QColor(0, 0, 0, 22),
+		.innerBorder = isDark ? QColor(255, 255, 255, 20) : QColor(0, 0, 0, 14),
+	};
 }
 
 [[nodiscard]] QImage TelegramQr(const Qr::Data &data, int pixel, int max = 0) {
@@ -51,18 +88,92 @@ namespace {
 	if (max > 0 && data.size * pixel > max) {
 		pixel = std::max(max / data.size, 1);
 	}
-	const auto qr = TelegramQrExact(data, pixel * style::DevicePixelRatio());
-	auto result = QImage(qr.size(), QImage::Format_ARGB32_Premultiplied);
-	result.fill(Qt::white);
-	{
-		auto p = QPainter(&result);
-		p.drawImage(QRect(QPoint(), qr.size()), qr);
+	const auto ratio = style::DevicePixelRatio();
+	const auto side = data.size * pixel * ratio;
+	auto result = QImage(side, side, QImage::Format_ARGB32_Premultiplied);
+	result.fill(Qt::transparent);
+
+	const auto count = data.size;
+	const auto palette = ComputeLoginQrPalette();
+	const auto cell = side / float64(count);
+	const auto blankFrom = (count - Qr::ReplaceSize(data, 1)) / 2;
+	const auto blankTill = count - blankFrom;
+	const auto inFinder = [&](int row, int col) {
+		return (row < 7 && col < 7)
+			|| (row < 7 && col >= count - 7)
+			|| (row >= count - 7 && col < 7);
+	};
+
+	auto p = QPainter(&result);
+	auto hq = PainterHighQualityEnabler(p);
+
+	const std::array<QPoint, 3> corners = {
+		QPoint(0, 0),
+		QPoint(count - 7, 0),
+		QPoint(0, count - 7),
+	};
+	for (const auto &corner : corners) {
+		const auto x = corner.x() * cell;
+		const auto y = corner.y() * cell;
+		const auto outer = QRectF(
+			x + 0.5 * cell,
+			y + 0.5 * cell,
+			6.0 * cell,
+			6.0 * cell);
+		p.setBrush(Qt::NoBrush);
+		p.setPen(QPen(palette.accent, cell, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+		p.drawRoundedRect(outer, 1.55 * cell, 1.55 * cell);
+
+		const auto inner = QRectF(
+			x + 2.0 * cell,
+			y + 2.0 * cell,
+			3.0 * cell,
+			3.0 * cell);
+		p.setPen(Qt::NoPen);
+		p.setBrush(palette.accent);
+		p.drawRoundedRect(inner, 0.85 * cell, 0.85 * cell);
+	}
+
+	p.setPen(Qt::NoPen);
+	p.setBrush(palette.dotFg);
+	const auto dotRadius = 0.41 * cell;
+	for (auto row = 0; row != count; ++row) {
+		for (auto col = 0; col != count; ++col) {
+			if (inFinder(row, col)) {
+				continue;
+			}
+			if (row >= blankFrom && row < blankTill
+				&& col >= blankFrom && col < blankTill) {
+				continue;
+			}
+			if (!data.values[row * count + col]) {
+				continue;
+			}
+			p.drawEllipse(
+				QPointF((col + 0.5) * cell, (row + 0.5) * cell),
+				dotRadius,
+				dotRadius);
+		}
 	}
 	return result;
 }
 
-[[nodiscard]] QColor QrActiveColor() {
-	return QColor(87, 101, 26);
+[[nodiscard]] QImage KomaruLoginLogoImage() {
+	const auto palette = ComputeLoginQrPalette();
+	const auto ratio = style::DevicePixelRatio();
+	const auto side = st::introQrCenterSize * ratio;
+	auto mask = QImage(side, side, QImage::Format_ARGB32_Premultiplied);
+	mask.fill(Qt::transparent);
+	{
+		auto p = QPainter(&mask);
+		auto hq = PainterHighQualityEnabler(p);
+		auto svg = QSvgRenderer(u":/gui/art/ayu/komaru_badge.svg"_q);
+		const auto inset = side * 0.08;
+		svg.render(&p, QRectF(inset, inset, side - 2. * inset, side - 2. * inset));
+	}
+	auto result = style::colorizeImage(std::move(mask), palette.accent);
+	result.setDevicePixelRatio(ratio);
+	return result;
 }
 
 [[nodiscard]] not_null<Ui::RpWidget*> PrepareQrWidget(
@@ -125,7 +236,7 @@ namespace {
 	std::move(
 		palettes
 	) | rpl::map([] {
-		return TelegramLogoImage();
+		return KomaruLoginLogoImage();
 	}) | rpl::on_next([=](QImage &&image) {
 		state->center = std::move(image);
 	}, result->lifetime());
@@ -160,15 +271,28 @@ namespace {
 			(result->height() - size.height()) / 2,
 			size.width(),
 			size.height());
-		const auto radius = st::introQrBackgroundRadius;
+		const auto palette = ComputeLoginQrPalette();
+		const auto radius = std::max(st::introQrBackgroundRadius, style::ConvertScale(20));
 		const auto skip = st::introQrBackgroundSkip;
 		auto hq = PainterHighQualityEnabler(p);
-		p.setPen(Qt::NoPen);
-		p.setBrush(Qt::white);
-		p.drawRoundedRect(
-			qr.marginsAdded({ skip, skip, skip, skip }),
-			radius,
-			radius);
+
+		const auto outerRect = QRectF(qr.marginsAdded({ skip, skip, skip, skip }));
+		auto cardGrad = QRadialGradient(
+			QPointF(outerRect.right() - outerRect.width() * 0.1, outerRect.top() + outerRect.height() * 0.1),
+			outerRect.width() * 1.25);
+		cardGrad.setColorAt(0., palette.cardCenter);
+		cardGrad.setColorAt(1., palette.cardEdge);
+		p.setPen(QPen(palette.border, st::lineWidth));
+		p.setBrush(cardGrad);
+		p.drawRoundedRect(outerRect.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius);
+
+		const auto innerPad = std::max(skip / 2, style::ConvertScale(6));
+		const auto innerRect = QRectF(qr.marginsAdded({ innerPad, innerPad, innerPad, innerPad }));
+		const auto innerRadius = std::max(radius - (skip - innerPad), style::ConvertScale(12));
+		p.setPen(QPen(palette.innerBorder, st::lineWidth));
+		p.setBrush(palette.qrSurface);
+		p.drawRoundedRect(innerRect, innerRadius, innerRadius);
+
 		if (!state->qr.isNull()) {
 			if (shown == 1.) {
 				state->previous = QImage();
@@ -184,12 +308,17 @@ namespace {
 			(result->height() - st::introQrCenterSize) / 2,
 			st::introQrCenterSize,
 			st::introQrCenterSize);
+		const auto cutoutPad = std::max(st::introQrCenterSize / 10, 3);
+		const auto cutout = QRectF(rect).adjusted(-cutoutPad, -cutoutPad, cutoutPad, cutoutPad);
+		p.setPen(Qt::NoPen);
+		p.setBrush(palette.qrSurface);
+		p.drawRoundedRect(cutout, cutout.width() * 0.28, cutout.width() * 0.28);
 		p.drawImage(rect, state->center);
 		if (!anim::Disabled() && state->waiting.animating()) {
 			auto hq = PainterHighQualityEnabler(p);
 			const auto line = st::radialLine;
 			const auto radial = state->waiting.computeState();
-			auto pen = QPen(QrActiveColor());
+			auto pen = QPen(palette.accent);
 			pen.setWidth(line);
 			pen.setCapStyle(Qt::RoundCap);
 			p.setOpacity(radial.shown * (1. - shown));
