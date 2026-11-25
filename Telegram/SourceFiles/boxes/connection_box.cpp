@@ -7,6 +7,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "boxes/connection_box.h"
 
+#include "ayu/features/komaru/komaru_ws_proxy.h"
+#include "ayu/komaru_strings.h"
 #include "base/call_delayed.h"
 #include "base/qt/qt_key_modifiers.h"
 #include "base/qthelp_regex.h"
@@ -669,6 +671,127 @@ private:
 	int _skipRight = 0;
 
 };
+
+class WebSocketProxyRow final : public Ui::RippleButton {
+public:
+	WebSocketProxyRow(
+		QWidget *parent,
+		Fn<void(QString)> showError);
+
+	void syncState();
+
+protected:
+	void paintEvent(QPaintEvent *e) override;
+	int resizeGetHeight(int newWidth) override;
+
+private:
+	Ui::RadioView _radio;
+	int _pingMs = 0; // 0 = checking, >0 = ms, -1 = unavailable
+	bool _connecting = false;
+};
+
+WebSocketProxyRow::WebSocketProxyRow(
+	QWidget *parent,
+	Fn<void(QString)> showError)
+: Ui::RippleButton(parent, st::proxyRowRipple)
+, _radio(st::defaultRadio, KomaruWsProxy::IsActive(), [=] { update(); })
+, _connecting(KomaruWsProxy::IsConnecting()) {
+	setClickedCallback([=, showError = std::move(showError)] {
+		if (KomaruWsProxy::IsActive() || KomaruWsProxy::IsConnecting()) {
+			return;
+		}
+		_connecting = true;
+		update();
+		const auto weak = base::make_weak(this);
+		KomaruWsProxy::Enable([=](QString error) {
+			if (const auto strong = weak.get()) {
+				strong->syncState();
+			}
+			if (!error.isEmpty() && showError) {
+				showError(error);
+			}
+		});
+	});
+
+	KomaruWsProxy::StateChanged(
+	) | rpl::on_next([=] {
+		syncState();
+	}, lifetime());
+
+	const auto weak = base::make_weak(this);
+	KomaruWsProxy::Ping([=](int ms) {
+		if (const auto strong = weak.get()) {
+			strong->_pingMs = ms;
+			strong->update();
+		}
+	});
+}
+
+void WebSocketProxyRow::syncState() {
+	_connecting = KomaruWsProxy::IsConnecting();
+	_radio.setChecked(KomaruWsProxy::IsActive(), anim::type::normal);
+	update();
+}
+
+int WebSocketProxyRow::resizeGetHeight(int newWidth) {
+	return st::proxyRowPadding.top()
+		+ st::semiboldFont->height
+		+ st::proxyRowSkip
+		+ st::normalFont->height
+		+ st::proxyRowPadding.bottom();
+}
+
+void WebSocketProxyRow::paintEvent(QPaintEvent *e) {
+	auto p = Painter(this);
+	paintRipple(p, 0, 0);
+
+	const auto radioSize = _radio.getSize();
+	const auto radioLeft = st::proxyRowPadding.left();
+	const auto radioTop = (height() - radioSize.height()) / 2;
+	_radio.paint(p, radioLeft, radioTop, width());
+
+	const auto rightText = _connecting
+		? Komaru::Text("ws_proxy_connecting")
+		: (_pingMs > 0)
+		? Komaru::Text("ws_proxy_ms").replace(
+			u"{ms}"_q,
+			QString::number(_pingMs))
+		: (_pingMs < 0)
+		? Komaru::Text("ws_proxy_unavailable")
+		: u"…"_q;
+	const auto rightWidth = st::normalFont->width(rightText);
+	const auto rightPadding = st::proxyRowPadding.left();
+	const auto rightX = width() - rightPadding - rightWidth;
+	const auto rightY = (height() - st::normalFont->height) / 2
+		+ st::normalFont->ascent;
+
+	p.setFont(st::normalFont);
+	p.setPen((_pingMs > 0 && !_connecting)
+		? st::proxyRowStatusFgOnline
+		: (_pingMs < 0 && !_connecting)
+		? st::proxyRowStatusFgOffline
+		: st::proxyRowStatusFg);
+	p.drawText(rightX, rightY, rightText);
+
+	const auto textLeft = radioLeft + st::proxyRowIconSkip;
+	const auto available = std::max(0, rightX - st::proxyRowPadding.right() - textLeft);
+	auto top = st::proxyRowPadding.top();
+
+	p.setFont(st::semiboldFont);
+	p.setPen(st::proxyRowTitleFg);
+	p.drawText(
+		textLeft,
+		top + st::semiboldFont->ascent,
+		st::semiboldFont->elided(Komaru::Text("ws_proxy_title"), available));
+	top += st::semiboldFont->height + st::proxyRowSkip;
+
+	p.setFont(st::normalFont);
+	p.setPen(st::proxyRowStatusFg);
+	p.drawText(
+		textLeft,
+		top + st::normalFont->ascent,
+		st::normalFont->elided(Komaru::Text("ws_proxy_subtitle"), available));
+}
 
 class ProxiesBox : public Ui::BoxContent {
 public:
@@ -1430,12 +1553,26 @@ void ProxiesBox::setupContent() {
 			st::proxyAboutPadding),
 		style::margins(0, 0, 0, st::proxyRowPadding.top()));
 
+	const auto wsRow = inner->add(
+		object_ptr<WebSocketProxyRow>(
+			inner,
+			[=](QString error) {
+				uiShow()->showToast(std::move(error));
+			}));
+	_controller->proxySettingsValue(
+	) | rpl::on_next([=](ProxyData::Settings) {
+		wsRow->syncState();
+	}, wsRow->lifetime());
+
 	_wrap = inner->add(std::move(_initialWrap));
 	inner->add(object_ptr<Ui::FixedHeightWidget>(
 		inner,
 		st::proxyRowPadding.bottom()));
 
 	_proxySettings->setChangedCallback([=](ProxyData::Settings value) {
+		if (value != ProxyData::Settings::Enabled && KomaruWsProxy::IsActive()) {
+			KomaruWsProxy::Disable();
+		}
 		if (!_controller->setProxySettings(value)) {
 			_proxySettings->setValue(_settings.settings());
 			addNewProxy();

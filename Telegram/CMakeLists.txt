@@ -148,6 +148,8 @@ set(ayugram_files
         ayu/features/komaru/komaru_badges.h
         ayu/features/komaru/extera_now_playing.cpp
         ayu/features/komaru/extera_now_playing.h
+        ayu/features/komaru/komaru_ws_proxy.cpp
+        ayu/features/komaru/komaru_ws_proxy.h
         ayu/features/komaru/now_playing.cpp
         ayu/features/komaru/now_playing.h
         ayu/ayu_url_handlers.cpp

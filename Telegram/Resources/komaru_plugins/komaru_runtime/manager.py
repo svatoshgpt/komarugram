@@ -719,6 +719,16 @@ class Manager:
         record = self.records.get(message.get("plugin", ""))
         if command == "hello":
             return {"version": HOST_VERSION, "python": sys.version.split()[0]}
+        if command == "tgws_start":
+            from komaru_runtime import tgws
+            return await tgws.start()
+        if command == "tgws_stop":
+            from komaru_runtime import tgws
+            tgws.stop()
+            return True
+        if command == "tgws_info":
+            from komaru_runtime import tgws
+            return tgws.info() or {}
         if command == "list":
             return [r.describe() for r in self.records.values()]
         if command == "install":

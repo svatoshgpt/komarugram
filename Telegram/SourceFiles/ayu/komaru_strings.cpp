@@ -43,6 +43,11 @@ constexpr Entry kStrings[] = {
 	{ "save_gif_download_first", u"Download it first.", u"Сначала скачайте файл." },
 	{ "save_gif_preparing", u"Converting…", u"Конвертирую…" },
 	{ "save_gif_failed", u"Could not convert.", u"Не удалось конвертировать." },
+	{ "ws_proxy_title", u"Telegram over WebSocket", u"Telegram через WebSocket" },
+	{ "ws_proxy_subtitle", u"Like opening web.telegram.org", u"Как заход на web.telegram.org" },
+	{ "ws_proxy_connecting", u"Connecting…", u"Подключение…" },
+	{ "ws_proxy_unavailable", u"Unavailable", u"Недоступно" },
+	{ "ws_proxy_ms", u"{ms} ms", u"{ms} мс" },
 };
 
 } // namespace
