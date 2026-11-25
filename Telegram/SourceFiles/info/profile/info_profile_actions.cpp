@@ -1408,21 +1408,30 @@ bool SetClickContext(
 	return false;
 }
 
-// KomaruGram: how many messages a chat has, asked as a one message slice.
+// KomaruGram: how many messages a chat has, asked via messages.search with an
+// empty filter because messages.getHistory returns INT_MAX for inexact slices.
 [[nodiscard]] rpl::producer<TextWithEntities> MessagesCountValue(
 		not_null<PeerData*> peer) {
 	return [=](auto consumer) {
 		auto lifetime = rpl::lifetime();
 		const auto api = &peer->session().api();
-		const auto requestId = api->request(MTPmessages_GetHistory(
+		const auto requestId = api->request(MTPmessages_Search(
+			MTP_flags(0),
 			peer->input(),
-			MTP_int(0),
-			MTP_int(0),
-			MTP_int(0),
-			MTP_int(1),
-			MTP_int(0),
-			MTP_int(0),
-			MTP_long(0)
+			MTP_string(),
+			MTP_inputPeerEmpty(),
+			MTP_inputPeerEmpty(),
+			MTP_vector<MTPReaction>(),
+			MTP_int(0), // top_msg_id
+			MTP_inputMessagesFilterEmpty(),
+			MTP_int(0), // min_date
+			MTP_int(0), // max_date
+			MTP_int(0), // offset_id
+			MTP_int(0), // add_offset
+			MTP_int(1), // limit
+			MTP_int(0), // max_id
+			MTP_int(0), // min_id
+			MTP_long(0) // hash
 		)).done([=](const MTPmessages_Messages &result) {
 			const auto count = result.match([](
 					const MTPDmessages_messages &data) {
@@ -1430,9 +1439,11 @@ bool SetClickContext(
 			}, [](const auto &data) {
 				return int(data.vcount().v);
 			});
-			consumer.put_next(TextWithEntities{
-				Lang::FormatCountDecimal(count),
-			});
+			if (count >= 0 && count < std::numeric_limits<int>::max()) {
+				consumer.put_next(TextWithEntities{
+					Lang::FormatCountDecimal(count),
+				});
+			}
 		}).send();
 		lifetime.add([=] { api->request(requestId).cancel(); });
 		return lifetime;

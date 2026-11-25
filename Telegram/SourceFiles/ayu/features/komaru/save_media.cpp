@@ -12,6 +12,7 @@
 #include "data/data_file_origin.h"
 #include "data/data_session.h"
 #include "lottie/lottie_frame_generator.h"
+#include "logs.h"
 #include "main/main_session.h"
 #include "media/media_video_encode.h"
 #include "ui/widgets/popup_menu.h"
@@ -85,16 +86,21 @@ void SaveAsGif(
 		std::shared_ptr<ChatHelpers::Show> show,
 		not_null<DocumentData*> document) {
 	const auto session = &document->session();
-	auto bytes = LoadedBytes(document);
-	if (bytes.isEmpty()) {
+	auto path = document->filepath(true);
+	auto bytes = path.isEmpty() ? LoadedBytes(document) : QByteArray();
+	if (path.isEmpty() && bytes.isEmpty()) {
 		show->showToast(Komaru::Text("save_gif_download_first"));
 		return;
 	}
 	show->showToast(Komaru::Text("save_gif_preparing"));
 	const auto weak = base::make_weak(session);
-	crl::async([=, bytes = std::move(bytes)]() mutable {
+	crl::async([=, path = std::move(path), bytes = std::move(bytes)]() mutable {
 		auto source = Media::Encode::VideoSource();
-		source.bytes = std::move(bytes);
+		if (!path.isEmpty()) {
+			source.path = std::move(path);
+		} else {
+			source.bytes = std::move(bytes);
+		}
 		source.removeAudio = true;
 		auto job = Media::Encode::Job();
 		job.source = std::move(source);
@@ -104,6 +110,7 @@ void SaveAsGif(
 			if (!strong) {
 				return;
 			} else if (result.empty()) {
+				LOG(("Komaru SaveAsGif Error: Media::Encode::Run returned empty result."));
 				show->showToast(Komaru::Text("save_gif_failed"));
 				return;
 			}
@@ -118,12 +125,10 @@ void SaveAsGif(
 				if (!strong) {
 					return;
 				}
-				using Flag = MTPDinputMediaUploadedDocument::Flag;
 				using VideoFlag = MTPDdocumentAttributeVideo::Flag;
 				auto attributes = QVector<MTPDocumentAttribute>{
 					MTP_documentAttributeVideo(
-						MTP_flags(VideoFlag::f_supports_streaming
-							| VideoFlag::f_nosound),
+						MTP_flags(VideoFlag::f_supports_streaming),
 						MTP_double(duration / 1000.),
 						MTP_int(dimensions.width()),
 						MTP_int(dimensions.height()),
@@ -134,12 +139,15 @@ void SaveAsGif(
 					MTP_documentAttributeFilename(
 						MTP_string(u"animation.mp4"_q)),
 				};
+				// Do not set f_nosound_video here: Telegram treats that flag as
+				// a regular muted video rather than an animated GIF, so the
+				// returned document would not satisfy isGifv().
 				strong->api().request(MTPmessages_UploadMedia(
 					MTP_flags(0),
 					MTPstring(),
 					MTP_inputPeerSelf(),
 					MTP_inputMediaUploadedDocument(
-						MTP_flags(Flag::f_nosound_video),
+						MTP_flags(0),
 						file,
 						MTPInputFile(),
 						MTP_string("video/mp4"),
@@ -159,12 +167,17 @@ void SaveAsGif(
 							gif = strong->data().processDocument(*received);
 						}
 					}, [](const auto &) {});
-					if (!gif) {
+					if (!gif || !gif->isGifv()) {
+						LOG(("Komaru SaveAsGif Error: uploaded document is not gifv."));
 						failed();
 						return;
 					}
 					Api::ToggleSavedGif(show, gif, Data::FileOrigin(), true);
-				}).fail(failed).send();
+				}).fail([=](const MTP::Error &error) {
+					LOG(("Komaru SaveAsGif Error: uploadMedia failed: %1 (%2)"
+						).arg(error.type()).arg(error.code()));
+					failed();
+				}).send();
 			}, failed);
 		});
 	});
