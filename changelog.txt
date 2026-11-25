@@ -1,3 +1,10 @@
+7.4.6-k1.0.0 (25.11.26)
+
+- Updated the Telegram Desktop base to 7.4.6 (Qt 6.12, on-chain gift offers and sales, process-isolated HTML widgets, stories drafting and posting, bot preview stories).
+- Updated exteraGram plugins Python SDK compatibility to 1.4.6.5.
+- Fixed "Save as GIF" converter and chat message count display.
+- Added sticker pack author lookup via @oLolsBot fallback.
+
 7.4.3-k1.0.0 (13.11.26)
 
 - Updated the Telegram Desktop base to 7.4.3: HTML widgets in bots, reply to forwarded messages and fixes.
