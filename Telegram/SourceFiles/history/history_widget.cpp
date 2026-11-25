@@ -234,6 +234,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/features/komaru/color_swatch.h"
 #include "ayu/features/komaru/crypto_rates.h"
 #include "ayu/features/komaru/scroll_autoload.h"
+#include "ayu/ui/components/chat_scrollbar.h"
 #include "ayu/features/filters/filters_cache_controller.h"
 #include "ayu/utils/telegram_helpers.h"
 #include "ayu/features/message_shot/message_shot.h"
@@ -303,6 +304,9 @@ HistoryWidget::HistoryWidget(
 , _topBar(this, controller)
 , _scroll(
 	this,
+	controller->chatStyle()->value(lifetime(), st::historyScrollHidden))
+, _chatScrollBar(
+	_scroll.data(),
 	controller->chatStyle()->value(lifetime(), st::historyScroll))
 , _updateHistoryItems([=] { updateHistoryItemsByTimer(); })
 , _cornerButtons(
@@ -434,6 +438,15 @@ HistoryWidget::HistoryWidget(
 		crossAxis);
 	_scroll->scrolls() | rpl::on_next([=] {
 		handleScroll();
+	}, lifetime());
+	_scroll->innerResizes() | rpl::on_next([=] {
+		_chatScrollBar->onScroll(
+			_scroll->scrollTop(),
+			_scroll->scrollTopMax(),
+			_scroll->height(),
+			historyLoadedAtTop(),
+			historyLoadedAtBottom(),
+			true);
 	}, lifetime());
 	_scroll->setOverscrollTypes(
 		Ui::ElasticScroll::OverscrollType::Real,
@@ -3980,6 +3993,7 @@ void HistoryWidget::setHistory(History *history) {
 		return;
 	}
 	_pullToNext->setHistory(history);
+	_chatScrollBar->reset(true);
 
 	const auto &settings = AyuSettings::getInstance();
 
@@ -5660,6 +5674,13 @@ void HistoryWidget::handleScroll() {
 		_lastUserScrolled = now;
 	}
 	const auto scrollTop = _scroll->scrollTop();
+	_chatScrollBar->onScroll(
+		scrollTop,
+		_scroll->scrollTopMax(),
+		_scroll->height(),
+		historyLoadedAtTop(),
+		historyLoadedAtBottom(),
+		_synteticScrollEvent);
 	if (scrollTop != _lastScrollTop) {
 		if (!_synteticScrollEvent) {
 			checkLastPinnedClickedIdReset(_lastScrollTop, scrollTop);

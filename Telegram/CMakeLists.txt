@@ -262,6 +262,8 @@ set(ayugram_files
         ayu/ui/components/avatar_corners_preview.h
         ayu/ui/components/message_preview.cpp
         ayu/ui/components/message_preview.h
+        ayu/ui/components/chat_scrollbar.cpp
+        ayu/ui/components/chat_scrollbar.h
         ayu/ui/components/saved_music.cpp
         ayu/ui/components/saved_music.h
         ayu/libs/json.hpp

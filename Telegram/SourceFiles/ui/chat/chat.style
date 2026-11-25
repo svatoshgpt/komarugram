@@ -201,6 +201,10 @@ historyScroll: ScrollArea(defaultScrollArea) {
 	bottomsh: -1px;
 }
 
+historyScrollHidden: ScrollArea(historyScroll) {
+	barHidden: true;
+}
+
 historyResizeWidth: 6px;
 
 historyPaddingBottom: 8px;

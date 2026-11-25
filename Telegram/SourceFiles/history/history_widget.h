@@ -112,6 +112,10 @@ class FieldAutocomplete;
 struct FileChosen;
 } // namespace ChatHelpers
 
+namespace KomaruUi {
+class ChatScrollBar;
+} // namespace KomaruUi
+
 namespace HistoryView {
 class StickerToast;
 class PaidReactionToast;
@@ -900,6 +904,7 @@ private:
 
 	object_ptr<HistoryView::TopBarWidget> _topBar;
 	object_ptr<Ui::ElasticScroll> _scroll;
+	object_ptr<KomaruUi::ChatScrollBar> _chatScrollBar;
 	QPointer<HistoryInner> _list;
 	base::weak_ptr<ListRevealHold> _listRevealHold;
 	History *_migrated = nullptr;
