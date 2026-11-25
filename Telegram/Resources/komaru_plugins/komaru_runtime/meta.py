@@ -13,7 +13,7 @@ ID_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{1,31}$")
 KEYS = (
     "id", "name", "description", "author", "version", "icon",
     "app_version", "sdk_version", "min_version", "requirements",
-    "requires", "runtime", "binaries",
+    "requires", "runtime", "binaries", "category",
 )
 ELYX_EXTENSIONS = (".elyx", ".eaf", ".elyx.zip", ".eaf.zip", ".zip")
 

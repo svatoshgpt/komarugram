@@ -12,7 +12,7 @@ import types
 PREFIXES = (
     "java", "javax", "android", "androidx", "dalvik", "kotlin",
     "org.telegram", "com.exteragram", "com.google.android", "de.robv",
-    "frida_gadget_api", "dynamic_proxy", "extera_utils", "markdown_utils",
+    "frida_gadget_api", "dynamic_proxy",
 )
 
 

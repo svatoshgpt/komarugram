@@ -60,6 +60,7 @@ class Record:
         self.go = None
         self.error = ""
         self.send_hook = False
+        self.send_hook_priority = 0
         self.update_hooks = []
         self.tasks = set()
         self.telethon_handlers = []
@@ -96,19 +97,25 @@ class Record:
         if not name:
             return {}
         path = os.path.join(self.dir, name)
-        candidates = []
         if os.path.isdir(path):
-            for lang in ("en", "ru"):
-                for ext in (".yml", ".yaml", ".json"):
-                    candidates.append(os.path.join(path, "strings_" + lang + ext))
-        else:
-            candidates.append(path)
-        result = {}
-        for candidate in reversed(candidates):
-            if os.path.isfile(candidate):
-                with open(candidate, "rb") as f:
-                    result.update(metamod.parse_mapping(candidate, f.read()))
-        return result
+            by_lang = {}
+            for entry in sorted(os.listdir(path)):
+                full = os.path.join(path, entry)
+                if not os.path.isfile(full):
+                    continue
+                stem, ext = os.path.splitext(entry)
+                if ext.lower() not in (".yml", ".yaml", ".json"):
+                    continue
+                lang = stem[len("strings_"):] if stem.startswith("strings_") else stem
+                with open(full, "rb") as f:
+                    data = metamod.parse_mapping(full, f.read())
+                if isinstance(data, dict):
+                    by_lang.setdefault(lang, {}).update(data)
+            return by_lang
+        if os.path.isfile(path):
+            with open(path, "rb") as f:
+                return metamod.parse_mapping(path, f.read())
+        return {}
 
     def unsupported(self, what):
         if what not in self._unsupported:
@@ -445,16 +452,26 @@ class Manager:
         spec = importlib.util.spec_from_file_location(name, main)
         module = importlib.util.module_from_spec(spec)
         sys.modules[name] = module
-        with context.running(record):
-            spec.loader.exec_module(module)
-            plugin_class = self._find_plugin_class(module)
-            if plugin_class is None:
-                raise RuntimeError("The plugin has no BasePlugin subclass")
-            instance = plugin_class()
-            record.instance = instance
-            instance.on_plugin_load()
-            from base_plugin import AppEvent
-            instance.on_app_event(AppEvent.START)
+        from extera_utils import lifecycle
+        lifecycle.begin(record.id)
+        try:
+            with context.running(record), lifecycle.plugin_context(record.id):
+                spec.loader.exec_module(module)
+                plugin_class = self._find_plugin_class(module)
+                if plugin_class is None:
+                    raise RuntimeError("The plugin has no BasePlugin subclass")
+                instance = plugin_class()
+                instance.enabled = True
+                instance.initialized = True
+                record.instance = instance
+                instance.on_plugin_load()
+                from base_plugin import AppEvent
+                instance.on_app_event(AppEvent.START)
+        except Exception:
+            lifecycle.stop(record.id)
+            from base_plugin import BasePlugin
+            BasePlugin._cleanup(record.id)
+            raise
 
     @staticmethod
     def _find_plugin_class(module):
@@ -473,14 +490,20 @@ class Manager:
         return found
 
     def unload(self, record):
+        from extera_utils import lifecycle
+        lifecycle.stop(record.id)
         if record.instance is not None:
             with context.running(record):
                 try:
                     from base_plugin import AppEvent
                     record.instance.on_app_event(AppEvent.STOP)
-                    record.instance.on_plugin_unload()
+                    record.instance._invoke_plugin_unload()
                 except Exception:
                     record.log_exception("unload")
+                finally:
+                    record.instance.enabled = False
+        from base_plugin import BasePlugin
+        BasePlugin._cleanup(record.id)
         if record.go is not None:
             record.go.stop()
         for task in list(record.tasks):
@@ -494,6 +517,7 @@ class Manager:
         record.update_hooks.clear()
         record.menu_items.clear()
         record.send_hook = False
+        record.send_hook_priority = 0
         record.instance = None
         record.go = None
         record.pages.clear()
@@ -611,7 +635,11 @@ class Manager:
     # Hooks.
     async def transform_outgoing(self, account, peer, text, reply_to):
         from base_plugin import HookStrategy
-        for record in list(self.records.values()):
+        ordered = sorted(
+            self.records.values(),
+            key=lambda r: -int(getattr(r, "send_hook_priority", 0) or 0),
+        )
+        for record in ordered:
             if record.id not in self.allowed_send_hook:
                 continue
             if record.go is not None and record.go.send_hook:
@@ -667,7 +695,8 @@ class Manager:
                 continue
             if record.instance is None:
                 continue
-            for hook, substring in record.update_hooks:
+            for entry in record.update_hooks:
+                hook, substring = entry[0], entry[1]
                 if hook == name or (substring and hook in name):
                     with context.running(record, account):
                         try:
@@ -761,6 +790,8 @@ class Manager:
         self.loop.create_task(run_command())
 
     async def shutdown(self):
+        from extera_utils import lifecycle
+        lifecycle.stop_all()
         for record in list(self.records.values()):
             self.unload(record)
         await self.accounts.close()

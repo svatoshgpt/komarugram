@@ -1,11 +1,30 @@
 # This is the source code of KomaruGram for Desktop.
 #
-# The Elyx public API. Its values belong to the plugin that reads them, so
-# every attribute is looked up from the plugin module that asks for it.
-import os
-import platform
+# The Elyx public API facade (matching exteraGram SDK 1.4.6.5). Plugin-bound
+# values (assets, metainfo, refmap, settings, strings, plugin_dir) are
+# resolved dynamically for the calling plugin.
 import sys
 
+from elyxcore import (  # noqa: F401
+    Asset,
+    AssetNotFoundException,
+    Assets,
+    AssetsDirNotFoundException,
+    Callback,
+    Callback2,
+    Callback3,
+    CallbackReturn,
+    LazyDict,
+    OnClickListener,
+    Runnable,
+    SettingsController,
+    Strings,
+    gen,
+    gen2,
+    get_environment,
+    import_module,
+    mvel_execute,
+)
 from komaru_runtime import context
 
 
@@ -17,42 +36,6 @@ def _record():
             return record
         frame = frame.f_back
     return context.current_record()
-
-
-class Assets:
-    def __init__(self, root):
-        self.root = root
-
-    def path(self, name):
-        full = os.path.normpath(os.path.join(self.root, name))
-        if not full.startswith(os.path.normpath(self.root)):
-            raise ValueError("Asset path leaves the assets folder")
-        return full
-
-    def exists(self, name):
-        return bool(self.root) and os.path.exists(self.path(name))
-
-    def read_bytes(self, name):
-        with open(self.path(name), "rb") as f:
-            return f.read()
-
-    def read_text(self, name, encoding="utf-8"):
-        return self.read_bytes(name).decode(encoding)
-
-
-class Strings(dict):
-    def __call__(self, key, **kwargs):
-        value = self.get(key, key)
-        return value.format(**kwargs) if kwargs else value
-
-
-def get_environment():
-    return {
-        "host": "komarugram-desktop",
-        "platform": sys.platform,
-        "machine": platform.machine(),
-        "python": platform.python_version(),
-    }
 
 
 def __getattr__(name):
@@ -67,6 +50,8 @@ def __getattr__(name):
         return Assets(record.assets_dir())
     if name == "strings":
         return Strings(record.strings())
+    if name == "settings":
+        return SettingsController(record.id)
     if name == "plugin_dir":
         return record.dir
     raise AttributeError(name)

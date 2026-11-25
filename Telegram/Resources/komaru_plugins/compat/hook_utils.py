@@ -1,10 +1,27 @@
 # This is the source code of KomaruGram for Desktop.
 #
-# exteraGram reflection helpers. There are no Java classes on desktop, so
-# lookups find nothing and plugins take their "class not found" path.
+# exteraGram reflection helpers (SDK 1.4.6.5). There are no Java classes on
+# desktop, so lookups find nothing and plugins take their "class not found"
+# path.
 
 
 def find_class(name, *args, **kwargs):
+    return None
+
+
+def java_class(clazz, *args, **kwargs):
+    return None
+
+
+def get_method(clazz, method_name, *param_types):
+    return None
+
+
+def get_constructor(clazz, *param_types):
+    return None
+
+
+def get_field(clazz, field_name):
     return None
 
 

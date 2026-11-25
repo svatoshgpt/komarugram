@@ -43,24 +43,30 @@ wheels are unpacked the same way.
 
 ## exteraGram plugins
 
-The exteraGram SDK is available: `base_plugin`, `ui.settings`,
+The exteraGram SDK (v1.4.6.5) is available: `base_plugin`, `ui.settings`,
 `ui.bulletin`, `ui.alert`, `client_utils`, `android_utils`, `hook_utils`,
-`file_utils` and `elyx`. What works on desktop:
+`file_utils`, `log_utils`, `markdown_utils`, `plugin_settings`, `intents`,
+`extera_utils`, `elyx`, `elyxcore` and `_sdk_version`. What works on desktop:
 
-- `on_plugin_load`, `on_plugin_unload`, `on_app_event`;
+- `on_plugin_load`, `on_plugin_unload`, `on_app_event`, plus lifecycle scopes
+  (`stop_event`, `register_cleanup`, automatic task/request cancellation on unload);
+- `log_utils` (`Logger`, `LogLevel`, `get_logger`, `dump`, `timed`) and `self.log`/`self.logger`;
+- `markdown_utils.parse_markdown` and `extera_utils.text_formatting` (`HTML`, `Markdown`, `parse_text`);
 - `create_settings` with Header, Divider, Switch, Selector, Input, Text and
   EditText, sub-pages included, drawn as native KomaruGram settings;
-- `add_on_send_message_hook` and `on_send_message_hook` for outgoing text;
+- `add_on_send_message_hook` and `on_send_message_hook` for outgoing text (with priority);
 - `add_hook("TL_updateNewMessage")` and other updates, delivered as Telethon
   objects;
 - `send_text`, `send_message`, `send_photo`/`document`/`video`/`audio`,
-  `edit_message` and `send_request` (with Telethon requests), per account;
+  `edit_message` and `send_request` (with Telethon or TLRPC requests), per account
+  (with `account_scope` and `AccountClient`);
+- Elyx `Assets`, `Asset`, `Strings` (with locale & pluralization) and `SettingsController`;
 - bulletins and dialogs become toasts.
 
-Xposed hooks, Java classes and Android menu items have nothing to attach to
+Xposed/partial/file/intent hooks and Java classes have nothing to attach to
 on desktop. Plugins that import them still load: the Android modules are
-stand-ins that do nothing, and `hook_method`/`add_menu_item` are logged once
-and ignored.
+stand-ins that do nothing, and `hook_method`/`hook_call_site`/`add_file_hook`/
+`add_intent_hook` are logged once and ignored.
 
 ## Python userbots
 
