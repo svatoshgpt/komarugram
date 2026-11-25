@@ -14,6 +14,9 @@ ICON(DEFAULT, "default");
 // Folder name kept as "extera2" so a saved appIcon setting keeps working.
 ICON(NEWYEAR, "extera2");
 
+[[nodiscard]] bool isNewYearSeason();
+[[nodiscard]] QString effectiveAppIcon();
+
 void loadAppIco();
 QString appIcoPath();
 

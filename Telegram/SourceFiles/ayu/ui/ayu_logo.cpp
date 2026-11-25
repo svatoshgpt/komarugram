@@ -10,6 +10,7 @@
 #include "styles/style_ayu_styles.h"
 #include "ui/rect.h"
 
+#include <QtCore/QDate>
 #include <QSvgRenderer>
 
 static QString LAST_LOADED_NAME;
@@ -18,16 +19,29 @@ static QImage LAST_LOADED_PAD;
 
 namespace AyuAssets {
 
+bool isNewYearSeason() {
+	const auto today = QDate::currentDate();
+	return (today.month() == 12)
+		|| (today.month() == 1 && today.day() == 1);
+}
+
+QString effectiveAppIcon() {
+	const auto &configured = AyuSettings::getInstance().appIcon();
+	if (configured == DEFAULT_ICON && isNewYearSeason()) {
+		return NEWYEAR_ICON;
+	}
+	return configured;
+}
+
 QString appIcoPath() {
-	const auto &settings = AyuSettings::getInstance();
 	return cWorkingDir()
 		+ u"tdata/KomaruGram-"_q
-		+ settings.appIcon()
+		+ effectiveAppIcon()
 		+ u".ico"_q;
 }
 
 void loadAppIco() {
-	const auto &settings = AyuSettings::getInstance();
+	const auto activeIcon = effectiveAppIcon();
 	const auto iconPath = appIcoPath();
 
 	auto f = QFile(iconPath);
@@ -41,13 +55,13 @@ void loadAppIco() {
 	// are repointed at the new one on this launch, so the old copy is dead.
 	auto legacy = QFile(cWorkingDir()
 		+ u"tdata/AyuGram-"_q
-		+ settings.appIcon()
+		+ activeIcon
 		+ u".ico"_q);
 	if (legacy.exists()) {
 		legacy.setPermissions(QFile::WriteOther);
 		legacy.remove();
 	}
-	QFile::copy(qsl(":/gui/art/ayu/%1/app_icon.ico").arg(settings.appIcon()), iconPath);
+	QFile::copy(qsl(":/gui/art/ayu/%1/app_icon.ico").arg(activeIcon), iconPath);
 }
 
 QImage CreateImage(const QString &name, const QSize resultImageSize, const int padding = 0) {
@@ -119,11 +133,11 @@ QImage CreateImage(const QString &name, const QSize resultImageSize, const int p
 }
 
 void loadIcons() {
-	const auto &settings = AyuSettings::getInstance();
-	if (LAST_LOADED_NAME != settings.appIcon()) {
-		LAST_LOADED_NAME = settings.appIcon();
-		LAST_LOADED = CreateImage(settings.appIcon(), Size(256));
-		LAST_LOADED_PAD = CreateImage(settings.appIcon(), Size(256), 12);
+	const auto activeIcon = effectiveAppIcon();
+	if (LAST_LOADED_NAME != activeIcon) {
+		LAST_LOADED_NAME = activeIcon;
+		LAST_LOADED = CreateImage(activeIcon, Size(256));
+		LAST_LOADED_PAD = CreateImage(activeIcon, Size(256), 12);
 	}
 }
 
