@@ -34,6 +34,7 @@ const FORBIDDEN: &[&str] = &[
     "initConnection", "invokeWithTakeout", "invokeWithBusinessConnection",
     "invokeWithMessagesRange", "invokeWithApnsSecret", "invokeWithReCaptcha",
     "invokeWithGooglePlayIntegrity",
+    "payments.withdrawStarsRevenueToWallet",
 ];
 
 const BASE: &[&str] = &[
@@ -101,11 +102,18 @@ pub fn action(name: &str) -> &'static str {
         "photos" => "ProfilePhoto",
         "contacts" => "Contacts",
         "payments" => {
-            if starts(method, &["sendStarsForm", "sendPaymentForm"]) {
+            if starts(method, &[
+                "sendStarsForm", "sendPaymentForm",
+                "buyStarGiftOnchain", "sendStarGiftOnchainOffer",
+            ]) {
                 "GiftsBuy"
             } else if starts(method, &[
                 "transferStarGift", "convertStarGift", "saveStarGift",
                 "upgradeStarGift", "updateStarGiftPrice", "toggleStarGiftsPinnedToTop",
+                "withdrawStarGift", "depositStarGift", "deleteStarGift",
+                "updateStarGiftOnchainPrice", "cancelStarGiftOnchainSale",
+                "acceptStarGiftOnchainOffer", "declineStarGiftOnchainOffer",
+                "cancelStarGiftOnchainOffer",
             ]) {
                 "GiftsTransfer"
             } else if starts(method, &["get", "check", "validate"]) {
