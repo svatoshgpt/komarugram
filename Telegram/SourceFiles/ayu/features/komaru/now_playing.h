@@ -10,6 +10,8 @@ namespace KomaruNowPlaying {
 struct Track {
 	QString title;
 	QString artist;
+	QString album;
+	QString platform;
 	QString url;
 	QString cover;
 	int duration = 0;

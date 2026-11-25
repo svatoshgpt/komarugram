@@ -311,6 +311,9 @@ void WriteBioBackup(uint64 userId, const QString &bio) {
 		.title = first.value(u"name"_q).toString().trimmed(),
 		.artist = first.value(u"artist"_q).toObject()
 			.value(u"#text"_q).toString().trimmed(),
+		.album = first.value(u"album"_q).toObject()
+			.value(u"#text"_q).toString().trimmed(),
+		.platform = u"LAST_FM"_q,
 		.url = first.value(u"url"_q).toString(),
 	};
 	for (const auto image : first.value(u"image"_q).toArray()) {
@@ -344,6 +347,8 @@ void WriteBioBackup(uint64 userId, const QString &bio) {
 	auto result = Track{
 		.title = track.value(u"name"_q).toString().trimmed(),
 		.artist = artists.join(u", "_q),
+		.album = albums.at(0).toObject().value(u"name"_q).toString().trimmed(),
+		.platform = spotify.isEmpty() ? u"STATS_FM"_q : u"SPOTIFY"_q,
 		.url = (spotify.isEmpty()
 			? (u"https://stats.fm/track/"_q
 				+ QString::number(track.value(u"id"_q).toInteger()))

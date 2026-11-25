@@ -78,6 +78,8 @@ crl::time LimitedTill = 0;
 	return {
 		.title = root.value(u"trackName"_q).toString().trimmed(),
 		.artist = artists.join(u", "_q),
+		.album = root.value(u"albumName"_q).toString().trimmed(),
+		.platform = root.value(u"platform"_q).toString().trimmed(),
 		.url = root.value(u"songUrl"_q).toString(),
 		.cover = root.value(u"coverUrl"_q).toString(),
 	};
@@ -154,16 +156,57 @@ void Load(uint64 userId) {
 	return found.replace(u"100x100bb"_q, u"300x300bb"_q);
 }
 
-void LoadImage(const QString &key, const QString &url) {
+void LoadFromItunes(
+		const QString &key,
+		const QString &title,
+		const QString &artist);
+
+void LoadImage(
+		const QString &key,
+		const QString &url,
+		const QString &fallbackTitle = QString(),
+		const QString &fallbackArtist = QString()) {
 	const auto reply = Get(QUrl(url));
 	QObject::connect(reply, &QNetworkReply::finished, [=] {
 		reply->deleteLater();
 		auto &cover = Covers()[key];
-		cover.loading = false;
 		if (reply->error() == QNetworkReply::NoError) {
-			cover.image = QImage::fromData(reply->readAll());
-			cover.updated.fire({});
+			if (auto image = QImage::fromData(reply->readAll()); !image.isNull()) {
+				cover.loading = false;
+				cover.image = std::move(image);
+				cover.updated.fire({});
+				return;
+			}
 		}
+		if (!fallbackTitle.isEmpty()) {
+			LoadFromItunes(key, fallbackTitle, fallbackArtist);
+		} else {
+			cover.loading = false;
+		}
+	});
+}
+
+void LoadFromItunes(
+		const QString &key,
+		const QString &title,
+		const QString &artist) {
+	auto query = QUrlQuery();
+	query.addQueryItem(u"term"_q, title + u" - "_q + artist);
+	query.addQueryItem(u"entity"_q, u"song"_q);
+	query.addQueryItem(u"limit"_q, u"5"_q);
+	auto url = QUrl(u"https://itunes.apple.com/search"_q);
+	url.setQuery(query);
+	const auto reply = Get(url);
+	QObject::connect(reply, &QNetworkReply::finished, [=] {
+		reply->deleteLater();
+		const auto artwork = (reply->error() == QNetworkReply::NoError)
+			? ArtworkUrl(reply->readAll(), title, artist)
+			: QString();
+		if (artwork.isEmpty()) {
+			Covers()[key].loading = false;
+			return;
+		}
+		LoadImage(key, artwork);
 	});
 }
 
@@ -187,27 +230,10 @@ void LoadCover(
 	}
 	covers[key].loading = true;
 	if (!known.isEmpty()) {
-		LoadImage(key, known);
+		LoadImage(key, known, title, artist);
 		return;
 	}
-	auto query = QUrlQuery();
-	query.addQueryItem(u"term"_q, title + u" - "_q + artist);
-	query.addQueryItem(u"entity"_q, u"song"_q);
-	query.addQueryItem(u"limit"_q, u"5"_q);
-	auto url = QUrl(u"https://itunes.apple.com/search"_q);
-	url.setQuery(query);
-	const auto reply = Get(url);
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
-		reply->deleteLater();
-		const auto artwork = (reply->error() == QNetworkReply::NoError)
-			? ArtworkUrl(reply->readAll(), title, artist)
-			: QString();
-		if (artwork.isEmpty()) {
-			Covers()[key].loading = false;
-			return;
-		}
-		LoadImage(key, artwork);
-	});
+	LoadFromItunes(key, title, artist);
 }
 
 } // namespace

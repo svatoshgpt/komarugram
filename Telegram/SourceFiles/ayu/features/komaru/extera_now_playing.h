@@ -6,6 +6,8 @@ namespace KomaruExteraNowPlaying {
 struct Track {
 	QString title;
 	QString artist;
+	QString album;
+	QString platform;
 	QString url;
 	QString cover;
 

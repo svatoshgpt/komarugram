@@ -114,6 +114,9 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 		not_null<UserData*> user) {
 	const auto savedMusic = &user->owner().savedMusic();
 	const auto peerId = user->id;
+	if (savedMusic->list(peerId).empty() && !savedMusic->fullyLoaded(peerId)) {
+		savedMusic->loadMore(peerId);
+	}
 	return rpl::single(
 		peerId
 	) | rpl::then(
@@ -131,6 +134,7 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 		return KomaruNowPlaying::Track{
 			.title = title,
 			.artist = artist,
+			.platform = u"TELEGRAM"_q,
 			.url = SearchUrl(artist, title),
 		};
 	});
@@ -152,6 +156,8 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 			return KomaruNowPlaying::Track{
 				.title = extera.title,
 				.artist = extera.artist,
+				.album = extera.album,
+				.platform = extera.platform,
 				.url = extera.url,
 				.cover = extera.cover,
 			};
@@ -162,20 +168,20 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 	});
 }
 
-// What we play now, else the music pinned to our profile.
+// Local desktop Now Playing, else exteraGram API, else bio, else pinned profile music.
 [[nodiscard]] rpl::producer<NowPlayingTrack> SelfTrackValue(
 		not_null<UserData*> user) {
 	return rpl::combine(
 		KomaruNowPlaying::Value(),
-		ProfileMusicTrackValue(user)
+		OtherTrackValue(user)
 	) | rpl::map([](
 			const NowPlayingTrack &playing,
-			const NowPlayingTrack &music) {
-		return playing ? playing : music;
+			const NowPlayingTrack &fallback) {
+		return playing ? playing : fallback;
 	});
 }
 
-// The official art for the track, whatever cover the file has.
+// Official cover art from exteraGram/service URL, falling back to iTunes Search.
 [[nodiscard]] rpl::producer<QImage> OfficialCoverValue(
 		rpl::producer<NowPlayingTrack> tracks) {
 	return std::move(
@@ -185,14 +191,12 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 			? KomaruExteraNowPlaying::CoverValue(
 				track->title,
 				track->artist,
-				(track->cover.contains(u"mzstatic.com"_q)
-					? track->cover
-					: QString()))
+				track->cover)
 			: rpl::single(QImage());
 	}) | rpl::flatten_latest();
 }
 
-[[nodiscard]] Section NowPlayingSection(
+[[nodiscard]] Ui::VerticalBlocks::Part NowPlayingSection(
 		not_null<Ui::RpWidget*> parent,
 		rpl::producer<NowPlayingTrack> tracks,
 		rpl::producer<QImage> covers) {
@@ -221,9 +225,10 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 			st::infoProfileSkip,
 			st::boxRowPadding.right(),
 			st::infoProfileSkip));
-	button->setCornerRadius(st::roundRadiusLarge);
+	button->setCornerRadius(st::roundRadiusLarge * 2);
 	button->setPadding(st::ayuNowPlayingPadding);
-	button->setThemeColors(true);
+	button->setThemeColors(false);
+	button->setNowPlayingCard(true);
 	button->setPlayIconShown(true);
 	rpl::combine(
 		track->value(),
@@ -241,6 +246,7 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 			.title = track->title,
 			.performer = track->artist,
 		});
+		button->setMeta(track->album, track->platform);
 	}, button->lifetime());
 	const auto shown = [=] {
 		return track->value() | rpl::map([](const NowPlayingTrack &track) {
@@ -385,11 +391,11 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 			: OtherTrackValue(user)
 		) | rpl::start_spawning(result->lifetime());
 		auto covers = OfficialCoverValue(rpl::duplicate(tracks));
-		stack.add(NowPlayingSection(
+		blocks.add(NowPlayingSection(
 			result.data(),
 			std::move(tracks),
 			std::move(covers)));
-		stack.addPlainSeparator();
+		blocks.addSeparator();
 	}
 
 	if (!_savedMessages) {

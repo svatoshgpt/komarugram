@@ -24,6 +24,7 @@ struct ResultCover
 {
 	QPixmap pix;
 	QColor bg;
+	QColor accent;
 	bool noCover;
 };
 
@@ -39,6 +40,8 @@ public:
 	void setPlayIconShown(bool shown);
 	// Theme colors whatever the adaptive cover color setting says.
 	void setThemeColors(bool theme);
+	void setNowPlayingCard(bool enabled);
+	void setMeta(const QString &album, const QString &platform);
 	void setExternalCover(QImage image);
 
 	rpl::producer<> onReady() const {
@@ -54,12 +57,14 @@ private:
 
 	std::unique_ptr<Ui::FlatLabel> _performer;
 	std::unique_ptr<Ui::FlatLabel> _title;
+	std::unique_ptr<Ui::FlatLabel> _meta;
 	std::shared_ptr<Data::DocumentMedia> _mediaView;
 	std::optional<ResultCover> _currentCover;
 	rpl::event_stream<> _onReady;
 
 	QString _performerText;
 	QString _titleText;
+	QString _metaText;
 
 	std::optional<QColor> _overrideBg;
 	std::optional<QImage> _externalCover;
@@ -67,6 +72,7 @@ private:
 	std::optional<QMargins> _padding;
 	bool _playIcon = false;
 	bool _themeColors = false;
+	bool _nowPlayingCard = false;
 
 };
 
