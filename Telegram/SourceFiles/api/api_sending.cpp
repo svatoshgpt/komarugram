@@ -232,6 +232,12 @@ void SendExistingMedia(
 	auto &action = message.action;
 
 	auto flags = NewMessageFlags(peer);
+	if constexpr (std::is_same_v<MediaData, DocumentData>) {
+		if ((media->isVoiceMessage() || media->isVideoMessage())
+			&& (!peer->isChannel() || peer->isMegagroup())) {
+			flags |= MessageFlag::MediaIsUnread;
+		}
+	}
 	auto sendFlags = MTPmessages_SendMedia::Flags(0);
 	if (welcomeTemplate) {
 		flags &= ~MessageFlag::Outgoing;

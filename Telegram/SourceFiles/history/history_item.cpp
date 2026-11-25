@@ -2881,6 +2881,11 @@ void HistoryItem::applySentMessage(const MTPDmessage &data) {
 	} else {
 		_flags &= ~MessageFlag::InvertMedia;
 	}
+	if (data.is_media_unread()) {
+		_flags |= MessageFlag::MediaIsUnread;
+	} else {
+		_flags &= ~MessageFlag::MediaIsUnread;
+	}
 	if (data.is_noforwards()) {
 		_flags |= MessageFlag::AyuNoForwards;
 	} else {
