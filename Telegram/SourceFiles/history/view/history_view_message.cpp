@@ -76,7 +76,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 // AyuGram includes
 #include "ayu/ayu_settings.h"
 #include "ayu/features/filters/filters_controller.h"
+#include "ayu/features/komaru/komaru_badges.h"
 #include "ayu/features/message_shot/message_shot.h"
+#include "ayu/utils/telegram_helpers.h"
 #include "styles/style_ayu_icons.h"
 
 
@@ -104,6 +106,63 @@ constexpr auto kMinWidthAppearDuration = crl::time(160);
 [[nodiscard]] DocumentId FromNameVerificationId(PeerData *from) {
 	const auto details = from ? from->botVerifyDetails() : nullptr;
 	return details ? details->iconId : 0;
+}
+
+enum class FromNameKomaruBadgeKind : uchar {
+	None,
+	KomaruFace,
+	KomaruCustom,
+	ExteraCustom,
+	ExteraOfficial,
+	ExteraSupporter,
+};
+
+struct FromNameKomaruBadge {
+	FromNameKomaruBadgeKind kind = FromNameKomaruBadgeKind::None;
+	const KomaruBadges::Entry *komaru = nullptr;
+	EmojiStatusId customEmojiId;
+
+	explicit operator bool() const {
+		return kind != FromNameKomaruBadgeKind::None;
+	}
+};
+
+[[nodiscard]] FromNameKomaruBadge ResolveFromNameKomaruBadge(PeerData *from) {
+	if (!from || AyuSettings::getInstance().hideExteraBadges()) {
+		return {};
+	}
+	const auto bareId = getBareID(from);
+	// Priority: KomaruGram Dev > KomaruGram Supporter > KomaruGram custom > exteraGram.
+	if (const auto dev = KomaruBadges::Developer(bareId)) {
+		return { FromNameKomaruBadgeKind::KomaruFace, dev, {} };
+	}
+	if (const auto sup = KomaruBadges::Supporter(bareId)) {
+		return { FromNameKomaruBadgeKind::KomaruFace, sup, {} };
+	}
+	if (const auto statuses = KomaruBadges::Statuses(bareId); !statuses.empty()) {
+		return {
+			FromNameKomaruBadgeKind::KomaruCustom,
+			nullptr,
+			EmojiStatusId{ .documentId = statuses.front() },
+		};
+	}
+	if (isCustomBadgePeer(bareId)) {
+		const auto custom = getCustomBadge(bareId);
+		if (custom.emojiStatusId) {
+			return {
+				FromNameKomaruBadgeKind::ExteraCustom,
+				nullptr,
+				custom.emojiStatusId,
+			};
+		}
+	}
+	if (isExteraPeer(bareId)) {
+		return { FromNameKomaruBadgeKind::ExteraOfficial, nullptr, {} };
+	}
+	if (isSupporterPeer(bareId)) {
+		return { FromNameKomaruBadgeKind::ExteraSupporter, nullptr, {} };
+	}
+	return {};
 }
 
 [[nodiscard]] int FromNameVerificationSkip(
@@ -2663,7 +2722,10 @@ void Message::paintFromName(
 	}();
 	const auto &settings = AyuSettings::getInstance();
 	const auto hidePremiumStatuses = settings.hidePremiumStatuses();
-	const auto statusWidth = _fromNameStatus && !hidePremiumStatuses
+	const auto komaruBadge = ResolveFromNameKomaruBadge(from);
+	const auto hasStatusBadge = _fromNameStatus
+		&& (komaruBadge || !hidePremiumStatuses);
+	const auto statusWidth = hasStatusBadge
 		? st::dialogsPremiumIcon.icon.width()
 		: 0;
 	const auto via = item->Get<HistoryMessageVia>();
@@ -2682,7 +2744,20 @@ void Message::paintFromName(
 		const auto y = trect.top();
 		auto color = nameFg;
 		color.setAlpha(115);
-		const auto id = from ? fromNameStatusId(from) : EmojiStatusId();
+		const auto tgStatusId = (!hidePremiumStatuses && from)
+			? fromNameStatusId(from)
+			: EmojiStatusId();
+		const auto useKomaruFace =
+			(komaruBadge.kind == FromNameKomaruBadgeKind::KomaruFace);
+		const auto id = useKomaruFace
+			? EmojiStatusId()
+			: (komaruBadge.kind == FromNameKomaruBadgeKind::KomaruCustom)
+			? komaruBadge.customEmojiId
+			: tgStatusId
+			? tgStatusId
+			: (komaruBadge.kind == FromNameKomaruBadgeKind::ExteraCustom)
+			? komaruBadge.customEmojiId
+			: EmojiStatusId();
 		if (_fromNameStatus->id != id) {
 			const auto that = const_cast<Message*>(this);
 			_fromNameStatus->custom = id
@@ -2699,17 +2774,49 @@ void Message::paintFromName(
 			}
 			_fromNameStatus->id = id;
 		}
-		if (_fromNameStatus->custom) {
+		if (useKomaruFace && komaruBadge.komaru) {
+			const auto badgeSize = st::dialogsExteraSupporterIcon.icon.width();
+			const auto badgeRect = QRect(
+				x,
+				y + (st::msgNameFont->height - badgeSize) / 2,
+				badgeSize,
+				badgeSize);
+			KomaruBadges::Paint(
+				p,
+				badgeRect,
+				*komaruBadge.komaru,
+				(context.paused || !KomaruBadges::Animated()) ? 0 : context.now,
+				nameFg);
+		} else if (_fromNameStatus->custom) {
 			clearCustomEmojiRepaint();
 			_fromNameStatus->custom->paint(p, {
-				.textColor = color,
+				.textColor = (komaruBadge.kind == FromNameKomaruBadgeKind::KomaruCustom
+					|| komaruBadge.kind == FromNameKomaruBadgeKind::ExteraCustom)
+					? nameFg
+					: color,
 				.now = context.now,
 				.position = QPoint(
 					x - 2 * _fromNameStatus->skip,
 					y + _fromNameStatus->skip),
 				.paused = context.paused || On(PowerSaving::kEmojiStatus),
 			});
-		} else if (from && from->isPremium()) {
+		} else if (komaruBadge.kind == FromNameKomaruBadgeKind::ExteraOfficial) {
+			const auto &icon = st::dialogsExteraOfficialIcon.icon;
+			icon.paint(
+				p,
+				x,
+				y + (st::msgNameFont->height - icon.height()) / 2,
+				width(),
+				nameFg);
+		} else if (komaruBadge.kind == FromNameKomaruBadgeKind::ExteraSupporter) {
+			const auto &icon = st::dialogsExteraSupporterIcon.icon;
+			icon.paint(
+				p,
+				x,
+				y + (st::msgNameFont->height - icon.height()) / 2,
+				width(),
+				nameFg);
+		} else if (from && from->isPremium() && !hidePremiumStatuses) {
 			st::dialogsPremiumIcon.icon.paint(p, x, y, width(), color);
 		}
 	}
@@ -2749,7 +2856,7 @@ void Message::paintFromName(
 		.elisionLines = 1,
 	});
 	const auto skipWidth = nameWidth
-		+ (_fromNameStatus && !hidePremiumStatuses
+		+ (hasStatusBadge
 			? (st::dialogsPremiumIcon.icon.width()
 				+ st::msgServiceFont->spacew)
 			: 0)
@@ -4440,7 +4547,9 @@ bool Message::getStateFromName(
 			nameAvailableWidth);
 		if (statusWidth
 			&& availableWidth > statusWidth
-			&& (from->isPremium() || fromNameStatusId(from))) {
+			&& (from->isPremium()
+				|| fromNameStatusId(from)
+				|| ResolveFromNameKomaruBadge(from))) {
 			const auto x = availableLeft
 				+ nameWidth
 				- (_fromNameStatus->custom ? (2 * _fromNameStatus->skip) : 0);
@@ -4592,6 +4701,10 @@ void Message::ensureFromNameStatusLink(not_null<PeerData*> peer) const {
 	}
 	_fromNameStatus->link = std::make_shared<LambdaClickHandler>([=](
 			ClickContext context) {
+		if (ResolveFromNameKomaruBadge(peer)) {
+			badgeClickHandler(peer)();
+			return;
+		}
 		const auto controller = ExtractController(context);
 		if (controller) {
 			Settings::ShowEmojiStatusPremium(controller, peer);
@@ -5655,6 +5768,7 @@ void Message::validateFromNameText(PeerData *from) const {
 			Ui::NameTextOptions());
 	}
 	if (from->isPremium()
+		|| ResolveFromNameKomaruBadge(from)
 		|| (from->isChannel()
 			&& from->emojiStatusId()
 			&& from != history()->peer)) {
