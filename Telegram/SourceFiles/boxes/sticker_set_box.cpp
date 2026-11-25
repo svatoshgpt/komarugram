@@ -1042,8 +1042,9 @@ void StickerSetBox::updateButtons() {
 				const auto weak = base::make_weak(this);
 				const auto session = _session;
 				const auto setId = _inner->setId();
-				const auto innerId = setId >> 32;
+				const auto innerId = getUserIdFromPackId(setId);
 
+				if (innerId != 0) {
 				menu->addAction(
 					tr::ayu_MessageDetailsPackOwnerPC(tr::now),
 					[weak, session, innerId]
@@ -1085,6 +1086,7 @@ void StickerSetBox::updateButtons() {
 							});
 					},
 					&st::menuIconProfile);
+				}
 
 				if (settings.showPeerId() != PeerIdDisplay::Hidden) {
 					menu->addAction(

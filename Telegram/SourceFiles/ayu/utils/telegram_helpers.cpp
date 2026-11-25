@@ -63,14 +63,20 @@
 #include <QTimer>
 #include <QtCore/QJsonDocument>
 #include <QtCore/QJsonObject>
+#include <QtCore/QRegularExpression>
 
 #include <komaru_core.h>
 
 namespace {
 
-constexpr auto usernameResolverBotId = 7424190611L;
-const auto usernameResolverBotUsername = QString("tgdb_search_bot");
-const auto usernameResolverEmpty = QString("Error, username or id invalid/not found.");
+// Lookup bot asked inline for a user known only by ID (@oLolsBot), as in
+// KomaruGram Go (internal/messenger/tgstore/user_lookup.go). Its ID is pinned
+// with its username so a username reassigned to another bot is never asked.
+constexpr auto usernameResolverBotId = 7822565021LL;
+const auto usernameResolverBotUsername = QStringLiteral("oLolsBot");
+const auto kLookupUsernameRegex = QRegularExpression(
+	QStringLiteral("username: @([A-Za-z0-9_]{4,32})\\b"),
+	QRegularExpression::MultilineOption);
 
 constexpr auto regDateBotId = 8083294286L;
 const auto regDateBotUsername = QString("exteraAuthBot");
@@ -855,181 +861,189 @@ void resolvePeer(
 	}).send();
 }
 
-void searchPeerInner(const QString &peerId, Main::Session *session, const UsernameResolverCallback &callback) {
-	if (!session) {
-		callback(QString(), nullptr);
+namespace {
+
+[[nodiscard]] UserData *takeUserFromMtpUsers(
+		const MTPVector<MTPUser> &users,
+		ID targetId,
+		Main::Session *session) {
+	session->data().processUsers(users);
+	for (const auto &raw : users.v) {
+		const auto matched = raw.match([&](const MTPDuser &data) {
+			return (data.vid().v == uint64(targetId))
+				&& !data.is_min()
+				&& !data.is_deleted()
+				&& (data.vaccess_hash().value_or_empty() != 0 || data.is_self());
+		}, [](const MTPDuserEmpty &) {
+			return false;
+		});
+		if (matched) {
+			if (const auto user = session->data().userLoaded(targetId)) {
+				if (user->accessHash() != 0 || user->isSelf()) {
+					return user;
+				}
+			}
+		}
+	}
+	return nullptr;
+}
+
+void resolveLookupUsernames(
+		ID userId,
+		QStringList usernames,
+		int index,
+		Main::Session *session,
+		const UsernameResolverCallback &callback,
+		Fn<void()> onNotFound) {
+	if (index >= usernames.size()) {
+		onNotFound();
 		return;
 	}
+	const auto username = usernames[index];
+	session->api().request(MTPcontacts_ResolveUsername(
+		MTP_flags(0),
+		MTP_string(username),
+		MTP_string()
+	)).done([=](const MTPcontacts_ResolvedPeer &result) {
+		const auto &data = result.c_contacts_resolvedPeer();
+		session->data().processChats(data.vchats());
+		if (const auto user = takeUserFromMtpUsers(data.vusers(), userId, session)) {
+			callback(user->username(), user);
+			return;
+		}
+		resolveLookupUsernames(userId, usernames, index + 1, session, callback, onNotFound);
+	}).fail([=] {
+		resolveLookupUsernames(userId, usernames, index + 1, session, callback, onNotFound);
+	}).handleAllErrors().send();
+}
 
-	const auto bot = session->data().userLoaded(usernameResolverBotId);
-	if (!bot) {
+void searchUserViaGetUsers(
+		ID userId,
+		Main::Session *session,
+		const UsernameResolverCallback &callback) {
+	session->api().request(MTPusers_GetUsers(
+		MTP_vector<MTPInputUser>(1, MTP_inputUser(MTP_long(userId), MTP_long(0)))
+	)).done([=](const MTPVector<MTPUser> &result) {
+		if (const auto user = takeUserFromMtpUsers(result, userId, session)) {
+			callback(user->username(), user);
+			return;
+		}
 		callback(QString(), nullptr);
-		return;
-	}
+	}).fail([=] {
+		callback(QString(), nullptr);
+	}).handleAllErrors().send();
+}
 
+void searchUserViaLookupBot(
+		ID userId,
+		not_null<UserData*> bot,
+		Main::Session *session,
+		const UsernameResolverCallback &callback) {
+	const auto fallback = [=] {
+		searchUserViaGetUsers(userId, session, callback);
+	};
 	session->api().request(MTPmessages_GetInlineBotResults(
 		MTP_flags(0),
 		bot->inputUser(),
 		MTP_inputPeerEmpty(),
 		MTPInputGeoPoint(),
-		MTP_string(peerId),
-		MTP_string("")
-	)).done([=](const MTPmessages_BotResults &result)
-	{
+		MTP_string(QString::number(userId)),
+		MTP_string()
+	)).done([=](const MTPmessages_BotResults &result) {
 		if (result.type() != mtpc_messages_botResults) {
-			callback(QString(), nullptr);
+			fallback();
 			return;
 		}
-		auto &d = result.c_messages_botResults();
-		session->data().processUsers(d.vusers());
+		const auto &d = result.c_messages_botResults();
+		if (const auto user = takeUserFromMtpUsers(d.vusers(), userId, session)) {
+			callback(user->username(), user);
+			return;
+		}
 
-		auto &v = d.vresults().v;
-
-		for (const auto &res : v) {
+		QStringList usernames;
+		for (const auto &res : d.vresults().v) {
 			const auto message = res.match(
-				[&](const MTPDbotInlineResult &data)
-				{
+				[](const MTPDbotInlineResult &data) {
 					return &data.vsend_message();
 				},
-				[&](const MTPDbotInlineMediaResult &data)
-				{
+				[](const MTPDbotInlineMediaResult &data) {
 					return &data.vsend_message();
 				});
-
 			const auto text = message->match(
-				[&](const MTPDbotInlineMessageMediaAuto &data)
-				{
-					return QString();
-				},
-				[&](const MTPDbotInlineMessageText &data)
-				{
+				[](const MTPDbotInlineMessageText &data) {
 					return qs(data.vmessage());
 				},
-				[&](const MTPDbotInlineMessageMediaGeo &data)
-				{
-					return QString();
-				},
-				[&](const MTPDbotInlineMessageMediaVenue &data)
-				{
-					return QString();
-				},
-				[&](const MTPDbotInlineMessageMediaContact &data)
-				{
-					return QString();
-				},
-				[&](const MTPDbotInlineMessageMediaInvoice &data)
-				{
-					return QString();
-				},
-				[&](const MTPDbotInlineMessageMediaWebPage &data)
-				{
-					return QString();
-				},
-				[&](const auto &data)
-				{
+				[](const auto &) {
 					return QString();
 				});
-
-			if (text.isEmpty() || text.contains(usernameResolverEmpty)) {
+			if (text.isEmpty()) {
 				continue;
 			}
-
-			QString id; // 🆔
-			QString title; // 🏷
-			QString username; // 📧
-
-			for (auto &line : text.split('\n')) {
-				if (line.startsWith("🆔")) {
-					id = line.mid(line.indexOf(": ") + 2).trimmed();
-				} else if (line.startsWith("🏷")) {
-					title = line.mid(line.indexOf(": ") + 2);
-				} else if (line.startsWith("📧")) {
-					username = line.mid(line.indexOf(": ") + 2);
+			const auto match = kLookupUsernameRegex.match(text);
+			if (match.hasMatch()) {
+				const auto candidate = match.captured(1);
+				if (!usernames.contains(candidate, Qt::CaseInsensitive)) {
+					usernames.push_back(candidate);
 				}
-			}
-
-			if (id.isEmpty() || id != peerId) {
-				continue;
-			}
-
-			if (id.startsWith("-100")) {
-				id = id.mid(4);
-			}
-
-			if (!username.isEmpty()) {
-				resolvePeer(
-					id,
-					username,
-					session,
-					[=](const QString &titleInner, PeerData *data)
-					{
-						if (data) {
-							callback(titleInner, data);
-						} else {
-							callback(title, nullptr);
-						}
-					});
-				return;
-			}
-
-			if (!title.isEmpty()) {
-				callback(title, nullptr);
-				return;
 			}
 		}
 
-		callback(QString(), nullptr);
-	}).fail([=]
-	{
-		callback(QString(), nullptr);
+		resolveLookupUsernames(userId, usernames, 0, session, callback, fallback);
+	}).fail([=] {
+		fallback();
 	}).handleAllErrors().send();
 }
 
+} // namespace
+
 void searchPeer(const QString &peerId, Main::Session *session, const UsernameResolverCallback &callback) {
-	callback(QString(), nullptr);
-	/*if (!session) {
+	bool ok = false;
+	const auto id = peerId.toLongLong(&ok);
+	if (!ok || id <= 0) {
 		callback(QString(), nullptr);
 		return;
 	}
-
-	if (session->data().userLoaded(usernameResolverBotId)) {
-		searchPeerInner(peerId, session, callback);
-	} else {
-		resolvePeer(
-			QString::number(usernameResolverBotId),
-			usernameResolverBotUsername,
-			session,
-			[=](const QString &title, PeerData *data)
-			{
-				searchPeerInner(peerId, session, callback);
-			});
-	}*/
+	searchUserById(id, session, callback);
 }
 
 void searchUserById(ID userId, Main::Session *session, const UsernameResolverCallback &callback) {
-	if (userId == 0 || !session) {
+	if (userId <= 0 || !session) {
 		callback(QString(), nullptr);
 		return;
 	}
 
 	if (const auto userLoaded = session->data().userLoaded(userId)) {
-		callback(userLoaded->username(), userLoaded);
-		return;
+		if (userLoaded->accessHash() != 0 || userLoaded->isSelf()) {
+			callback(userLoaded->username(), userLoaded);
+			return;
+		}
 	}
 
-	searchPeer(
-		QString::number(userId),
-		session,
-		[=](const QString &title, PeerData *data)
-		{
-			if (data) {
-				if (const auto user = data->asUser(); user->accessHash()) {
-					callback(title, user);
-					return;
-				}
+	if (const auto bot = session->data().userLoaded(usernameResolverBotId)) {
+		if (bot->isBot() && bot->accessHash() != 0) {
+			searchUserViaLookupBot(userId, bot, session, callback);
+			return;
+		}
+	}
+
+	session->api().request(MTPcontacts_ResolveUsername(
+		MTP_flags(0),
+		MTP_string(usernameResolverBotUsername),
+		MTP_string()
+	)).done([=](const MTPcontacts_ResolvedPeer &result) {
+		const auto &data = result.c_contacts_resolvedPeer();
+		session->data().processUsers(data.vusers());
+		session->data().processChats(data.vchats());
+		if (const auto bot = session->data().userLoaded(usernameResolverBotId)) {
+			if (bot->isBot() && bot->accessHash() != 0) {
+				searchUserViaLookupBot(userId, bot, session, callback);
+				return;
 			}
-			callback(QString(), nullptr);
-		});
+		}
+		searchUserViaGetUsers(userId, session, callback);
+	}).fail([=] {
+		searchUserViaGetUsers(userId, session, callback);
+	}).handleAllErrors().send();
 }
 
 void searchChatById(ID chatId, Main::Session *session, const UsernameResolverCallback &callback) {
