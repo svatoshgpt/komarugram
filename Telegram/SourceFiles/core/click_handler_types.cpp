@@ -54,8 +54,6 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/ayu_url_handlers.h"
 
-#include <ada.h>
-
 namespace {
 
 constexpr auto kReminderSetToastDuration = 4 * crl::time(1000);
