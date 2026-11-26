@@ -37,19 +37,6 @@ namespace {
 QColor performerColor(255, 255, 255, 192); // white 75%
 QColor metaColor(255, 255, 255, 148); // white 58%
 
-[[nodiscard]] QColor ComputeAccentColor(QColor bg) {
-	const auto hsl = Ayu::Ui::ColorUtils::colorToHSL(bg.rgb());
-	const auto lum = hsl[2];
-	const auto targetLum = (lum <= 0.25f)
-		? 2.0f
-		: (lum <= 0.50f)
-		? 1.5f
-		: (lum <= 0.75f)
-		? 1.0f
-		: 0.5f;
-	return QColor::fromRgb(AdjustHsl(bg.rgb(), targetLum));
-}
-
 [[nodiscard]] QString FormatPlatformLabel(const QString &platform) {
 	const auto upper = platform.trimmed().toUpper();
 	if (upper == u"SPOTIFY"_q) {
@@ -171,6 +158,19 @@ QRgb AdjustHsl(QRgb color, float luminance, float saturation = -1.0f) {
 	hsl[2] = std::min(hsl[2] * luminance, 1.0f);
 
 	return Ayu::Ui::ColorUtils::HSLToRGB(hsl);
+}
+
+[[nodiscard]] QColor ComputeAccentColor(QColor bg) {
+	const auto hsl = Ayu::Ui::ColorUtils::colorToHSL(bg.rgb());
+	const auto lum = hsl[2];
+	const auto targetLum = (lum <= 0.25f)
+		? 2.0f
+		: (lum <= 0.50f)
+		? 1.5f
+		: (lum <= 0.75f)
+		? 1.0f
+		: 0.5f;
+	return QColor::fromRgb(AdjustHsl(bg.rgb(), targetLum));
 }
 
 QRgb BlendARGB(QRgb color1, QRgb color2, float ratio) {
