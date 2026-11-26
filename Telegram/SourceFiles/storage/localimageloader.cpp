@@ -218,7 +218,8 @@ struct PreparedFileThumbnail {
 } // namespace
 
 int PhotoSideLimit(bool large) {
-	return large ? 2560 : 1280;
+	// KomaruGram: send crisp HD photos (2560px) by default.
+	return 2560;
 }
 
 int PhotoSideLimit() {

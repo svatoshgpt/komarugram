@@ -66,6 +66,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/features/komaru/now_playing.h"
 #include "ayu/ui/components/saved_music.h"
 #include "info/profile/info_profile_music_button.h"
+#include "media/audio/media_audio.h"
+#include "media/player/media_player_instance.h"
 #include "styles/style_ayu_styles.h"
 #include "styles/style_layers.h"
 #include "ui/basic_click_handlers.h"
@@ -198,6 +200,7 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 
 [[nodiscard]] Ui::VerticalBlocks::Part NowPlayingSection(
 		not_null<Ui::RpWidget*> parent,
+		not_null<UserData*> user,
 		rpl::producer<NowPlayingTrack> tracks,
 		rpl::producer<QImage> covers) {
 	// The stack only places separators by `shown`; a block hides itself.
@@ -216,6 +219,35 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 			},
 			std::nullopt,
 			[=] {
+				const auto current = track->current();
+				const auto &list = user->owner().savedMusic().list(user->id);
+				HistoryItem *matched = nullptr;
+				if (current && !list.empty()) {
+					const auto wantedTitle = current->title.trimmed().toLower();
+					for (const auto &item : list) {
+						const auto media = item->media();
+						const auto doc = media ? media->document() : nullptr;
+						const auto song = doc ? doc->song() : nullptr;
+						if (song && song->title.trimmed().toLower() == wantedTitle) {
+							matched = item;
+							break;
+						}
+					}
+					if (!matched && current->platform == u"TELEGRAM"_q) {
+						matched = list.front();
+					}
+				}
+				if (matched) {
+					if (const auto media = matched->media()) {
+						if (const auto doc = media->document()) {
+							Media::Player::instance()->play({
+								doc,
+								matched->fullId(),
+							});
+							return;
+						}
+					}
+				}
 				if (!url->isEmpty()) {
 					UrlClickHandler::Open(*url);
 				}
@@ -393,6 +425,7 @@ object_ptr<Ui::RpWidget> InnerWidget::setupContent(
 		auto covers = OfficialCoverValue(rpl::duplicate(tracks));
 		blocks.add(NowPlayingSection(
 			result.data(),
+			user,
 			std::move(tracks),
 			std::move(covers)));
 		blocks.addSeparator();

@@ -39,8 +39,8 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 namespace Storage {
 namespace {
 
-// max 1mb uploaded at the same time in each session
-constexpr auto kMaxUploadPerSession = 1024 * 1024;
+// KomaruGram upload speed boost: 2MB in-flight per session, 60ms pacing, up to 16 parallel sessions.
+constexpr auto kMaxUploadPerSession = 2 * 1024 * 1024;
 
 constexpr auto kDocumentMaxPartsCountDefault = 4000;
 
@@ -59,8 +59,8 @@ constexpr auto kDocumentUploadPartSize3 = 256 * 1024;
 // 512kb for large document ( <= 1500mb )
 constexpr auto kDocumentUploadPartSize4 = 512 * 1024;
 
-// One part each 200ms, if not uploaded faster.
-constexpr auto kUploadRequestInterval = crl::time(200);
+// One part each 60ms, if not uploaded faster.
+constexpr auto kUploadRequestInterval = crl::time(60);
 
 // How much time without upload causes additional session kill.
 constexpr auto kKillSessionTimeout = 15 * crl::time(1000);
@@ -68,7 +68,7 @@ constexpr auto kKillSessionTimeout = 15 * crl::time(1000);
 // How much wait after session kill before killing another one.
 constexpr auto kWaitForNormalizeTimeout = 8 * crl::time(1000);
 
-constexpr auto kMaxSessionsCount = 8;
+constexpr auto kMaxSessionsCount = 16;
 constexpr auto kFastRequestThreshold = 1 * crl::time(1000);
 constexpr auto kSlowRequestThreshold = 8 * crl::time(1000);
 
