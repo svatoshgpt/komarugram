@@ -2416,7 +2416,6 @@ bool checkReadyUpdate() {
 	if (CopyFile(updater.absoluteFilePath().toStdWString().c_str(), curUpdater.toStdWString().c_str(), FALSE) == FALSE) {
 		DWORD errorCode = GetLastError();
 		if (errorCode == ERROR_ACCESS_DENIED) { // we are in write-protected dir, like Program Files
-			cSetWriteProtected(true);
 			return true;
 		} else {
 			ClearAll();
@@ -2442,7 +2441,6 @@ bool checkReadyUpdate() {
 		if (errno == EACCES) {
 			DEBUG_LOG(("Update Info: "
 				"could not unlink current Updater, access denied."));
-			cSetWriteProtected(true);
 			return true;
 		} else {
 			DEBUG_LOG(("Update Error: could not unlink current Updater."));
@@ -2454,7 +2452,6 @@ bool checkReadyUpdate() {
 		if (errno == EACCES) {
 			DEBUG_LOG(("Update Info: "
 				"could not copy new Updater, access denied."));
-			cSetWriteProtected(true);
 			return true;
 		} else {
 			DEBUG_LOG(("Update Error: could not copy new Updater."));
