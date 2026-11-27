@@ -800,7 +800,7 @@ void Story::applyFields(
 		: data.is_selected_contacts()
 		? StoryPrivacy::SelectedContacts
 		: StoryPrivacy::Other;
-	const auto noForwards = data.is_noforwards();
+	const auto noForwards = false;
 	const auto out = data.is_min() ? _out : data.is_out();
 	auto privacyAllowed = std::vector<not_null<PeerData*>>();
 	auto privacyDisallowed = std::vector<not_null<PeerData*>>();

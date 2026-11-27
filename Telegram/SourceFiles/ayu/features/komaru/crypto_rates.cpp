@@ -134,7 +134,7 @@ void RequestRates() {
 		u"TWD"_q, u"ISK"_q, u"MAD"_q,
 		u"TON"_q, u"GRAM"_q, u"BTC"_q, u"ETH"_q, u"SOL"_q, u"USDT"_q,
 		u"USDC"_q, u"LTC"_q, u"DOGE"_q, u"XRP"_q, u"BNB"_q, u"TRX"_q,
-		u"ADA"_q, u"NOT"_q, u"XTR"_q,
+		u"ADA"_q, u"NOT"_q, u"XMR"_q, u"XTR"_q,
 	};
 	if (kSupported.contains(code)) {
 		return true;
@@ -292,6 +292,7 @@ void RequestRates() {
 	static const QSet<QString> kCrypto = {
 		u"BTC"_q, u"ETH"_q, u"TON"_q, u"GRAM"_q, u"SOL"_q, u"LTC"_q,
 		u"DOGE"_q, u"XRP"_q, u"BNB"_q, u"TRX"_q, u"ADA"_q, u"NOT"_q,
+		u"XMR"_q,
 	};
 	if (kCrypto.contains(code)) {
 		if (absVal >= 1000.0) return 2;
@@ -317,6 +318,7 @@ enum class UnitKind {
 	Speed,
 	Temperature,
 	Duration,
+	DataSize,
 };
 
 struct MathUnit {
@@ -396,8 +398,9 @@ struct CurrencyRegistry {
 		add(u"RUB"_q, { u"рубль", u"рубля", u"рублей", u"рубли", u"рублях", u"руб", u"р",
 			u"ruble", u"rubles", u"rouble", u"roubles" });
 		add(u"GBP"_q, { u"фунт", u"фунта", u"фунтов", u"фунты", u"фунтах" });
-		add(u"KZT"_q, { u"тенге", u"tenge" });
-		add(u"UAH"_q, { u"гривна", u"гривны", u"гривен", u"гривнах", u"грн", u"hryvnia", u"hryvnias" });
+		add(u"KZT"_q, { u"тенге", u"тг", u"кзт", u"tenge" });
+		add(u"UAH"_q, { u"гривна", u"гривны", u"гривен", u"гривнах", u"гривну", u"гривень", u"грн", u"hryvnia", u"hryvnias" });
+		add(u"BYN"_q, { u"белруб", u"бун", u"бел" });
 		add(u"CNY"_q, { u"юань", u"юаня", u"юаней", u"юани", u"юанях", u"yuan" });
 		add(u"JPY"_q, { u"иена", u"иены", u"иен", u"иенах", u"йена", u"йены", u"йен", u"йенах", u"yen" });
 		add(u"TRY"_q, { u"лира", u"лиры", u"лир", u"лирах", u"lira", u"liras" });
@@ -421,8 +424,16 @@ struct CurrencyRegistry {
 			u"ton", u"тон", u"тона", u"тонов", u"тонах", u"toncoin", u"toncoins",
 			u"тонкоин", u"тонкоина", u"тонкоинов" });
 		add(u"USDT"_q, { u"tether", u"юсдт", u"тезер" });
+		add(u"USDC"_q, { u"юсдц" });
 		add(u"LTC"_q, { u"лтц", u"лайт", u"лайтов", u"лайткоин", u"litecoin" });
 		add(u"SOL"_q, { u"солана", u"соланы", u"солан", u"solana" });
+		add(u"NOT"_q, { u"нот", u"ноткоин", u"ноткоина", u"ноткоинов", u"notcoin" });
+		add(u"DOGE"_q, { u"дог", u"доги", u"догикоин", u"dogecoin" });
+		add(u"TRX"_q, { u"трон", u"трона", u"тронов", u"tron" });
+		add(u"BNB"_q, { u"бнб" });
+		add(u"XRP"_q, { u"рипл", u"ripple" });
+		add(u"ADA"_q, { u"кардано", u"cardano" });
+		add(u"XMR"_q, { u"монеро", u"monero" });
 		add(u"XTR"_q, { u"звезда", u"звезды", u"звёзды", u"звезд", u"звёзд",
 			u"звездах", u"звёздах", u"звездами", u"звёздами", u"звезду", u"star", u"stars" });
 	}
@@ -610,6 +621,18 @@ struct MeasureRegistry {
 		add(u"y"_q, u"y"_q, u"г."_q, UnitKind::Duration, 31536000.0, QString(),
 			{ u"y", u"yr", u"yrs", u"year", u"years", u"год", u"года", u"лет", u"годах" });
 
+		// Data size (binary 1024-step)
+		add(u"B"_q, u"B"_q, u"Б"_q, UnitKind::DataSize, 1.0, QString(),
+			{ u"byte", u"bytes", u"байт", u"байта", u"байтов" });
+		add(u"KB"_q, u"KB"_q, u"КБ"_q, UnitKind::DataSize, 1024.0, QString(),
+			{ u"kb", u"kib", u"кб", u"килобайт", u"килобайта", u"килобайт" });
+		add(u"MB"_q, u"MB"_q, u"МБ"_q, UnitKind::DataSize, 1048576.0, QString(),
+			{ u"mb", u"mib", u"мб", u"мегабайт", u"мегабайта", u"мегабайтов" });
+		add(u"GB"_q, u"GB"_q, u"ГБ"_q, UnitKind::DataSize, 1073741824.0, QString(),
+			{ u"gb", u"gib", u"гб", u"гигабайт", u"гигабайта", u"гигабайтов" });
+		add(u"TB"_q, u"TB"_q, u"ТБ"_q, UnitKind::DataSize, 1099511627776.0, QString(),
+			{ u"tb", u"tib", u"тб", u"терабайт", u"терабайта", u"терабайтов" });
+
 		compounds.insert(u"km/h"_q, u"kmh"_q);
 		compounds.insert(u"км/ч"_q, u"kmh"_q);
 		compounds.insert(u"m/s"_q, u"ms"_q);
@@ -627,6 +650,7 @@ struct MeasureRegistry {
 		addLadder(false, { u"mg"_q, u"g"_q, u"kg"_q, u"t"_q });
 		addLadder(false, { u"ml"_q, u"l"_q });
 		addLadder(false, { u"m2"_q, u"ha"_q, u"km2"_q });
+		addLadder(false, { u"B"_q, u"KB"_q, u"MB"_q, u"GB"_q, u"TB"_q });
 		ladders.insert(u"yd"_q, addLadder(true, { u"in"_q, u"ft"_q, u"mi"_q }));
 		addLadder(true, { u"oz"_q, u"lb"_q });
 		addLadder(true, { u"floz"_q, u"gal"_q });
@@ -669,7 +693,8 @@ struct MeasureRegistry {
 			double value,
 			bool imperial) const {
 		const auto lIt = ladders.constFind(unit.code);
-		if (lIt != ladders.constEnd() && lIt->imperial == imperial) {
+		if (lIt != ladders.constEnd()
+			&& (unit.kind == UnitKind::DataSize || lIt->imperial == imperial)) {
 			const auto base = std::abs(unit.toBase(value));
 			for (auto i = int(lIt->codes.size()) - 1; i >= 0; --i) {
 				const auto &code = lIt->codes[i];
@@ -1617,6 +1642,70 @@ private:
 	qsizetype _pos = 0;
 };
 
+[[nodiscard]] QString TryShorthandRate(
+		const QString &expr,
+		const QString &afterEquals,
+		bool russian) {
+	auto s = expr.trimmed();
+	const auto lower = s.toLower();
+	if (lower.startsWith(u"курс "_q)) {
+		s = s.mid(5).trimmed();
+	} else if (lower.startsWith(u"rate "_q)) {
+		s = s.mid(5).trimmed();
+	}
+	if (s.isEmpty()) {
+		return QString();
+	}
+	const auto parts = s.split(QRegularExpression(u"[ \\t]+"_q), Qt::SkipEmptyParts);
+	if (parts.isEmpty() || parts.size() > 3) {
+		return QString();
+	}
+	const auto resolveCur = [](const QString &tok) -> std::optional<MathUnit> {
+		if (tok.size() == 1) {
+			if (auto c = Currencies().fromSymbol(tok[0])) {
+				return c;
+			}
+		}
+		return Currencies().fromWord(tok);
+	};
+	const auto src = resolveCur(parts[0]);
+	if (!src) {
+		return QString();
+	}
+	std::optional<MathUnit> dst;
+	bool fromAfter = false;
+	if (parts.size() == 3 && IsConversionWord(parts[1])) {
+		dst = resolveCur(parts[2]);
+		if (!dst) return QString();
+	} else if (parts.size() == 1 && !afterEquals.isEmpty()) {
+		dst = resolveCur(afterEquals.trimmed());
+		if (!dst) return QString();
+		fromAfter = true;
+	} else if (parts.size() != 1) {
+		return QString();
+	}
+
+	if (!dst) {
+		auto dstCode = LocalCurrency(russian);
+		if (dstCode == src->code) {
+			dstCode = (dstCode == u"USD"_q) ? u"EUR"_q : u"USD"_q;
+		}
+		const auto lbl = Currencies().labelFor(dstCode);
+		dst = MathUnit{ dstCode, lbl, lbl, UnitKind::Currency, 1.0, 0.0 };
+	}
+	const auto rate = ExchangeRate(src->code, dst->code);
+	if (!rate) {
+		return QString();
+	}
+	const auto decs = CurrencyDecimals(dst->code, std::abs(*rate));
+	const auto decimalSep = russian ? QChar(',') : QChar('.');
+	const auto formatted = FormatNumber(*rate, decimalSep, decs, decs > 2);
+	if (formatted.isEmpty()) {
+		return QString();
+	}
+	return fromAfter ? formatted : (formatted + QChar(0x00A0) + dst->label(russian));
+}
+
 [[nodiscard]] QString EvaluateExpression(
 		const QString &expr,
 		const QString &afterEquals,
@@ -1628,6 +1717,11 @@ private:
 		if (const auto baseRes = TryBaseConversion(expr); !baseRes.isEmpty()) {
 			return baseRes;
 		}
+	}
+
+	// 1b. Shorthand rate queries: "btc =", "ton =", "$ =", "ton в $ =", "курс btc ="
+	if (const auto rateRes = TryShorthandRate(expr, afterEquals, russian); !rateRes.isEmpty()) {
+		return rateRes;
 	}
 
 	// 2. General math / currency / unit parser

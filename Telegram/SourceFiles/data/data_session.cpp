@@ -1054,8 +1054,7 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 					&& chat->groupCall()->fullCount() > 0))
 				? Flag::CallNotEmpty
 				: Flag())
-			| (data.is_noforwards() ? Flag::NoForwards : Flag())
-			| (data.is_ayuNoforwards() ? Flag::AyuNoForwards : Flag());
+			| (data.is_noforwards() ? Flag::AyuNoForwards : Flag());
 		chat->setFlags((chat->flags() & ~flagsMask) | flagsSet);
 		chat->count = data.vparticipants_count().v;
 
@@ -1218,8 +1217,7 @@ not_null<PeerData*> Session::processChat(const MTPChat &data) {
 				? ((data.is_left() ? Flag::Left : Flag())
 					| (data.is_creator() ? Flag::Creator : Flag()))
 				: Flag())
-			| (data.is_noforwards() ? Flag::NoForwards : Flag())
-			| (data.is_ayuNoforwards() ? Flag::AyuNoForwards : Flag())
+			| (data.is_noforwards() ? Flag::AyuNoForwards : Flag())
 			| (data.is_join_to_send() ? Flag::JoinToWrite : Flag())
 			| (data.is_join_request() ? Flag::RequestToJoin : Flag())
 			| ((data.is_forum() && data.is_megagroup())
