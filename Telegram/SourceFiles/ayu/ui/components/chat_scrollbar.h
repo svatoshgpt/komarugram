@@ -4,11 +4,8 @@
 #include "base/timer.h"
 #include "ui/effects/animations.h"
 #include "ui/rp_widget.h"
+#include "ui/widgets/scroll_area.h"
 #include "styles/style_widgets.h"
-
-namespace Ui {
-class ScrollArea;
-} // namespace Ui
 
 namespace KomaruUi {
 
@@ -17,7 +14,7 @@ namespace KomaruUi {
 class ChatScrollBar final : public Ui::RpWidget {
 public:
 	ChatScrollBar(
-		not_null<Ui::ScrollArea*> scroll,
+		Ui::ScrollArea *scroll,
 		const style::ScrollArea &st);
 
 	void reset(bool atBottom = true);

@@ -19,7 +19,7 @@ constexpr auto kVirtualThumbRatio = 0.11;
 } // namespace
 
 ChatScrollBar::ChatScrollBar(
-	not_null<Ui::ScrollArea*> scroll,
+	Ui::ScrollArea *scroll,
 	const style::ScrollArea &st)
 : RpWidget(scroll)
 , _scroll(scroll)
