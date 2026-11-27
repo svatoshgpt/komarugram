@@ -2,7 +2,7 @@
 #include "ayu/ui/components/chat_scrollbar.h"
 
 #include "ui/painter.h"
-#include "ui/widgets/scroll_area.h"
+#include "ui/widgets/elastic_scroll.h"
 
 #include <QtCore/QCoreApplication>
 #include <QtGui/QtEvents>
@@ -19,7 +19,7 @@ constexpr auto kVirtualThumbRatio = 0.11;
 } // namespace
 
 ChatScrollBar::ChatScrollBar(
-	Ui::ScrollArea *scroll,
+	Ui::ElasticScroll *scroll,
 	const style::ScrollArea &st)
 : RpWidget(scroll)
 , _scroll(scroll)
@@ -262,7 +262,6 @@ void ChatScrollBar::setMoving(bool moving) {
 		return;
 	}
 	_moving = moving;
-	_scroll->setMovingByScrollBar(moving);
 	if (!_moving && !_over && _st.hiding > 0) {
 		_hideTimer.callOnce(_st.hiding);
 	}

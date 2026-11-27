@@ -4,7 +4,7 @@
 #include "base/timer.h"
 #include "ui/effects/animations.h"
 #include "ui/rp_widget.h"
-#include "ui/widgets/scroll_area.h"
+#include "ui/widgets/elastic_scroll.h"
 #include "styles/style_widgets.h"
 
 namespace KomaruUi {
@@ -14,7 +14,7 @@ namespace KomaruUi {
 class ChatScrollBar final : public Ui::RpWidget {
 public:
 	ChatScrollBar(
-		Ui::ScrollArea *scroll,
+		Ui::ElasticScroll *scroll,
 		const style::ScrollArea &st);
 
 	void reset(bool atBottom = true);
@@ -47,7 +47,7 @@ private:
 	void setMoving(bool moving);
 	void hideTimer();
 
-	const not_null<Ui::ScrollArea*> _scroll;
+	const not_null<Ui::ElasticScroll*> _scroll;
 	const style::ScrollArea &_st;
 
 	int _topSkip = 0;
