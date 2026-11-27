@@ -240,7 +240,7 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 				if (matched) {
 					if (const auto media = matched->media()) {
 						if (const auto doc = media->document()) {
-							Media::Player::instance()->play({
+							::Media::Player::instance()->play({
 								doc,
 								matched->fullId(),
 							});
