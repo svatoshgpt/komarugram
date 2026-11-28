@@ -39,18 +39,23 @@ constexpr auto kCelsiusOffset = 273.15;
 constexpr auto kFahrenheitScale = 5.0 / 9.0;
 constexpr auto kMaxFactorial = 170;
 
-const auto kCoinbaseUrl =
-	u"https://api.coinbase.com/v2/exchange-rates?currency=USD"_q;
+const auto kFiatUrl =
+	u"https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json"_q;
+const auto kCryptoUrl =
+	u"https://api.coingecko.com/api/v3/simple/price"
+	"?ids=the-open-network,notcoin,bitcoin,ethereum,solana,tether,usd-coin,"
+	"litecoin,dogecoin,ripple,tron,binancecoin,cardano,monero"
+	"&vs_currencies=usd"_q;
 
 // ============================================================================
-// Exchange Rates (Coinbase API — 150+ fiat currencies + crypto + Stars)
+// Exchange Rates (jsDelivr 200+ fiats + CoinGecko live crypto + Stars)
 // ============================================================================
 
 struct RatesState {
 	QHash<QString, double> usdRates; // code -> USD price of 1 unit
 	crl::time loaded = 0;
 	crl::time requested = 0;
-	bool loading = false;
+	int pendingRequests = 0;
 	rpl::event_stream<> updated;
 };
 
@@ -68,51 +73,105 @@ struct RatesState {
 void RequestRates() {
 	auto &state = Instance();
 	const auto now = crl::now();
-	if (state.loading
+	if (state.pendingRequests > 0
 		|| (state.loaded && now - state.loaded < kRefreshAfter)
 		|| (state.requested && now - state.requested < kRetryAfter)) {
 		return;
 	}
-	state.loading = true;
+	state.pendingRequests = 2;
 	state.requested = now;
-	LOG(("Komaru Rates: requesting Coinbase exchange rates."));
+	LOG(("Komaru Rates: requesting jsDelivr + CoinGecko rates."));
 
-	auto request = QNetworkRequest(QUrl(kCoinbaseUrl));
-	request.setTransferTimeout(kTimeout);
-	request.setHeader(QNetworkRequest::UserAgentHeader, u"KomaruGram"_q);
-	const auto reply = Manager().get(request);
-	QObject::connect(reply, &QNetworkReply::finished, [=] {
-		reply->deleteLater();
+	auto makeReq = [](const QString &url) {
+		auto request = QNetworkRequest(QUrl(url));
+		request.setTransferTimeout(kTimeout);
+		request.setHeader(QNetworkRequest::UserAgentHeader, u"KomaruGram"_q);
+		return request;
+	};
+
+	// 1. jsDelivr Currency API (200+ fiat currencies + base crypto)
+	const auto fiatReply = Manager().get(makeReq(kFiatUrl));
+	QObject::connect(fiatReply, &QNetworkReply::finished, [=] {
+		fiatReply->deleteLater();
 		auto &st = Instance();
-		st.loading = false;
-		if (reply->error() != QNetworkReply::NoError) {
-			LOG(("Komaru Rates Error: %1").arg(reply->errorString()));
+		st.pendingRequests = std::max(0, st.pendingRequests - 1);
+		if (fiatReply->error() != QNetworkReply::NoError) {
+			LOG(("Komaru Rates Fiat Error: %1").arg(fiatReply->errorString()));
 			return;
 		}
-		const auto root = QJsonDocument::fromJson(reply->readAll()).object();
-		const auto ratesObj = root.value(u"data"_q).toObject()
-			.value(u"rates"_q).toObject();
-		if (ratesObj.isEmpty()) {
-			LOG(("Komaru Rates Error: empty Coinbase rates."));
+		const auto root = QJsonDocument::fromJson(fiatReply->readAll()).object();
+		const auto usdObj = root.value(u"usd"_q).toObject();
+		if (usdObj.isEmpty()) {
+			LOG(("Komaru Rates Fiat Error: empty response."));
 			return;
 		}
-		QHash<QString, double> parsed;
-		parsed.reserve(ratesObj.size() + 4);
-		parsed.insert(u"USD"_q, 1.0);
-		for (auto it = ratesObj.constBegin(); it != ratesObj.constEnd(); ++it) {
-			bool ok = false;
-			const auto perUsd = it.value().toString().toDouble(&ok);
-			if (ok && perUsd > 0.0 && std::isfinite(perUsd)) {
-				parsed.insert(it.key().toUpper(), 1.0 / perUsd);
+		st.usdRates.insert(u"USD"_q, 1.0);
+		st.usdRates.insert(u"XTR"_q, kStarsUsdRate);
+		static const QSet<QString> kLiveCrypto = {
+			u"TON"_q, u"GRAM"_q, u"NOT"_q, u"BTC"_q, u"ETH"_q, u"SOL"_q,
+			u"USDT"_q, u"USDC"_q, u"LTC"_q, u"DOGE"_q, u"XRP"_q, u"TRX"_q,
+			u"BNB"_q, u"ADA"_q, u"XMR"_q,
+		};
+		for (auto it = usdObj.constBegin(); it != usdObj.constEnd(); ++it) {
+			const auto perUsd = it.value().toDouble();
+			if (perUsd > 0.0 && std::isfinite(perUsd)) {
+				const auto code = it.key().toUpper();
+				// Always refresh fiats; keep live CoinGecko crypto if already loaded.
+				if (!kLiveCrypto.contains(code) || !st.usdRates.contains(code)) {
+					st.usdRates.insert(code, 1.0 / perUsd);
+				}
 			}
 		}
-		if (parsed.contains(u"TON"_q)) {
-			parsed.insert(u"GRAM"_q, parsed.value(u"TON"_q));
-		}
-		parsed.insert(u"XTR"_q, kStarsUsdRate);
-		st.usdRates = std::move(parsed);
 		st.loaded = crl::now();
-		LOG(("Komaru Rates: loaded %1 currencies.").arg(st.usdRates.size()));
+		LOG(("Komaru Rates: loaded %1 fiat/base currencies.").arg(st.usdRates.size()));
+		st.updated.fire({});
+	});
+
+	// 2. CoinGecko live crypto prices (TON/GRAM, NOT, BTC, ETH, SOL, etc.)
+	const auto cryptoReply = Manager().get(makeReq(kCryptoUrl));
+	QObject::connect(cryptoReply, &QNetworkReply::finished, [=] {
+		cryptoReply->deleteLater();
+		auto &st = Instance();
+		st.pendingRequests = std::max(0, st.pendingRequests - 1);
+		if (cryptoReply->error() != QNetworkReply::NoError) {
+			LOG(("Komaru Rates Crypto Error: %1").arg(cryptoReply->errorString()));
+			return;
+		}
+		const auto root = QJsonDocument::fromJson(cryptoReply->readAll()).object();
+		if (root.isEmpty()) {
+			return;
+		}
+		static const std::pair<const char*, const char*> kMap[] = {
+			{ "the-open-network", "TON" },
+			{ "notcoin", "NOT" },
+			{ "bitcoin", "BTC" },
+			{ "ethereum", "ETH" },
+			{ "solana", "SOL" },
+			{ "tether", "USDT" },
+			{ "usd-coin", "USDC" },
+			{ "litecoin", "LTC" },
+			{ "dogecoin", "DOGE" },
+			{ "ripple", "XRP" },
+			{ "tron", "TRX" },
+			{ "binancecoin", "BNB" },
+			{ "cardano", "ADA" },
+			{ "monero", "XMR" },
+		};
+		st.usdRates.insert(u"USD"_q, 1.0);
+		st.usdRates.insert(u"XTR"_q, kStarsUsdRate);
+		for (const auto &[cgId, code] : kMap) {
+			const auto usd = root.value(QString::fromLatin1(cgId))
+				.toObject().value(u"usd"_q).toDouble();
+			if (usd > 0.0 && std::isfinite(usd)) {
+				const auto key = QString::fromLatin1(code);
+				st.usdRates.insert(key, usd);
+				if (key == u"TON"_q) {
+					st.usdRates.insert(u"GRAM"_q, usd);
+				}
+			}
+		}
+		st.loaded = crl::now();
+		LOG(("Komaru Rates: loaded live crypto prices."));
 		st.updated.fire({});
 	});
 }
