@@ -601,20 +601,6 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		}
 	}
 
-	if (_nowPlayingCard && radius > 0) {
-		// Subtle MD3 outlineVariant border.
-		auto border = adaptive ? QColor(255, 255, 255, 34) : st::shadowFg->c;
-		if (!adaptive) {
-			border.setAlphaF(0.18);
-		}
-		p.setPen(QPen(border, st::lineWidth));
-		p.setBrush(Qt::NoBrush);
-		p.drawRoundedRect(
-			QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
-			radius,
-			radius);
-	}
-
 	const auto padding = _padding.value_or(st::infoMusicButtonPadding);
 	if (!cover.pix.isNull()) {
 		const auto coverX = _nowPlayingCard ? metrics.padX : padding.left();
@@ -623,14 +609,6 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 			: padding.top();
 		const auto coverRect = QRect(coverX, coverY, size, size);
 		p.drawPixmap(coverRect, cover.pix);
-		if (_nowPlayingCard) {
-			p.setPen(QPen(QColor(255, 255, 255, adaptive ? 38 : 22), st::lineWidth));
-			p.setBrush(Qt::NoBrush);
-			p.drawRoundedRect(
-				QRectF(coverRect).adjusted(0.5, 0.5, -0.5, -0.5),
-				metrics.innerRadius,
-				metrics.innerRadius);
-		}
 	}
 
 	if (_playIcon) {

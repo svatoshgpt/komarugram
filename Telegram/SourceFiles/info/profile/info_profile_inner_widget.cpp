@@ -119,6 +119,9 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 	if (savedMusic->list(peerId).empty() && !savedMusic->fullyLoaded(peerId)) {
 		savedMusic->loadMore(peerId);
 	}
+	if (user->isSelf()) {
+		user->updateFull();
+	}
 	return rpl::single(
 		peerId
 	) | rpl::then(
@@ -127,12 +130,21 @@ using NowPlayingTrack = std::optional<KomaruNowPlaying::Track>;
 		const auto &list = savedMusic->list(peerId);
 		const auto media = list.empty() ? nullptr : list.front()->media();
 		const auto document = media ? media->document() : nullptr;
-		const auto song = document ? document->song() : nullptr;
-		if (!song || song->title.trimmed().isEmpty()) {
+		if (!document) {
 			return std::nullopt;
 		}
-		const auto title = song->title.trimmed();
-		const auto artist = song->performer.trimmed();
+		const auto song = document->song();
+		auto title = song ? song->title.trimmed() : QString();
+		auto artist = song ? song->performer.trimmed() : QString();
+		if (title.isEmpty()) {
+			title = document->filename().trimmed();
+			if (const auto dot = title.lastIndexOf('.'); dot > 0) {
+				title = title.left(dot);
+			}
+		}
+		if (title.isEmpty()) {
+			return std::nullopt;
+		}
 		return KomaruNowPlaying::Track{
 			.title = title,
 			.artist = artist,
