@@ -4,6 +4,8 @@
 // zone converter ported from official exteraGram (com.exteragram.messenger.inline).
 #include "ayu/features/komaru/crypto_rates.h"
 
+#include "ayu/ayu_settings.h"
+
 #include <QtCore/QCoreApplication>
 #include <QtCore/QDateTime>
 #include <QtCore/QHash>
@@ -1888,6 +1890,9 @@ private:
 } // namespace
 
 QString Completion(const QString &text) {
+	if (!AyuSettings::getInstance().inlineCalculator()) {
+		return QString();
+	}
 	const auto eqIdx = text.lastIndexOf('=');
 	if (eqIdx <= 0) {
 		return QString();

@@ -390,6 +390,10 @@ public:
 	[[nodiscard]] bool nowPlayingKeepMusic() const { return _nowPlayingKeepMusic.current(); }
 	[[nodiscard]] bool nowPlayingBio() const { return _nowPlayingBio.current(); }
 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
+	[[nodiscard]] bool hdPhotos() const { return _hdPhotos.current(); }
+	[[nodiscard]] bool speedBoost() const { return _speedBoost.current(); }
+	[[nodiscard]] bool inlineCalculator() const { return _inlineCalculator.current(); }
+	[[nodiscard]] bool sendMenuTranslate() const { return _sendMenuTranslate.current(); }
 
 	void setSaveDeletedMessages(bool val);
 	void setSaveMessagesHistory(bool val);
@@ -494,6 +498,10 @@ public:
 	void setNowPlayingKeepMusic(bool val);
 	void setNowPlayingBio(bool val);
 	void setStreamerMode(bool val);
+	void setHdPhotos(bool val);
+	void setSpeedBoost(bool val);
+	void setInlineCalculator(bool val);
+	void setSendMenuTranslate(bool val);
 
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeValue() const { return _useGlobalGhostMode.value(); }
 	[[nodiscard]] rpl::producer<bool> useGlobalGhostModeChanges() const { return _useGlobalGhostMode.changes(); }
@@ -791,6 +799,10 @@ private:
 	rpl::variable<bool> _nowPlayingKeepMusic = false;
 	rpl::variable<bool> _nowPlayingBio = false;
 	rpl::variable<bool> _streamerMode = false;
+	rpl::variable<bool> _hdPhotos = true;
+	rpl::variable<bool> _speedBoost = true;
+	rpl::variable<bool> _inlineCalculator = true;
+	rpl::variable<bool> _sendMenuTranslate = true;
 
 	rpl::variable<bool> _useGlobalGhostMode = true;
 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;

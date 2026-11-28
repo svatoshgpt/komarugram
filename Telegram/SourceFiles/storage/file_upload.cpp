@@ -34,13 +34,27 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 
 #include <QtCore/QFileInfo>
 
+#include "ayu/ayu_settings.h"
 #include "ayu/features/komaru/send_metadata.h"
 
 namespace Storage {
 namespace {
 
-// KomaruGram upload speed boost: 2MB in-flight per session, 60ms pacing, up to 16 parallel sessions.
-constexpr auto kMaxUploadPerSession = 2 * 1024 * 1024;
+[[nodiscard]] int MaxUploadPerSession() {
+	return AyuSettings::getInstance().speedBoost()
+		? (2 * 1024 * 1024)
+		: (1024 * 1024);
+}
+
+[[nodiscard]] crl::time UploadRequestInterval() {
+	return AyuSettings::getInstance().speedBoost()
+		? crl::time(60)
+		: crl::time(200);
+}
+
+[[nodiscard]] int MaxUploadSessionsCount() {
+	return AyuSettings::getInstance().speedBoost() ? 16 : 8;
+}
 
 constexpr auto kDocumentMaxPartsCountDefault = 4000;
 
@@ -59,16 +73,12 @@ constexpr auto kDocumentUploadPartSize3 = 256 * 1024;
 // 512kb for large document ( <= 1500mb )
 constexpr auto kDocumentUploadPartSize4 = 512 * 1024;
 
-// One part each 60ms, if not uploaded faster.
-constexpr auto kUploadRequestInterval = crl::time(60);
-
 // How much time without upload causes additional session kill.
 constexpr auto kKillSessionTimeout = 15 * crl::time(1000);
 
 // How much wait after session kill before killing another one.
 constexpr auto kWaitForNormalizeTimeout = 8 * crl::time(1000);
 
-constexpr auto kMaxSessionsCount = 16;
 constexpr auto kFastRequestThreshold = 1 * crl::time(1000);
 constexpr auto kSlowRequestThreshold = 8 * crl::time(1000);
 
@@ -714,7 +724,7 @@ QByteArray Uploader::readDocPart(not_null<Entry*> entry) {
 
 bool Uploader::canAddDcIndex() const {
 	const auto count = int(_sentPerDcIndex.size());
-	return (count < kMaxSessionsCount)
+	return (count < MaxUploadSessionsCount())
 		&& (count == int(_dcIndicesWithFastRequests.size()));
 }
 
@@ -827,7 +837,7 @@ auto Uploader::sendDocPart(not_null<Entry*> entry, uchar dcIndex)
 	const auto itemId = entry->itemId;
 	const auto alreadySent = _sentPerDcIndex[dcIndex];
 	const auto willProbablyBeSent = entry->docPartSize;
-	if (alreadySent + willProbablyBeSent > kMaxUploadPerSession) {
+	if (alreadySent + willProbablyBeSent > MaxUploadPerSession()) {
 		return SendResult::DcIndexFull;
 	}
 
@@ -873,7 +883,7 @@ auto Uploader::sendSlicedPart(not_null<Entry*> entry, uchar dcIndex)
 	const auto itemId = entry->itemId;
 	const auto alreadySent = _sentPerDcIndex[dcIndex];
 	const auto willBeSent = entry->parts->at(entry->partsSent).size();
-	if (alreadySent + willBeSent >= kMaxUploadPerSession) {
+	if (alreadySent + willBeSent >= MaxUploadPerSession()) {
 		return SendResult::DcIndexFull;
 	}
 
@@ -934,7 +944,7 @@ void Uploader::maybeSend() {
 	if (usedDcIndices.empty()) {
 		_nextTimer.cancel();
 	} else {
-		_nextTimer.callOnce(kUploadRequestInterval);
+		_nextTimer.callOnce(UploadRequestInterval());
 	}
 }
 

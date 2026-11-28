@@ -6585,7 +6585,8 @@ SendMenu::Details HistoryWidget::sendMenuDetails() const {
 	const auto effectAllowed = _peer && _peer->isUser();
 	const auto aiComposeAllowed = _field->hasText()
 		&& !session().data().aiComposeTones().list().empty();
-	const auto translateAllowed = _field->hasText();
+	const auto translateAllowed = _field->hasText()
+		&& AyuSettings::getInstance().sendMenuTranslate();
 	return {
 		.type = type,
 		.barePeerId = _peer ? _peer->id.value : 0,

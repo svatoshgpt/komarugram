@@ -248,6 +248,31 @@ void BuildQoLToggles(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 		.setter = &AyuSettings::setShowMessagesCount,
 	});
 
+	ayu.addSettingToggle({
+		.id = u"ayu/hdPhotos"_q,
+		.title = Komaru::TextValue("hd_photos"),
+		.getter = &AyuSettings::hdPhotos,
+		.setter = &AyuSettings::setHdPhotos,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/speedBoost"_q,
+		.title = Komaru::TextValue("speed_boost"),
+		.getter = &AyuSettings::speedBoost,
+		.setter = &AyuSettings::setSpeedBoost,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/inlineCalculator"_q,
+		.title = Komaru::TextValue("inline_calculator"),
+		.getter = &AyuSettings::inlineCalculator,
+		.setter = &AyuSettings::setInlineCalculator,
+	});
+	ayu.addSettingToggle({
+		.id = u"ayu/sendMenuTranslate"_q,
+		.title = Komaru::TextValue("send_menu_translate"),
+		.getter = &AyuSettings::sendMenuTranslate,
+		.setter = &AyuSettings::setSendMenuTranslate,
+	});
+
 	BuildShowPeerId(builder);
 
 	ayu.addSectionDivider();

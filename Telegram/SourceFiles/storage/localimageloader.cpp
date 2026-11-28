@@ -7,6 +7,7 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 */
 #include "storage/localimageloader.h"
 
+#include "ayu/ayu_settings.h"
 #include "ayu/features/komaru/send_metadata.h"
 
 #include "api/api_text_entities.h"
@@ -218,8 +219,7 @@ struct PreparedFileThumbnail {
 } // namespace
 
 int PhotoSideLimit(bool large) {
-	// KomaruGram: send crisp HD photos (2560px) by default.
-	return 2560;
+	return (large || AyuSettings::getInstance().hdPhotos()) ? 2560 : 1280;
 }
 
 int PhotoSideLimit() {

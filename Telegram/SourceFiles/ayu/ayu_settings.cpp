@@ -1307,6 +1307,30 @@ void AyuSettings::setNowPlayingKeepMusic(bool val) {
 	save();
 }
 
+void AyuSettings::setHdPhotos(bool val) {
+	if (_hdPhotos.current() == val) return;
+	_hdPhotos = val;
+	save();
+}
+
+void AyuSettings::setSpeedBoost(bool val) {
+	if (_speedBoost.current() == val) return;
+	_speedBoost = val;
+	save();
+}
+
+void AyuSettings::setInlineCalculator(bool val) {
+	if (_inlineCalculator.current() == val) return;
+	_inlineCalculator = val;
+	save();
+}
+
+void AyuSettings::setSendMenuTranslate(bool val) {
+	if (_sendMenuTranslate.current() == val) return;
+	_sendMenuTranslate = val;
+	save();
+}
+
 void AyuSettings::setNowPlayingBio(bool val) {
 	if (_nowPlayingBio.current() == val) return;
 	_nowPlayingBio = val;
@@ -1440,6 +1464,10 @@ void to_json(nlohmann::json &j, const AyuSettings &s) {
 		{"nowPlayingKeepMusic", s._nowPlayingKeepMusic.current()},
 		{"nowPlayingBio", s._nowPlayingBio.current()},
 		{"streamerMode", s._streamerMode.current()},
+		{"hdPhotos", s._hdPhotos.current()},
+		{"speedBoost", s._speedBoost.current()},
+		{"inlineCalculator", s._inlineCalculator.current()},
+		{"sendMenuTranslate", s._sendMenuTranslate.current()},
 		{"messageShotSettings", s._messageShotSettings}
 	};
 }
@@ -1561,6 +1589,10 @@ void from_json(const nlohmann::json &j, AyuSettings &s) {
 	s._nowPlayingKeepMusic = j.value("nowPlayingKeepMusic", defaults._nowPlayingKeepMusic.current());
 	s._nowPlayingBio = j.value("nowPlayingBio", defaults._nowPlayingBio.current());
 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
+	s._hdPhotos = j.value("hdPhotos", defaults._hdPhotos.current());
+	s._speedBoost = j.value("speedBoost", defaults._speedBoost.current());
+	s._inlineCalculator = j.value("inlineCalculator", defaults._inlineCalculator.current());
+	s._sendMenuTranslate = j.value("sendMenuTranslate", defaults._sendMenuTranslate.current());
 
 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
 		j["messageShotSettings"].get_to(s._messageShotSettings);

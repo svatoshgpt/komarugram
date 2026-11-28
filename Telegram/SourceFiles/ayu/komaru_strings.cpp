@@ -48,6 +48,10 @@ constexpr Entry kStrings[] = {
 	{ "ws_proxy_connecting", u"Connecting…", u"Подключение…" },
 	{ "ws_proxy_unavailable", u"Unavailable", u"Недоступно" },
 	{ "ws_proxy_ms", u"{ms} ms", u"{ms} мс" },
+	{ "hd_photos", u"Send HD photos (2560px)", u"Отправлять фото в HD (2560px)" },
+	{ "speed_boost", u"Upload & download speed boost", u"Ускорение загрузки и выгрузки" },
+	{ "inline_calculator", u"Inline calculator & rates", u"Калькулятор и курсы в поле ввода" },
+	{ "send_menu_translate", u"Translate in send menu", u"Перевод в меню отправки" },
 };
 
 } // namespace
