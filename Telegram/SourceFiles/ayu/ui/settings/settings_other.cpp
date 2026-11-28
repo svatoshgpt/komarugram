@@ -151,27 +151,6 @@ void BuildDonations(SectionBuilder &builder) {
 	});
 }
 
-void BuildCrashReporting(SectionBuilder &builder, AyuSectionBuilder &ayu) {
-#ifdef TDESKTOP_DISABLE_AUTOUPDATE
-	return;
-#endif
-	builder.addSkip();
-	builder.addSubsectionTitle(tr::ayu_CategoryOther());
-
-#ifndef TDESKTOP_DISABLE_AUTOUPDATE
-	ayu.addSettingToggle({
-		.id = u"ayu/crashReporting"_q,
-		.altIds = { u"ayu/crashlytics"_q },
-		.title = tr::ayu_CrashReporting(),
-		.getter = &AyuSettings::crashReporting,
-		.setter = &AyuSettings::setCrashReporting,
-		.icon = { &st::menuIconReport },
-	});
-	builder.addSkip();
-	builder.addDividerText(tr::ayu_CrashReportingDescription());
-#endif
-}
-
 void BuildOtherThings(SectionBuilder &builder) {
 	const auto controller = builder.controller();
 
@@ -210,11 +189,8 @@ const auto kMeta = BuildHelper({
 	.title = &tr::ayu_CategoryOther,
 	.icon = &st::menuIconFave,
 }, [](SectionBuilder &builder) {
-	auto ayu = AyuSectionBuilder(builder);
-
 	builder.addSkip();
 	BuildDonations(builder);
-	BuildCrashReporting(builder, ayu);
 	BuildOtherThings(builder);
 });
 
