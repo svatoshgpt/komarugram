@@ -579,9 +579,21 @@ void AyuMusicButton::paintEvent(QPaintEvent *e) {
 		&& (_nowPlayingCard || settings.adaptiveCoverColor());
 	if (!adaptive) {
 		// Material 3 surface container adapting to current Light/Dark theme.
-		p.fillRect(e->rect(), _overrideBg ? cover.bg : st::windowBgOver->c);
-		if (_nowPlayingCard) {
-			DrawNowPlayingPattern(p, rect(), st::windowSubTextFg->c, 0.55);
+		if (_nowPlayingCard && !_overrideBg) {
+			const auto base = st::windowBgOver->c;
+			const auto accent = st::windowBgActive->c;
+			const auto isDark = (st::windowBg->c.lightness() < 128);
+			const auto tint = anim::color(base, accent, isDark ? 0.16 : 0.10);
+			QRadialGradient gradient(QPointF(width(), height() / 2.0), width() * 1.4);
+			gradient.setColorAt(0, tint);
+			gradient.setColorAt(1, base);
+			p.fillRect(rect(), gradient);
+			DrawNowPlayingPattern(p, rect(), accent, isDark ? 0.65 : 0.45);
+		} else {
+			p.fillRect(e->rect(), _overrideBg ? cover.bg : st::windowBgOver->c);
+			if (_nowPlayingCard) {
+				DrawNowPlayingPattern(p, rect(), st::windowSubTextFg->c, 0.55);
+			}
 		}
 		paintRipple(p, QPoint());
 	} else {
