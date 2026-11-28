@@ -233,7 +233,9 @@ https://github.com/telegramdesktop/tdesktop/blob/master/LEGAL
 #include "ayu/ayu_settings.h"
 #include "ayu/features/komaru/color_swatch.h"
 #include "ayu/features/komaru/crypto_rates.h"
+#include "api/api_text_entities.h"
 #include "ayu/features/komaru/scroll_autoload.h"
+#include "ayu/features/translator/ayu_translator.h"
 #include "ayu/ui/components/chat_scrollbar.h"
 #include "ayu/features/filters/filters_cache_controller.h"
 #include "ayu/utils/telegram_helpers.h"
@@ -501,6 +503,8 @@ HistoryWidget::HistoryWidget(
 			send(action.options);
 		} else if (action.type == SendMenu::ActionType::AiCompose) {
 			showAiComposeBox();
+		} else if (action.type == SendMenu::ActionType::Translate) {
+			translateComposeField(action.translateToLang);
 		} else {
 			sendScheduled(action.options);
 		}
@@ -5942,6 +5946,75 @@ void HistoryWidget::showAiComposeBox() {
 	});
 }
 
+void HistoryWidget::translateComposeField(const QString &toLang) {
+	const auto text = prepareTextForEditMsg();
+	if (text.text.trimmed().isEmpty()) {
+		return;
+	}
+	if (!Ayu::Translator::TranslateManager::currentInstance()) {
+		Ayu::Translator::TranslateManager::init();
+	}
+	const auto manager = Ayu::Translator::TranslateManager::currentInstance();
+	if (!manager) {
+		return;
+	}
+	auto targetLang = toLang;
+	if (targetLang.isEmpty()) {
+		auto hasCyrillic = false;
+		for (const auto ch : text.text) {
+			const auto u = ch.unicode();
+			if (u >= 0x0400 && u <= 0x04FF) {
+				hasCyrillic = true;
+				break;
+			}
+		}
+		targetLang = hasCyrillic ? u"en"_q : u"ru"_q;
+	}
+	auto provider = AyuSettings::getInstance().translationProvider();
+	if (provider == TranslationProvider::Telegram && !session().premium()) {
+		provider = TranslationProvider::Google;
+	}
+	auto texts = QVector<MTPTextWithEntities>();
+	texts.push_back(MTP_textWithEntities(
+		MTP_string(text.text),
+		Api::EntitiesToMTP(
+			&session(),
+			text.entities,
+			Api::ConvertOption::SkipLocal)));
+	using Flag = MTPmessages_TranslateText::Flag;
+	const auto weak = base::make_weak(this);
+	manager->request(
+		&session(),
+		MTP_flags(Flag::f_text),
+		MTP_inputPeerEmpty(),
+		MTPVector<MTPint>(),
+		MTP_vector<MTPTextWithEntities>(texts),
+		MTP_string(targetLang),
+		provider
+	).done([=](const MTPmessages_TranslatedText &result) {
+		const auto strong = weak.get();
+		if (!strong) {
+			return;
+		}
+		const auto &list = result.data().vresult().v;
+		if (list.isEmpty()) {
+			strong->controller()->showToast(tr::lng_translate_box_error(tr::now));
+			return;
+		}
+		const auto translated = Api::ParseTextWithEntities(
+			&strong->session(),
+			list.front());
+		strong->setFieldText({
+			translated.text,
+			TextUtilities::ConvertEntitiesToTextTags(translated.entities),
+		}, TextUpdateEvent::SaveDraft, Ui::InputField::HistoryAction::NewEntry);
+	}).fail([=] {
+		if (const auto strong = weak.get()) {
+			strong->controller()->showToast(tr::lng_translate_box_error(tr::now));
+		}
+	}).send();
+}
+
 void HistoryWidget::triggerAiApplyInPlace() {
 	Api::TriggerAiApplyInPlace(
 		&session(),
@@ -6512,11 +6585,13 @@ SendMenu::Details HistoryWidget::sendMenuDetails() const {
 	const auto effectAllowed = _peer && _peer->isUser();
 	const auto aiComposeAllowed = _field->hasText()
 		&& !session().data().aiComposeTones().list().empty();
+	const auto translateAllowed = _field->hasText();
 	return {
 		.type = type,
 		.barePeerId = _peer ? _peer->id.value : 0,
 		.effectAllowed = effectAllowed,
 		.aiComposeAllowed = aiComposeAllowed,
+		.translateAllowed = translateAllowed,
 	};
 }
 

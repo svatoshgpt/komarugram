@@ -709,7 +709,7 @@ QImage TelegramLogoImage() {
 	{
 		auto p = QPainter(&result);
 		auto hq = PainterHighQualityEnabler(p);
-		p.setBrush(QrActiveColor());
+		p.setBrush(ComputeLoginQrPalette().accent);
 		p.setPen(Qt::NoPen);
 		p.drawEllipse(QRect(QPoint(), size));
 		st::introQrPlane.paintInCenter(p, QRect(QPoint(), size));

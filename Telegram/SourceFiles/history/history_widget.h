@@ -583,6 +583,7 @@ private:
 	void updateAiButtonVisibility();
 	void updateAiButtonGeometry();
 	void showAiComposeBox();
+	void translateComposeField(const QString &toLang);
 	void triggerAiApplyInPlace();
 	void initSendAsFileButton();
 	void sendTextAsFile(

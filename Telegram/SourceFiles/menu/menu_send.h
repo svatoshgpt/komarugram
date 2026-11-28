@@ -50,6 +50,7 @@ enum class ActionType : uchar {
 	RemoveCover,
 	ChangePrice,
 	AiCompose,
+	Translate,
 	ReplyToForward,
 };
 struct Action {
@@ -57,6 +58,7 @@ struct Action {
 
 	Api::SendOptions options;
 	Type type = Type::Send;
+	QString translateToLang;
 };
 [[nodiscard]] Fn<void(Action, Details)> DefaultCallback(
 	std::shared_ptr<ChatHelpers::Show> show,

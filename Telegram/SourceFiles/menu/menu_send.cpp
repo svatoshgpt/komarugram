@@ -780,6 +780,43 @@ FillMenuResult FillSendMenu(
 			[=] { action({ .type = ActionType::AiCompose }, details); },
 			&st::menuIconTranslate);
 	}
+	if (sending && details.translateAllowed) {
+		const auto translateAction = menu->addAction(
+			tr::lng_context_translate(tr::now),
+			[=] { action({ .type = ActionType::Translate }, details); },
+			&st::menuIconTranslate);
+		const auto submenu = menu->ensureSubmenu(
+			translateAction,
+			st::popupMenuWithIcons);
+		struct LangEntry {
+			const char *code;
+			const char16_t *label;
+		};
+		static constexpr LangEntry kLangs[] = {
+			{ "en", u"English" },
+			{ "ru", u"Русский" },
+			{ "uk", u"Українська" },
+			{ "de", u"Deutsch" },
+			{ "fr", u"Français" },
+			{ "es", u"Español" },
+			{ "it", u"Italiano" },
+			{ "pt", u"Português" },
+			{ "pl", u"Polski" },
+			{ "tr", u"Türkçe" },
+			{ "zh", u"中文" },
+			{ "ja", u"日本語" },
+			{ "ko", u"한국어" },
+		};
+		for (const auto &entry : kLangs) {
+			const auto langCode = QString::fromLatin1(entry.code);
+			submenu->addAction(QString::fromUtf16(entry.label), [=] {
+				action({
+					.type = ActionType::Translate,
+					.translateToLang = langCode,
+				}, details);
+			});
+		}
+	}
 	if (sending && details.replyToForward) {
 		menu->addAction(
 			tr::lng_send_reply_to_forward(tr::now),

@@ -63,6 +63,7 @@ struct Details {
 	const style::EmojiPan *effectsPan = nullptr;
 	bool effectAllowed = false;
 	bool aiComposeAllowed = false;
+	bool translateAllowed = false;
 	bool replyToForward = false;
 };
 
