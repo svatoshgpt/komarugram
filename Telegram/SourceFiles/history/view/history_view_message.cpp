@@ -2775,7 +2775,7 @@ void Message::paintFromName(
 			_fromNameStatus->id = id;
 		}
 		if (useKomaruFace && komaruBadge.komaru) {
-			const auto badgeSize = st::dialogsExteraSupporterIcon.icon.width();
+			const auto badgeSize = st::dialogsPremiumIcon.icon.width();
 			const auto badgeRect = QRect(
 				x,
 				y + (st::msgNameFont->height - badgeSize) / 2,

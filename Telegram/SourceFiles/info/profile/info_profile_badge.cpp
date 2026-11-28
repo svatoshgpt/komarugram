@@ -55,20 +55,20 @@ void PaintKomaruFaces(
 		const Badge::Content &content,
 		int left,
 		int height,
+		int faceSize,
 		QColor themeColor) {
-	const auto &icon = st::infoExteraSupporterBadge;
 	const auto now = crl::now();
-	const auto top = (height - icon.height()) / 2;
+	const auto top = (height - faceSize) / 2;
 	const auto paint = [&](const KomaruBadges::Entry *entry) {
 		if (entry) {
 			KomaruBadges::Paint(
 				p,
-				QRect(left, top, icon.width(), icon.height()),
+				QRect(left, top, faceSize, faceSize),
 				*entry,
 				now,
 				themeColor);
 		}
-		left += icon.width();
+		left += faceSize;
 	};
 	if (content.komaruDeveloper) {
 		paint(KomaruBadges::Developer(content.komaruPeer));
@@ -160,11 +160,11 @@ void Badge::setContent(Content content) {
 	}());
 	_view->show();
 	const auto faces = _content;
-	const auto facesOnlyWidth = KomaruFacesCount(_content)
-		* st::infoExteraSupporterBadge.width();
+	const auto faceSize = Data::FrameSizeFromTag(sizeTag())
+		/ style::DevicePixelRatio();
+	const auto facesOnlyWidth = KomaruFacesCount(_content) * faceSize;
 	if (!_content.komaruStatuses.empty()) {
-		_komaruStatusWidth = Data::FrameSizeFromTag(sizeTag())
-			/ style::DevicePixelRatio();
+		_komaruStatusWidth = faceSize;
 		_komaruStatusesWidth = _komaruStatusWidth
 			* int(_content.komaruStatuses.size());
 	}
@@ -186,7 +186,7 @@ void Badge::setContent(Content content) {
 			int left,
 			int height,
 			QColor themeColor) {
-		PaintKomaruFaces(p, faces, left, height, themeColor);
+		PaintKomaruFaces(p, faces, left, height, faceSize, themeColor);
 		auto x = left + facesOnlyWidth;
 		for (const auto &emoji : _komaruStatuses) {
 			emoji->paint(p, {
@@ -249,7 +249,7 @@ void Badge::setContent(Content content) {
 		const auto height = std::max({
 			emoji,
 			icon ? icon->height() : 0,
-			prefix ? _komaruStatusWidth : 0,
+			prefix ? faceSize : 0,
 		});
 		_view->resize(width, height);
 		_view->paintRequest(
@@ -339,7 +339,7 @@ void Badge::setContent(Content content) {
 		const auto skip = st::infoVerifiedCheckPosition.x();
 		_view->resize(
 			skip + facesWidth + icon->width(),
-			std::max(icon->height(), _komaruStatusWidth));
+			std::max(icon->height(), facesWidth ? faceSize : 0));
 		_view->paintRequest(
 		) | rpl::on_next([=, check = _view.data()]{
 			Painter p(check);
@@ -357,11 +357,7 @@ void Badge::setContent(Content content) {
 	} break;
 	case BadgeType::Komaru: {
 		const auto skip = st::infoVerifiedCheckPosition.x();
-		_view->resize(
-			skip + facesWidth,
-			std::max(
-				st::infoExteraSupporterBadge.height(),
-				_komaruStatusWidth));
+		_view->resize(skip + facesWidth, faceSize);
 		_view->paintRequest(
 		) | rpl::on_next([=, check = _view.data()]{
 			auto p = QPainter(check);
@@ -429,7 +425,8 @@ Badge::Content Badge::clickedContent() const {
 	if (!_view || (!faces && !status)) {
 		return result;
 	}
-	const auto faceWidth = st::infoExteraSupporterBadge.width();
+	const auto faceWidth = Data::FrameSizeFromTag(sizeTag())
+		/ style::DevicePixelRatio();
 	const auto skip = (result.badge == BadgeType::ExteraCustom)
 		? 0
 		: st::infoVerifiedCheckPosition.x();
