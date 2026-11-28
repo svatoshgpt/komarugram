@@ -1563,6 +1563,13 @@ void ProxiesBox::setupContent() {
 	) | rpl::on_next([=](ProxyData::Settings) {
 		wsRow->syncState();
 	}, wsRow->lifetime());
+	Core::App().proxyChanges(
+	) | rpl::on_next([=] {
+		if (!KomaruWsProxy::IsActive()) {
+			KomaruWsProxy::Disable();
+		}
+		wsRow->syncState();
+	}, wsRow->lifetime());
 
 	_wrap = inner->add(std::move(_initialWrap));
 	inner->add(object_ptr<Ui::FixedHeightWidget>(
@@ -2741,6 +2748,12 @@ object_ptr<Ui::BoxContent> ProxiesBoxController::create(
 	for (const auto &item : _list) {
 		updateView(item);
 	}
+	KomaruWsProxy::StateChanged(
+	) | rpl::on_next([=] {
+		for (const auto &item : _list) {
+			updateView(item);
+		}
+	}, result->lifetime());
 	return result;
 }
 
@@ -2824,6 +2837,9 @@ void ProxiesBoxController::applyItem(int id) {
 		return;
 	}
 
+	if (KomaruWsProxy::IsActive()) {
+		KomaruWsProxy::Disable();
+	}
 	auto j = findByProxy(_settings.selected());
 
 	Core::App().setCurrentProxy(
